@@ -93,6 +93,7 @@ export async function startRun(params: {
     : sampleQuestionIds(bankIds, quiz.questionsPerRun, Math.random)
   if (runIds.length === 0) throw new EmptyQuizError('that quiz has no questions to play')
 
+  // Null only when the question was deleted between the two reads above.
   const question = await loadPublicQuestion(executor, runIds[0])
   if (!question) throw new EmptyQuizError('that quiz has no questions to play')
 
@@ -266,5 +267,13 @@ async function loadCorrectOptionIds(executor: Executor, questionId: string): Pro
 // pg reports a unique violation as SQLSTATE 23505. The message text is not a
 // contract: it carries the constraint name and the server locale.
 function isUniqueViolation(error: unknown): boolean {
-  return error instanceof Error && 'code' in error && error.code === UNIQUE_VIOLATION
+  // Drizzle wraps query failures in DrizzleQueryError and hangs the real pg
+  // error off `cause`, so the code is never on the error we actually catch.
+  // Walk the chain rather than trusting the top-level object.
+  let current: unknown = error
+  while (current instanceof Error) {
+    if ('code' in current && current.code === UNIQUE_VIOLATION) return true
+    current = current.cause
+  }
+  return false
 }

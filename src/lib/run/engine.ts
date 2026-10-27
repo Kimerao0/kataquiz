@@ -12,6 +12,9 @@ export function sampleQuestionIds(ids: string[], n: number, rng: () => number): 
 export function gradeAnswer(correctOptionIds: string[], selectedOptionIds: string[]): boolean {
   const correct = new Set(correctOptionIds)
   const selected = new Set(selectedOptionIds)
+  // Validation rejects a question with no correct option, so this is latent
+  // rather than live — but without it two empty sets grade as correct.
+  if (correct.size === 0) return false
   if (correct.size !== selected.size) return false
   for (const id of selected) {
     if (!correct.has(id)) return false

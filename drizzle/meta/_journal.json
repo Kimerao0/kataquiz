@@ -15,6 +15,13 @@
       "when": 1793104279946,
       "tag": "0001_tearful_microchip",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1793106183371,
+      "tag": "0002_sleepy_naoko",
+      "breakpoints": true
     }
   ]
 }

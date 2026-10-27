@@ -1,7 +1,8 @@
-import { relations } from 'drizzle-orm'
+import { relations, sql } from 'drizzle-orm'
 import {
   type AnyPgColumn,
   boolean,
+  customType,
   index,
   integer,
   pgEnum,
@@ -81,23 +82,42 @@ export const verification = pgTable(
   (table) => [index().on(table.identifier)],
 )
 
-export const quizzes = pgTable('quizzes', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  slug: text('slug').notNull().unique(),
-  authorId: text('author_id')
-    .notNull()
-    .references(() => user.id, { onDelete: 'cascade' }),
-  title: text('title').notNull(),
-  description: text('description'),
-  language: text('language').notNull(),
-  tags: text('tags').array().notNull().default([]),
-  questionsPerRun: integer('questions_per_run').notNull(),
-  maxErrors: integer('max_errors').notNull(),
-  timePerQuestionSec: integer('time_per_question_sec'),
-  isHidden: boolean('is_hidden').notNull().default(false),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+// Drizzle ships no tsvector type, and the column is never written from the
+// application, so the SQL type is all it needs.
+const tsvector = customType<{ data: string }>({
+  dataType() {
+    return 'tsvector'
+  },
 })
+
+export const quizzes = pgTable(
+  'quizzes',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    slug: text('slug').notNull().unique(),
+    authorId: text('author_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    title: text('title').notNull(),
+    description: text('description'),
+    language: text('language').notNull(),
+    tags: text('tags').array().notNull().default([]),
+    questionsPerRun: integer('questions_per_run').notNull(),
+    maxErrors: integer('max_errors').notNull(),
+    timePerQuestionSec: integer('time_per_question_sec'),
+    isHidden: boolean('is_hidden').notNull().default(false),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+    // 'simple' and not 'english': quiz content is multilingual by design, and
+    // the English stemmer would mangle every other language. Postgres keeps the
+    // column in step with the two source columns on every write.
+    searchVector: tsvector('search_vector').generatedAlwaysAs(
+      sql`to_tsvector('simple', coalesce(title, '') || ' ' || coalesce(description, ''))`,
+    ),
+  },
+  // GIN on both: one makes the text search cheap, the other the tag filter.
+  (table) => [index().using('gin', table.searchVector), index().using('gin', table.tags)],
+)
 
 export const questions = pgTable(
   'questions',

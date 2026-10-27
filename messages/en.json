@@ -13,7 +13,32 @@
     "loading": "Loading\u2026",
     "error": "Something went wrong.",
     "retry": "Try again",
-    "cancel": "Cancel"
+    "cancel": "Cancel",
+    "questionCount": "{count, plural, =1 {# question} other {# questions}}"
+  },
+  "catalog": {
+    "title": "Browse quizzes",
+    "intro": "Search the public catalog, or narrow it down by tag.",
+    "searchLabel": "Search quizzes",
+    "searchPlaceholder": "Search by title or description",
+    "searchSubmit": "Search",
+    "tagsLabel": "Popular tags",
+    "paginationLabel": "Pagination",
+    "pageOf": "Page {page} of {pages}",
+    "previous": "Previous",
+    "next": "Next",
+    "noMatchTitle": "Nothing matches your search",
+    "noMatchBody": "Try fewer words, or a different tag.",
+    "noMatchCta": "Show every quiz",
+    "noQuizzesTitle": "No quizzes yet",
+    "noQuizzesBody": "The catalog is empty.",
+    "noQuizzesCta": "Upload the first one"
+  },
+  "quiz": {
+    "author": "By {name}",
+    "runSettings": "{questions, plural, =1 {# question} other {# questions}}, {errors, plural, =0 {no mistakes allowed} =1 {up to # mistake} other {up to # mistakes}}, {seconds}s each",
+    "runSettingsUntimed": "{questions, plural, =1 {# question} other {# questions}}, {errors, plural, =0 {no mistakes allowed} =1 {up to # mistake} other {up to # mistakes}}, no time limit",
+    "start": "Start"
   },
   "upload": {
     "title": "Upload a quiz",
