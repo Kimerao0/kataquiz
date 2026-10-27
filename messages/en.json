@@ -10,9 +10,26 @@
     "signOut": "Sign out"
   },
   "common": {
-    "loading": "Loading…",
+    "loading": "Loading\u2026",
     "error": "Something went wrong.",
     "retry": "Try again",
     "cancel": "Cancel"
+  },
+  "upload": {
+    "title": "Upload a quiz",
+    "intro": "Upload a YAML or JSON question bank, or paste one below.",
+    "fileLabel": "Quiz file",
+    "textLabel": "Or paste the file contents",
+    "textPlaceholder": "Paste your YAML or JSON quiz here",
+    "submit": "Upload quiz",
+    "submitting": "Uploading\u2026",
+    "errorsTitle": "This file was not accepted",
+    "signInTitle": "Sign in to upload",
+    "signInCta": "Sign in",
+    "errors": {
+      "unauthorized": "You must be signed in to upload a quiz.",
+      "tooLarge": "The file is larger than 1 MB.",
+      "empty": "Choose a file or paste a quiz first."
+    }
   }
 }
