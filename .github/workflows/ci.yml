@@ -8,6 +8,26 @@ on:
 jobs:
   check:
     runs-on: ubuntu-latest
+
+    # The suite runs against a real Postgres, never a mock, so CI provides one.
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: grindstone
+          POSTGRES_PASSWORD: grindstone
+          POSTGRES_DB: grindstone_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U grindstone -d grindstone_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgres://grindstone:grindstone@localhost:5432/grindstone_test
+
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
