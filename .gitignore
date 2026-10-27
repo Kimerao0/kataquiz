@@ -43,3 +43,6 @@ next-env.d.ts
 # keep the documented env surface in the repo
 !.env.example
 !.env.test
+
+# build output
+/.next

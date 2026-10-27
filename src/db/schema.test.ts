@@ -1,13 +1,19 @@
 import { eq } from 'drizzle-orm'
 import { type TestTx, withTestDb } from '@/test/db'
-import { attemptAnswers, attempts, options, questions, quizzes, rateLimits } from './schema'
+import { attemptAnswers, attempts, options, questions, quizzes, rateLimits, user } from './schema'
 
-async function insertQuiz(tx: TestTx, slug = `quiz-${crypto.randomUUID()}`) {
+async function insertUser(tx: TestTx) {
+  const id = `user-${crypto.randomUUID()}`
+  await tx.insert(user).values({ id, name: 'Author', email: `${id}@example.com` })
+  return id
+}
+
+async function insertQuiz(tx: TestTx, slug = `quiz-${crypto.randomUUID()}`, authorId?: string) {
   const [quiz] = await tx
     .insert(quizzes)
     .values({
       slug,
-      authorId: 'author-1',
+      authorId: authorId ?? (await insertUser(tx)),
       title: 'Italian Driving Licence - Road Signs',
       language: 'it',
       questionsPerRun: 2,
@@ -77,10 +83,47 @@ describe('schema', () => {
     })
   })
 
+  it('deleting a user deletes the quizzes they authored', async () => {
+    await withTestDb(async (tx) => {
+      const authorId = await insertUser(tx)
+      const quizId = await insertQuiz(tx, undefined, authorId)
+
+      await tx.delete(user).where(eq(user.id, authorId))
+
+      const leftQuizzes = await tx.select().from(quizzes).where(eq(quizzes.id, quizId))
+      expect(leftQuizzes).toHaveLength(0)
+    })
+  })
+
+  it('deleting a user leaves their attempts in place with a null userId', async () => {
+    await withTestDb(async (tx) => {
+      // The quiz is somebody else's on purpose: deleting its author would take
+      // the attempt with it through the quiz cascade and prove nothing.
+      const quizId = await insertQuiz(tx, undefined, await insertUser(tx))
+      const playerId = await insertUser(tx)
+      const [attempt] = await tx
+        .insert(attempts)
+        .values({ quizId, userId: playerId, questionIds: [], score: 7 })
+        .returning({ id: attempts.id })
+
+      await tx.delete(user).where(eq(user.id, playerId))
+
+      const [row] = await tx.select().from(attempts).where(eq(attempts.id, attempt.id))
+      expect(row.userId).toBeNull()
+      expect(row.score).toBe(7)
+    })
+  })
+
   it('rejects two quizzes with the same slug', async () => {
     await withTestDb(async (tx) => {
       await insertQuiz(tx, 'duplicate-slug')
       await expect(insertQuiz(tx, 'duplicate-slug')).rejects.toThrow()
+    })
+  })
+
+  it('rejects a quiz whose authorId is not a real user', async () => {
+    await withTestDb(async (tx) => {
+      await expect(insertQuiz(tx, undefined, 'ghost-user')).rejects.toThrow()
     })
   })
 

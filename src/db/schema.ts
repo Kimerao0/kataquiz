@@ -2,6 +2,7 @@ import { relations } from 'drizzle-orm'
 import {
   type AnyPgColumn,
   boolean,
+  index,
   integer,
   pgEnum,
   pgTable,
@@ -14,12 +15,78 @@ import {
 // Mirrors QuestionType in src/lib/quiz-schema: the two lists must stay in sync.
 export const questionType = pgEnum('question_type', ['single', 'multi', 'boolean'])
 
+// The next four tables have the shape Better Auth dictates, down to the string
+// ids it generates. Their export names are load-bearing: the Drizzle adapter
+// looks each model up by name, so a plural or renamed export does not break the
+// build, it breaks the first sign-in.
+export const user = pgTable('user', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull(),
+  email: text('email').notNull().unique(),
+  emailVerified: boolean('email_verified').notNull().default(false),
+  image: text('image'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+})
+
+export const session = pgTable(
+  'session',
+  {
+    id: text('id').primaryKey(),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    token: text('token').notNull().unique(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+    ipAddress: text('ip_address'),
+    userAgent: text('user_agent'),
+    userId: text('user_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+  },
+  (table) => [index().on(table.userId)],
+)
+
+export const account = pgTable(
+  'account',
+  {
+    id: text('id').primaryKey(),
+    accountId: text('account_id').notNull(),
+    providerId: text('provider_id').notNull(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    accessToken: text('access_token'),
+    refreshToken: text('refresh_token'),
+    idToken: text('id_token'),
+    accessTokenExpiresAt: timestamp('access_token_expires_at', { withTimezone: true }),
+    refreshTokenExpiresAt: timestamp('refresh_token_expires_at', { withTimezone: true }),
+    scope: text('scope'),
+    password: text('password'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index().on(table.userId)],
+)
+
+export const verification = pgTable(
+  'verification',
+  {
+    id: text('id').primaryKey(),
+    identifier: text('identifier').notNull(),
+    value: text('value').notNull(),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index().on(table.identifier)],
+)
+
 export const quizzes = pgTable('quizzes', {
   id: uuid('id').primaryKey().defaultRandom(),
   slug: text('slug').notNull().unique(),
-  // Plain text, no foreign key: Better Auth creates the `user` table in a later
-  // task, and that task's migration adds the constraint.
-  authorId: text('author_id').notNull(),
+  authorId: text('author_id')
+    .notNull()
+    .references(() => user.id, { onDelete: 'cascade' }),
   title: text('title').notNull(),
   description: text('description'),
   language: text('language').notNull(),
@@ -68,9 +135,9 @@ export const attempts = pgTable('attempts', {
   quizId: uuid('quiz_id')
     .notNull()
     .references(() => quizzes.id, { onDelete: 'cascade' }),
-  // Plain text, no foreign key: Better Auth creates the `user` table in a later
-  // task, and that task's migration adds the constraint.
-  userId: text('user_id'),
+  // Set null where quizzes cascade: deleting an account anonymises its past
+  // attempts rather than destroying the scores other players were compared to.
+  userId: text('user_id').references(() => user.id, { onDelete: 'set null' }),
   guestId: text('guest_id'),
   nickname: text('nickname'),
   questionIds: uuid('question_ids').array().notNull(),
@@ -109,7 +176,12 @@ export const rateLimits = pgTable('rate_limits', {
   count: integer('count').notNull(),
 })
 
-export const quizzesRelations = relations(quizzes, ({ many }) => ({
+export const userRelations = relations(user, ({ many }) => ({
+  quizzes: many(quizzes),
+}))
+
+export const quizzesRelations = relations(quizzes, ({ one, many }) => ({
+  author: one(user, { fields: [quizzes.authorId], references: [user.id] }),
   questions: many(questions),
 }))
 
@@ -134,6 +206,8 @@ export const attemptAnswersRelations = relations(attemptAnswers, ({ one }) => ({
   question: one(questions, { fields: [attemptAnswers.questionId], references: [questions.id] }),
 }))
 
+export type User = typeof user.$inferSelect
+export type NewUser = typeof user.$inferInsert
 export type Quiz = typeof quizzes.$inferSelect
 export type NewQuiz = typeof quizzes.$inferInsert
 export type Question = typeof questions.$inferSelect
