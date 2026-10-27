@@ -7,7 +7,7 @@
   },
   "files": {
     "ignoreUnknown": true,
-    "includes": ["**", "!drizzle", "!.next"]
+    "includes": ["**", "!drizzle", "!.next", "!src/components/ui", "!pnpm-lock.yaml"]
   },
   "formatter": {
     "enabled": true,
