@@ -6,7 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "check": "biome check . && tsc --noEmit && vitest run",
+    "check": "biome check . && tsc --noEmit && vitest run && pnpm check:portability",
     "test": "vitest",
     "lint": "biome check .",
     "format": "biome check --write .",
@@ -14,7 +14,8 @@
     "db:down": "docker compose down",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
-    "db:studio": "drizzle-kit studio"
+    "db:studio": "drizzle-kit studio",
+    "check:portability": "./scripts/check-portability.sh"
   },
   "dependencies": {
     "@base-ui/react": "^1.9.0",
