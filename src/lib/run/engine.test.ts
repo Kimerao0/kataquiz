@@ -1,4 +1,11 @@
-import { gradeAnswer, hasPassed, isTimedOut, sampleQuestionIds, TIMER_GRACE_MS } from './engine'
+import {
+  gradeAnswer,
+  hasPassed,
+  isTimedOut,
+  sampleQuestionIds,
+  seededOrder,
+  TIMER_GRACE_MS,
+} from './engine'
 
 function mulberry32(seed: number): () => number {
   let a = seed
@@ -60,6 +67,59 @@ describe('sampleQuestionIds', () => {
     const a = sampleQuestionIds(ids, 20, mulberry32(1))
     const b = sampleQuestionIds(ids, 20, mulberry32(999))
     expect(a).not.toEqual(b)
+  })
+})
+
+describe('seededOrder', () => {
+  it('returns the same order for the same seed', () => {
+    const items = range(12)
+    expect(seededOrder(items, 'attempt-1:question-1')).toEqual(
+      seededOrder(items, 'attempt-1:question-1'),
+    )
+  })
+
+  it('returns a different order for a different seed', () => {
+    // Twelve items: 479 million orders, so two seeds colliding is not the
+    // explanation for a green run here.
+    const items = range(12)
+    expect(seededOrder(items, 'attempt-1:question-1')).not.toEqual(
+      seededOrder(items, 'attempt-2:question-1'),
+    )
+  })
+
+  it('spreads single-character seed changes across many orders', () => {
+    const items = range(8)
+    const orders = new Set(
+      Array.from({ length: 20 }, (_, i) => seededOrder(items, `attempt-${i}`).join(',')),
+    )
+    expect(orders.size).toBeGreaterThan(15)
+  })
+
+  it('contains exactly the input items', () => {
+    const items = range(12)
+    const result = seededOrder(items, 'seed')
+    expect(result).toHaveLength(items.length)
+    expect([...result].sort()).toEqual([...items].sort())
+  })
+
+  it('does not mutate the input', () => {
+    const items = range(12)
+    const snapshot = [...items]
+    seededOrder(items, 'seed')
+    expect(items).toEqual(snapshot)
+  })
+
+  it('handles an empty list', () => {
+    expect(seededOrder([], 'seed')).toEqual([])
+  })
+
+  it('handles a single item', () => {
+    expect(seededOrder(['only'], 'seed')).toEqual(['only'])
+  })
+
+  it('handles an empty seed', () => {
+    const items = range(5)
+    expect([...seededOrder(items, '')].sort()).toEqual([...items].sort())
   })
 })
 

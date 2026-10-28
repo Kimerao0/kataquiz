@@ -11,9 +11,9 @@ questions:
     prompt: How many semitones are in a perfect fifth?
     explanation: A perfect fifth spans seven semitones, for example C up to G. It is the most consonant interval after the octave, which is why it anchors so much harmony.
     options:
+      - { text: "8", correct: false }
       - { text: "7", correct: true }
       - { text: "5", correct: false }
-      - { text: "8", correct: false }
       - { text: "12", correct: false }
   - type: boolean
     prompt: A major scale has the same pattern of tones and semitones in every key.
@@ -23,18 +23,18 @@ questions:
     prompt: Which of these are in the key of G major?
     explanation: "G major has one sharp, F#. So F# belongs and F natural does not. C and D are both natural in G major."
     options:
-      - { text: "F#", correct: true }
-      - { text: "C", correct: true }
       - { text: "D", correct: true }
       - { text: "Bb", correct: false }
+      - { text: "F#", correct: true }
+      - { text: "C", correct: true }
   - type: single
     prompt: What is the relative minor of C major?
     explanation: The relative minor sits a minor third below the major, sharing the same key signature. For C major, with no sharps or flats, that is A minor.
     options:
-      - { text: A minor, correct: true }
       - { text: E minor, correct: false }
-      - { text: G minor, correct: false }
       - { text: F minor, correct: false }
+      - { text: G minor, correct: false }
+      - { text: A minor, correct: true }
   - type: boolean
     prompt: An interval of twelve semitones is called an octave.
     answer: true
@@ -43,7 +43,7 @@ questions:
     prompt: How many sharps are in the key of D major?
     explanation: "D major has two sharps, F# and C#. The order sharps are added is always F C G D A E B."
     options:
-      - { text: "2", correct: true }
-      - { text: "1", correct: false }
-      - { text: "3", correct: false }
       - { text: "0", correct: false }
+      - { text: "2", correct: true }
+      - { text: "3", correct: false }
+      - { text: "1", correct: false }

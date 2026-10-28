@@ -31,15 +31,15 @@ questions:
     explanation: Triangular signs warn of danger ahead. # optional
     theoryUrl: https://example.com/theory#signs # optional
     options:
-      - { text: Warning, correct: true }
       - { text: Prohibition, correct: false }
+      - { text: Warning, correct: true }
       - { text: Obligation, correct: false }
   - type: multi
     prompt: Which of these are mandatory when overtaking?
     options:
+      - { text: Sound the horn, correct: false }
       - { text: Check the road ahead is clear, correct: true }
       - { text: Signal your intention, correct: true }
-      - { text: Sound the horn, correct: false }
   - type: boolean
     prompt: You may park on a pedestrian crossing.
     answer: false
@@ -72,6 +72,7 @@ The source of truth is [`src/lib/quiz-schema/index.ts`](src/lib/quiz-schema/inde
 ## Run rules
 
 - A run samples `questionsPerRun` distinct questions at random from the bank, so every run differs.
+- Option order is shuffled per run, so you cannot learn the position instead of the rule. Write your options in whatever order reads best; do not write options that depend on their position ("all of the above").
 - Feedback is immediate and per question: right or wrong, plus the explanation and theory link.
 - If `timePerQuestionSec` is set, the timer stops the moment you answer. Reading the explanation is untimed.
 - A timeout counts as wrong, and the explanation is still shown.
@@ -96,6 +97,8 @@ The container from `compose.yaml` uses user, password and database `kataquiz` on
 ```bash
 DATABASE_URL=postgres://kataquiz:kataquiz@localhost:5432/kataquiz
 ```
+
+`pnpm db:seed` imports the quizzes in `seeds/`, so a fresh database opens with something to play instead of an empty catalog. It is idempotent: a quiz it has already imported is skipped, so running it twice leaves exactly one copy of each. Those files double as worked examples of the file format.
 
 `pnpm db:down` stops the container. Other scripts: `pnpm db:generate` (create a migration from schema changes), `pnpm db:studio`, `pnpm format`.
 

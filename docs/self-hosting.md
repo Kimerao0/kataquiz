@@ -44,6 +44,8 @@ pnpm start
 
 `pnpm db:migrate` applies the SQL files in `./drizzle`. Use the same `DATABASE_URL` for it as for the running app. An exported `DATABASE_URL` takes precedence over `.env.local`. Run it again after every upgrade that adds a migration.
 
+`pnpm db:seed` then imports the quizzes in `seeds/`, so a fresh instance has something to play rather than an empty catalog. It is idempotent, it reads `DATABASE_URL` the same way, and it needs dev dependencies installed. The quizzes it imports are attributed to a built-in seed account at `seed.invalid`, a reserved domain that cannot receive mail, so they never look like one of your users' uploads.
+
 ## OAuth apps
 
 Sign-in is GitHub and Google OAuth only; there is no email or password login. Without at least one provider configured the app runs but nobody can sign in. Replace `{BETTER_AUTH_URL}` with the value you set.

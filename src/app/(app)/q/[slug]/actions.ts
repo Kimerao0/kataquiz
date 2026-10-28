@@ -15,6 +15,7 @@ import {
   startRun,
   submitAnswer,
 } from '@/lib/run/service'
+import { isUuid } from '@/lib/uuid'
 
 export type StartRunResult =
   | { ok: true; run: RunStart }
@@ -60,6 +61,21 @@ export async function submitAnswerAction(input: {
   elapsedMs: number
 }): Promise<SubmitResult> {
   const player = await resolvePlayer()
+
+  // All three ids travel in the payload of a public Server Action and all three
+  // reach a uuid column, and Postgres answers a malformed uuid with a query
+  // error rather than no rows. Drizzle wraps it in a DrizzleQueryError, which
+  // matches none of the arms below and is rethrown — so without this the
+  // browser gets an opaque 500 for what is only a bad request.
+  if (!isUuid(input.attemptId)) return { ok: false, error: 'notFound' }
+  if (!isUuid(input.questionId)) return { ok: false, error: 'notFound' }
+  // selectedOptionIds is compared against a uuid[] column, so one bad element
+  // is enough. Array-ness is checked too: the declared type is an assertion
+  // about what the browser should send, not a guarantee that it did, and
+  // calling .every on a string would be the same 500 by another route.
+  if (!Array.isArray(input.selectedOptionIds) || !input.selectedOptionIds.every(isUuid)) {
+    return { ok: false, error: 'notFound' }
+  }
 
   try {
     // Field by field, never a spread of `input`: the payload is whatever the

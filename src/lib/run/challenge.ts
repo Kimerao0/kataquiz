@@ -4,6 +4,7 @@ import type { PgDatabase } from 'drizzle-orm/pg-core'
 import { type Db, db } from '@/db/client'
 import { attempts, questions, quizzes, user } from '@/db/schema'
 import { hasPassed } from './engine'
+import { isAttemptPlayedBy } from './identity'
 import { type Player, type RunStart, type RunSummary, startRun } from './service'
 
 export type ChallengeInvite = {
@@ -72,15 +73,27 @@ export async function startChallengeRun(params: {
 
 export async function getChallengeComparison(
   myAttemptId: string,
+  player: Player,
   executor: Executor = db,
 ): Promise<{ mine: RunSummary; theirs: RunSummary } | null> {
+  // The first half of the spoiler guard, and it lives here rather than in the
+  // caller: /c/<attemptId> is a public link, so a visitor handed a link to a run
+  // that was itself a challenge could otherwise read both scores without
+  // answering a question. Asked of the derived player, never of the attempt id
+  // in the payload — that says which run this is, never who is playing it.
+  //
+  // A caller who is not playing this run gets the same `null` as a caller whose
+  // own run is still unfinished: refusing more loudly would itself confirm that
+  // the attempt exists and answers a challenge.
+  if (!(await isAttemptPlayedBy(myAttemptId, player, executor))) return null
+
   const mine = await loadScore(executor, myAttemptId)
   if (!mine?.challengeOfAttemptId) {
     throw new NotAChallengeError('that attempt does not answer a challenge')
   }
 
-  // The spoiler guard: what keeps the opponent's score hidden is this run's
-  // stored finishedAt, never anything the caller hands in.
+  // The second half: what keeps the opponent's score hidden until the end is
+  // this run's stored finishedAt, never anything the caller hands in.
   if (!mine.finishedAt) return null
 
   const theirs = await loadScore(executor, mine.challengeOfAttemptId)

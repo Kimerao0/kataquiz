@@ -4,6 +4,7 @@ import { getTranslations } from 'next-intl/server'
 import { Suspense } from 'react'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { getCurrentUser } from '@/lib/session'
+import { FormatHelp } from './format-help'
 import { UploadForm } from './upload-form'
 
 export default function UploadPage() {
@@ -16,6 +17,10 @@ export default function UploadPage() {
         <h1 className="font-bold text-3xl">{t('title')}</h1>
         <p className="opacity-70">{t('intro')}</p>
       </div>
+      {/* Above the session boundary on purpose: the format does not depend on
+          who is asking, so it is part of the static shell and is there for a
+          signed-out visitor too. */}
+      <FormatHelp />
       {/* The session is read per request, so it cannot be part of the static shell. */}
       <Suspense fallback={<p className="opacity-70">{tCommon('loading')}</p>}>
         <UploadSection />

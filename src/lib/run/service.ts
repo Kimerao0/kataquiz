@@ -3,7 +3,7 @@ import type { NodePgQueryResultHKT } from 'drizzle-orm/node-postgres'
 import type { PgDatabase } from 'drizzle-orm/pg-core'
 import { type Db, db } from '@/db/client'
 import { attemptAnswers, attempts, options, questions, quizzes } from '@/db/schema'
-import { gradeAnswer, hasPassed, isTimedOut, sampleQuestionIds } from './engine'
+import { gradeAnswer, hasPassed, isTimedOut, sampleQuestionIds, seededOrder } from './engine'
 
 export type Player =
   | { kind: 'user'; userId: string }
@@ -105,7 +105,9 @@ export async function startRun(params: {
 
   return {
     attemptId: attempt.id,
-    question,
+    // Shuffled only once the attempt exists: the id it is seeded on is minted
+    // by the insert above.
+    question: withSeededOptionOrder(question, attempt.id),
     total: runIds.length,
     timePerQuestionSec: quiz.timePerQuestionSec,
   }
@@ -180,21 +182,27 @@ export async function submitAnswer(params: {
       .from(attemptAnswers)
       .where(eq(attemptAnswers.attemptId, attemptId))
     const answeredIds = new Set(answered.map((row) => row.questionId))
-    const nextId = attempt.questionIds.find((id) => !answeredIds.has(id)) ?? null
+    const remainingIds = attempt.questionIds.filter((id) => !answeredIds.has(id))
+
+    // Resolved before the update, because whether this answer finishes the run
+    // is exactly "is there a question left that still exists". Taking the first
+    // unanswered id on trust and discovering afterwards that it was deleted
+    // would leave finishedAt unset with nothing to serve.
+    const next = await loadNextSurvivingQuestion(tx, remainingIds)
 
     // Counted in SQL: reading the totals into JS and writing them back loses
     // one of two answers that are in flight at the same time.
     const progress = correct
       ? { score: sql`${attempts.score} + 1` }
       : { errors: sql`${attempts.errors} + 1` }
-    const finish = nextId === null ? { finishedAt: sql`now()` } : {}
+    const finish = next === null ? { finishedAt: sql`now()` } : {}
     const [totals] = await tx
       .update(attempts)
       .set({ ...progress, ...finish })
       .where(eq(attempts.id, attemptId))
       .returning({ score: attempts.score, errors: attempts.errors })
 
-    if (nextId === null) {
+    if (next === null) {
       return {
         ...graded,
         next: null,
@@ -208,7 +216,9 @@ export async function submitAnswer(params: {
       }
     }
 
-    return { ...graded, next: await loadPublicQuestion(tx, nextId), summary: null }
+    // next and summary are never both null: that pair is a run the player
+    // cannot advance and the server will never mark finished.
+    return { ...graded, next: withSeededOptionOrder(next, attemptId), summary: null }
   })
 }
 
@@ -241,7 +251,9 @@ async function loadPublicQuestion(
   if (!question) return null
 
   // Projected column by column, never a spread of the option row: selecting the
-  // row would carry isCorrect to a player who has not answered yet.
+  // row would carry isCorrect to a player who has not answered yet. Stored
+  // position only fixes a deterministic base order; what the player sees is the
+  // seeded permutation of it applied by the callers.
   const publicOptions = await executor
     .select({ id: options.id, text: options.text })
     .from(options)
@@ -255,6 +267,47 @@ async function loadPublicQuestion(
     imageUrl: question.imageUrl,
     options: publicOptions,
   }
+}
+
+// The ids an attempt stores are a snapshot taken when the run started, and a
+// quiz is edited in place: by the time the player gets there a question may be
+// gone. Serving `null` for it would hand the browser a run with no next
+// question and no summary — the Next button does nothing and finishedAt is
+// never set, so the run also never produces a challenge link. So walk the
+// remaining ids in order and answer with the first that still exists. `null`
+// here means the run is over, which the caller turns into a summary; it never
+// means the run is stuck.
+//
+// Loaded one at a time rather than filtered with a single `inArray` on purpose:
+// a row can be deleted between that filter and the read that follows it, and
+// then the gap is back. This asks the only question that matters — did it
+// load — and is one round trip in the ordinary case where nothing was deleted.
+async function loadNextSurvivingQuestion(
+  executor: Executor,
+  remainingIds: string[],
+): Promise<PublicQuestion | null> {
+  for (const id of remainingIds) {
+    const question = await loadPublicQuestion(executor, id)
+    if (question) return question
+  }
+  return null
+}
+
+// Authors overwhelmingly write the right answer first, so stored position is a
+// tell: played unshuffled, a drill teaches "pick the first one" instead of the
+// rule. The order is derived from the attempt and the question together, so it
+// is stable for every read inside one attempt, differs between two attempts on
+// the same question — including a challenger replaying the same set — and costs
+// neither a column nor a round trip. Grading compares option ids, never
+// positions, so nothing here can move a score.
+function withSeededOptionOrder(question: PublicQuestion, attemptId: string): PublicQuestion {
+  // True/False keeps its conventional reading order. Shuffling is there to stop
+  // a player learning the position instead of the rule, and with two options a
+  // player reads both anyway — so the leak it would close is negligible, while
+  // showing "False, True" is a jarring read for no gain.
+  if (question.type === 'boolean') return question
+
+  return { ...question, options: seededOrder(question.options, `${attemptId}:${question.id}`) }
 }
 
 async function loadCorrectOptionIds(executor: Executor, questionId: string): Promise<string[]> {

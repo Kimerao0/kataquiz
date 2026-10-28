@@ -17,8 +17,18 @@ type QuestionCardProps = {
   onSelect: (optionIds: string[]) => void
   /** Called when the player commits an answer: a click for single, Confirm for multi. */
   onCommit: (optionIds: string[]) => void
-  /** True while a submission is in flight and once the question has been answered. */
+  /**
+   * True whenever option input must be ignored: a submission is in flight, the
+   * question has been answered, or it has only just appeared and a click left
+   * over from the previous one could still land.
+   */
   locked: boolean
+  /**
+   * True only while an answer is actually in flight. Separate from `locked`
+   * because it is what the Confirm button says, and a button that claims to be
+   * checking when nothing has been sent is a lie.
+   */
+  submitting: boolean
   /** Null until the server has graded this question; the client never derives it. */
   correctOptionIds: string[] | null
 }
@@ -29,6 +39,7 @@ export function QuestionCard({
   onSelect,
   onCommit,
   locked,
+  submitting,
   correctOptionIds,
 }: QuestionCardProps) {
   const t = useTranslations('run')
@@ -59,6 +70,7 @@ export function QuestionCard({
           onSelect={onSelect}
           onCommit={onCommit}
           locked={locked}
+          submitting={submitting}
           correctOptionIds={correctOptionIds}
         />
       ) : (
@@ -69,6 +81,7 @@ export function QuestionCard({
           onSelect={onSelect}
           onCommit={onCommit}
           locked={locked}
+          submitting={submitting}
           correctOptionIds={correctOptionIds}
         />
       )}
@@ -120,6 +133,7 @@ function MultiOptions({
   onSelect,
   onCommit,
   locked,
+  submitting,
   correctOptionIds,
 }: QuestionCardProps & { promptId: string }) {
   const t = useTranslations('run')
@@ -153,7 +167,7 @@ function MultiOptions({
       </fieldset>
       {correctOptionIds === null && (
         <Button type="button" size="lg" disabled={locked} onClick={() => onCommit(selected)}>
-          {locked ? t('checking') : t('confirm')}
+          {submitting ? t('checking') : t('confirm')}
         </Button>
       )}
     </div>

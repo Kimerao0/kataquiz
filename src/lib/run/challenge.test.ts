@@ -440,17 +440,17 @@ describe('getChallengeComparison', () => {
       })
 
       const first = await answer(tx, seed, challenger, run.attemptId, run.question.id)
-      expect(await getChallengeComparison(run.attemptId, tx)).toBeNull()
+      expect(await getChallengeComparison(run.attemptId, challenger, tx)).toBeNull()
 
       if (!first.next) throw new Error('expected a second question')
       const second = await answer(tx, seed, challenger, run.attemptId, first.next.id)
-      expect(await getChallengeComparison(run.attemptId, tx)).toBeNull()
+      expect(await getChallengeComparison(run.attemptId, challenger, tx)).toBeNull()
 
       // Nothing changed between the two calls below but the last answer, which
       // is what sets finishedAt and so what reveals the opponent.
       if (!second.next) throw new Error('expected a third question')
       await answer(tx, seed, challenger, run.attemptId, second.next.id)
-      expect(await getChallengeComparison(run.attemptId, tx)).not.toBeNull()
+      expect(await getChallengeComparison(run.attemptId, challenger, tx)).not.toBeNull()
     })
   })
 
@@ -466,7 +466,7 @@ describe('getChallengeComparison', () => {
       })
       await playToEnd(tx, seed, challenger, run)
 
-      const comparison = await getChallengeComparison(run.attemptId, tx)
+      const comparison = await getChallengeComparison(run.attemptId, challenger, tx)
 
       expect(comparison).toEqual({
         mine: { attemptId: run.attemptId, score: 3, errors: 0, total: 3, passed: true },
@@ -490,7 +490,7 @@ describe('getChallengeComparison', () => {
       })
       await playToEnd(tx, seed, challenger, run)
 
-      const comparison = await getChallengeComparison(run.attemptId, tx)
+      const comparison = await getChallengeComparison(run.attemptId, challenger, tx)
 
       expect(comparison?.mine.total).toBe(3)
       expect(comparison?.theirs.total).toBe(4)
@@ -502,8 +502,61 @@ describe('getChallengeComparison', () => {
       const seed = await seedQuiz(tx, { questionCount: 2 })
       const attemptId = await finishedRun(tx, seed, seed.player)
 
-      const comparison = getChallengeComparison(attemptId, tx)
+      const comparison = getChallengeComparison(attemptId, seed.player, tx)
       await expect(comparison).rejects.toThrow(NotAChallengeError)
+    })
+  })
+
+  it('returns null for a player who is not playing that attempt', async () => {
+    await withTestDb(async (tx) => {
+      const seed = await seedQuiz(tx, { questionCount: 2 })
+      const challenger = await seedChallenger(tx)
+      const theirAttemptId = await finishedRun(tx, seed, seed.player)
+      const run = await startChallengeRun({
+        attemptId: theirAttemptId,
+        player: challenger,
+        executor: tx,
+      })
+      await playToEnd(tx, seed, challenger, run)
+
+      // A run that is finished, is a challenge, and has both scores sitting in
+      // the database: everything the function needs to answer, withheld only
+      // because this player is not the one who played it.
+      const stranger: Player = { kind: 'user', userId: await seedUser(tx, 'Stranger') }
+      expect(await getChallengeComparison(run.attemptId, stranger, tx)).toBeNull()
+
+      const guest: Player = { kind: 'guest', guestId: crypto.randomUUID(), nickname: 'Mallory' }
+      expect(await getChallengeComparison(run.attemptId, guest, tx)).toBeNull()
+
+      // The author of the challenged run is not the challenger either: owning
+      // the attempt this one answers is not owning this one.
+      expect(await getChallengeComparison(run.attemptId, seed.player, tx)).toBeNull()
+
+      // Not null because there is nothing to compare: the owner gets it.
+      expect(await getChallengeComparison(run.attemptId, challenger, tx)).not.toBeNull()
+    })
+  })
+
+  it('refuses a non-owner without telling them the attempt is even a challenge', async () => {
+    await withTestDb(async (tx) => {
+      const seed = await seedQuiz(tx, { questionCount: 2 })
+      const challenger = await seedChallenger(tx)
+      const theirAttemptId = await finishedRun(tx, seed, seed.player)
+      const run = await startChallengeRun({
+        attemptId: theirAttemptId,
+        player: challenger,
+        executor: tx,
+      })
+      await playToEnd(tx, seed, challenger, run)
+
+      const stranger: Player = { kind: 'user', userId: await seedUser(tx, 'Stranger') }
+
+      // NotAChallengeError distinguishes an ordinary run from one that answers
+      // a challenge, so a non-owner has to get the same `null` for both rather
+      // than a throw for one of them.
+      expect(await getChallengeComparison(run.attemptId, stranger, tx)).toBeNull()
+      expect(await getChallengeComparison(theirAttemptId, stranger, tx)).toBeNull()
+      expect(await getChallengeComparison(crypto.randomUUID(), stranger, tx)).toBeNull()
     })
   })
 })

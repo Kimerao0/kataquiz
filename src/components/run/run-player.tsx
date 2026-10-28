@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useTranslations } from 'next-intl'
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { type SubmitResult, submitAnswerAction } from '@/app/(app)/q/[slug]/actions'
 import { fetchChallengeComparisonAction } from '@/app/c/[attemptId]/actions'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
@@ -21,6 +21,15 @@ type SubmitErrorCode = Extract<SubmitResult, { ok: false }>['error']
 type Failure = { retryable: true } | { retryable: false; code: SubmitErrorCode }
 
 type Attempt = { optionIds: string[]; elapsedMs: number }
+
+/**
+ * How long option input is ignored after the run moves to the next question.
+ * The Next button sits where an option is about to be, so the second click of a
+ * double click — or a fast second tap — would otherwise answer a question the
+ * player has not read yet. Long enough to swallow that, short enough that a
+ * player who is actually reading never meets it.
+ */
+export const ADVANCE_LOCK_MS = 300
 
 type RunPlayerProps = {
   run: RunStart
@@ -51,6 +60,16 @@ export function RunPlayer({ run, quizSlug, challenge }: RunPlayerProps) {
   // Once the clock has run out for a question it stays out, so a failed
   // auto-submit cannot restart the timer and fire itself again.
   const [expired, setExpired] = useState(false)
+  // Set when the run advances and cleared by the timer below, which is the one
+  // way out of it: a player who waits is never blocked, and unmounting during
+  // the wait cannot leave a lock behind.
+  const [advanceLock, setAdvanceLock] = useState(false)
+
+  useEffect(() => {
+    if (!advanceLock) return
+    const timer = setTimeout(() => setAdvanceLock(false), ADVANCE_LOCK_MS)
+    return () => clearTimeout(timer)
+  }, [advanceLock])
 
   // Captured on the first try and replayed verbatim: recomputing the elapsed
   // time on a retry would charge the player for our own failed round trip, and
@@ -113,6 +132,11 @@ export function RunPlayer({ run, quizSlug, challenge }: RunPlayerProps) {
   }
 
   function commit(optionIds: string[]) {
+    // The guard behind the disabled options, for the same reason the in-flight
+    // one exists: a click that slips past the styling still must not answer a
+    // question the player has not read. The timeout path below deliberately
+    // skips it — the clock is not input.
+    if (advanceLock) return
     void submit({ optionIds, elapsedMs: Date.now() - startedAt })
   }
 
@@ -138,6 +162,11 @@ export function RunPlayer({ run, quizSlug, challenge }: RunPlayerProps) {
     setFailure(null)
     setExpired(false)
     setStartedAt(Date.now())
+    // The feedback panel this click landed in is about to vanish and the
+    // options are about to take its place on screen; a second click of the
+    // same gesture would answer the new question. Not the Next button itself:
+    // it is leaving anyway, and locking it would strand a stuck run.
+    setAdvanceLock(true)
   }
 
   if (summary !== null) {
@@ -172,7 +201,8 @@ export function RunPlayer({ run, quizSlug, challenge }: RunPlayerProps) {
         selected={selected}
         onSelect={setSelected}
         onCommit={commit}
-        locked={pending || answered}
+        locked={pending || answered || advanceLock}
+        submitting={pending}
         correctOptionIds={correctOptionIds}
       />
 

@@ -54,6 +54,13 @@ vi.mock('@/lib/run/service', async (importOriginal) => ({
 
 const user = { id: 'user-1', name: 'Ada Lovelace', image: null }
 
+// Attempt, question and option ids are uuids in the database, and
+// submitAnswerAction checks their shape before the service call, so the
+// fixtures have to be real ones.
+const attemptId = '11111111-1111-4111-8111-111111111111'
+const questionId = '22222222-2222-4222-8222-222222222222'
+const optionId = '33333333-3333-4333-8333-333333333333'
+
 const quiz = {
   id: 'quiz-1',
   slug: 'road-signs-ab12cd',
@@ -69,8 +76,14 @@ const quiz = {
 }
 
 const run = {
-  attemptId: 'attempt-1',
-  question: { id: 'q1', type: 'single' as const, prompt: 'Why?', imageUrl: null, options: [] },
+  attemptId,
+  question: {
+    id: questionId,
+    type: 'single' as const,
+    prompt: 'Why?',
+    imageUrl: null,
+    options: [],
+  },
   total: 5,
   timePerQuestionSec: 30,
 }
@@ -78,17 +91,17 @@ const run = {
 const answer = {
   correct: true,
   timedOut: false,
-  correctOptionIds: ['o1'],
+  correctOptionIds: [optionId],
   explanation: null,
   theoryUrl: null,
   next: null,
-  summary: { attemptId: 'attempt-1', score: 5, errors: 0, total: 5, passed: true },
+  summary: { attemptId, score: 5, errors: 0, total: 5, passed: true },
 }
 
 const submitInput = {
-  attemptId: 'attempt-1',
-  questionId: 'q1',
-  selectedOptionIds: ['o1'],
+  attemptId,
+  questionId,
+  selectedOptionIds: [optionId],
   elapsedMs: 1200,
 }
 
@@ -213,8 +226,44 @@ describe('submitAnswerAction', () => {
     await submitAnswerAction({ ...submitInput, elapsedMs: 999_999 })
 
     expect(submitAnswer).toHaveBeenCalledWith(
-      expect.objectContaining({ elapsedMs: 999_999, selectedOptionIds: ['o1'] }),
+      expect.objectContaining({ elapsedMs: 999_999, selectedOptionIds: [optionId] }),
     )
+  })
+
+  // Postgres answers a malformed uuid with 22P02, which Drizzle wraps in a
+  // DrizzleQueryError. That class matches none of the arms in the action, so it
+  // is rethrown and a public Server Action hands the browser an opaque 500 for
+  // what is only a bad request. Each of these three values reaches a uuid
+  // column, so each has to be refused before the query.
+  it.each([
+    ['attemptId', { ...submitInput, attemptId: 'not-a-uuid' }],
+    ['questionId', { ...submitInput, questionId: "' or 1=1 --" }],
+    ['an entry in selectedOptionIds', { ...submitInput, selectedOptionIds: [optionId, 'nope'] }],
+  ])('refuses a malformed %s without reaching the service', async (_name, input) => {
+    const result = await submitAnswerAction(input)
+
+    expect(result).toEqual({ ok: false, error: 'notFound' })
+    // Not merely mapped to a nicer error: the query never runs.
+    expect(submitAnswer).not.toHaveBeenCalled()
+  })
+
+  it('refuses a selectedOptionIds that is not an array at all', async () => {
+    // The declared type says string[]; the payload is whatever the browser
+    // chose to send. Calling .every on a string would be the same 500 by
+    // another route.
+    const result = await submitAnswerAction({
+      ...submitInput,
+      selectedOptionIds: optionId,
+    } as never)
+
+    expect(result).toEqual({ ok: false, error: 'notFound' })
+    expect(submitAnswer).not.toHaveBeenCalled()
+  })
+
+  it('accepts an empty selection, which is a real answer and not a malformed one', async () => {
+    await submitAnswerAction({ ...submitInput, selectedOptionIds: [] })
+
+    expect(submitAnswer).toHaveBeenCalledWith(expect.objectContaining({ selectedOptionIds: [] }))
   })
 
   it('maps DuplicateAnswerError to { ok: false, error: duplicate }', async () => {

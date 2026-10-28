@@ -8,7 +8,7 @@ import {
   NotAChallengeError,
   startChallengeRun,
 } from '@/lib/run/challenge'
-import { isAttemptPlayedBy, resolvePlayer, runLimitKey } from '@/lib/run/identity'
+import { resolvePlayer, runLimitKey } from '@/lib/run/identity'
 import {
   EmptyQuizError,
   QuizNotFoundError,
@@ -76,17 +76,12 @@ export async function fetchChallengeComparisonAction(input: {
 
   if (!isUuid(input.attemptId)) return { ok: false, error: 'notFound' }
 
-  // The second half of the spoiler guard. getChallengeComparison answers about
-  // any finished attempt that answers a challenge, and /c/<attemptId> is a
-  // public link — so a visitor who was handed a link to a run that was itself
-  // a challenge could otherwise read both scores without playing a question.
-  // The attempt id says which run this is, never who is playing it.
-  if (!(await isAttemptPlayedBy(input.attemptId, player))) {
-    return { ok: false, error: 'notFound' }
-  }
-
   try {
-    return { ok: true, comparison: await getChallengeComparison(input.attemptId) }
+    // A pass-through on purpose. The ownership check is inside
+    // getChallengeComparison, which answers `null` for a caller who is not
+    // playing this run, so there is no ordering here for a future caller to get
+    // wrong. The player handed over is the one this server derived.
+    return { ok: true, comparison: await getChallengeComparison(input.attemptId, player) }
   } catch (error) {
     // An ordinary run has nothing to compare against. Nothing for the player to
     // retry either, so it is the same dead end as an unknown attempt.

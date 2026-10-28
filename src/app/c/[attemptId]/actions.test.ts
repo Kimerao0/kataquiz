@@ -10,7 +10,6 @@ const {
   getChallenge,
   startChallengeRun,
   getChallengeComparison,
-  isAttemptPlayedBy,
 } = vi.hoisted(() => ({
   getCurrentUser: vi.fn<typeof import('@/lib/session').getCurrentUser>(),
   getOrCreateGuestId: vi.fn<typeof import('@/lib/guest').getOrCreateGuestId>(),
@@ -18,7 +17,6 @@ const {
   getChallenge: vi.fn<typeof import('@/lib/run/challenge').getChallenge>(),
   startChallengeRun: vi.fn<typeof import('@/lib/run/challenge').startChallengeRun>(),
   getChallengeComparison: vi.fn<typeof import('@/lib/run/challenge').getChallengeComparison>(),
-  isAttemptPlayedBy: vi.fn<typeof import('@/lib/run/identity').isAttemptPlayedBy>(),
 }))
 
 // Replaced wholesale: the action only ever asks these two modules who the
@@ -44,13 +42,10 @@ vi.mock('@/lib/run/challenge', async (importOriginal) => ({
   getChallengeComparison,
 }))
 
-// resolvePlayer and runLimitKey stay real — deriving the player is what these
-// tests are about. Only the database read is stubbed; it has its own test
-// against a real Postgres in src/lib/run/identity.test.ts.
-vi.mock('@/lib/run/identity', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@/lib/run/identity')>()),
-  isAttemptPlayedBy,
-}))
+// @/lib/run/identity is deliberately not mocked: resolvePlayer and runLimitKey
+// are what these tests are about, and the ownership read that used to be
+// stubbed here now lives inside getChallengeComparison, where challenge.test.ts
+// covers it against a real Postgres.
 
 const user = { id: 'user-1', name: 'Ada Lovelace', image: null }
 
@@ -89,7 +84,6 @@ beforeEach(() => {
   getChallenge.mockResolvedValue(invite)
   startChallengeRun.mockResolvedValue(run)
   getChallengeComparison.mockResolvedValue(comparison)
-  isAttemptPlayedBy.mockResolvedValue(true)
 })
 
 describe('startChallengeRunAction', () => {
@@ -211,36 +205,36 @@ describe('fetchChallengeComparisonAction', () => {
     const result = await fetchChallengeComparisonAction({ attemptId: myAttemptId })
 
     expect(result).toEqual({ ok: true, comparison })
-    expect(getChallengeComparison).toHaveBeenCalledWith(myAttemptId)
+    // Two arguments, not one: the player is what lets getChallengeComparison
+    // decide ownership for itself instead of trusting this caller to have
+    // checked first.
+    expect(getChallengeComparison).toHaveBeenCalledWith(myAttemptId, {
+      kind: 'user',
+      userId: user.id,
+    })
   })
 
-  it('refuses an attempt the caller is not playing', async () => {
-    // The spoiler guard. /c/<attemptId> is a public link, and an attempt that
-    // was itself a challenge has a comparison: without the ownership check a
-    // visitor could read both scores before answering a question.
-    isAttemptPlayedBy.mockResolvedValue(false)
-
-    const result = await fetchChallengeComparisonAction({ attemptId: theirAttemptId })
-
-    expect(result).toEqual({ ok: false, error: 'notFound' })
-    // Not merely withheld from the response: never read.
-    expect(getChallengeComparison).not.toHaveBeenCalled()
-  })
-
-  it('asks ownership of the derived player, never of the payload', async () => {
+  it('hands over the derived player, never anything from the payload', async () => {
+    // The spoiler guard lives in getChallengeComparison now, so the one thing
+    // this action still owes it is an identity the caller cannot choose:
+    // /c/<attemptId> is a public link, and an attempt that was itself a
+    // challenge has both scores behind it.
     getCurrentUser.mockResolvedValue(null)
     const hostile = { attemptId: theirAttemptId, guestId: 'victim', userId: 'root' }
 
     await fetchChallengeComparisonAction(hostile as never)
 
-    expect(isAttemptPlayedBy).toHaveBeenCalledWith(theirAttemptId, {
+    expect(getChallengeComparison).toHaveBeenCalledWith(theirAttemptId, {
       kind: 'guest',
       guestId: 'guest-1',
       nickname: '',
     })
   })
 
-  it('reports an unfinished run as nothing to compare, not as an error', async () => {
+  it('reports null as nothing to compare, not as an error', async () => {
+    // Null covers an unfinished run and a caller who is not playing this one.
+    // The action cannot tell them apart, which is the point: neither can the
+    // browser.
     getChallengeComparison.mockResolvedValue(null)
 
     await expect(fetchChallengeComparisonAction({ attemptId })).resolves.toEqual({
@@ -262,7 +256,6 @@ describe('fetchChallengeComparisonAction', () => {
     const result = await fetchChallengeComparisonAction({ attemptId: 'not-a-uuid' })
 
     expect(result).toEqual({ ok: false, error: 'notFound' })
-    expect(isAttemptPlayedBy).not.toHaveBeenCalled()
     expect(getChallengeComparison).not.toHaveBeenCalled()
   })
 

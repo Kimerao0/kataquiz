@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm'
+import { eq, inArray } from 'drizzle-orm'
 import { attemptAnswers, attempts, options, questions, quizzes, user } from '@/db/schema'
 import { type TestTx, withTestDb } from '@/test/db'
 import { TIMER_GRACE_MS } from './engine'
@@ -7,8 +7,10 @@ import {
   EmptyQuizError,
   NotYourAttemptError,
   type Player,
+  type PublicQuestion,
   QuestionNotInAttemptError,
   QuizNotFoundError,
+  type RunStart,
   startRun,
   submitAnswer,
 } from './service'
@@ -19,6 +21,10 @@ type SeedOptions = {
   maxErrors?: number
   timePerQuestionSec?: number | null
   isHidden?: boolean
+  /** More than two makes a coincidental shuffle collision implausible. */
+  optionsPerQuestion?: number
+  /** 'boolean' seeds True/False options, which are exempt from the shuffle. */
+  questionType?: 'single' | 'boolean'
 }
 
 type SeededQuestion = {
@@ -36,7 +42,8 @@ type Seed = {
 }
 
 // Every test runs against a quiz that exists: one author, one quiz, and N
-// single-choice questions with one right and one wrong option each.
+// single-choice questions, each with the one right option stored first and the
+// rest wrong — the way authors overwhelmingly write them.
 async function seedQuiz(tx: TestTx, overrides: SeedOptions = {}): Promise<Seed> {
   const {
     questionCount = 3,
@@ -44,6 +51,8 @@ async function seedQuiz(tx: TestTx, overrides: SeedOptions = {}): Promise<Seed> 
     maxErrors = 1,
     timePerQuestionSec = null,
     isHidden = false,
+    optionsPerQuestion = 2,
+    questionType = 'single' as 'single' | 'boolean',
   } = overrides
 
   const userId = `user-${crypto.randomUUID()}`
@@ -69,7 +78,7 @@ async function seedQuiz(tx: TestTx, overrides: SeedOptions = {}): Promise<Seed> 
   const rows = Array.from({ length: questionCount }, (_, index) => ({
     quizId: quiz.id,
     position: index,
-    type: 'single' as const,
+    type: questionType,
     prompt: `Question ${index}`,
     explanation: `Rule ${index} says so`,
     theoryUrl: `https://example.com/theory/${index}`,
@@ -79,10 +88,19 @@ async function seedQuiz(tx: TestTx, overrides: SeedOptions = {}): Promise<Seed> 
   const optionRows = await tx
     .insert(options)
     .values(
-      inserted.flatMap((question, index) => [
-        { questionId: question.id, position: 0, text: `Right ${index}`, isCorrect: true },
-        { questionId: question.id, position: 1, text: `Wrong ${index}`, isCorrect: false },
-      ]),
+      inserted.flatMap((question, index) =>
+        Array.from({ length: optionsPerQuestion }, (_, position) => ({
+          questionId: question.id,
+          position,
+          text:
+            questionType === 'boolean'
+              ? ['True', 'False'][position]
+              : position === 0
+                ? `Right ${index}`
+                : `Wrong ${index}.${position}`,
+          isCorrect: position === 0,
+        })),
+      ),
     )
     .returning({ id: options.id, questionId: options.questionId, isCorrect: options.isCorrect })
 
@@ -113,9 +131,33 @@ function seededQuestion(seed: Seed, questionId: string): SeededQuestion {
   return question
 }
 
+// The order the player was shown, as one comparable value.
+function orderOf(question: PublicQuestion): string {
+  return question.options.map((option) => option.id).join(',')
+}
+
+// Starts runs until the shuffle puts the right answer somewhere other than the
+// top of the list. The order is a pure function of the attempt id, so this is a
+// search across attempts and not a retry of a flaky call.
+async function runWhereRightAnswerIsNotFirst(tx: TestTx, seed: Seed): Promise<RunStart> {
+  const [correctId] = seed.questions[0].correctOptionIds
+  for (let i = 0; i < 20; i++) {
+    const run = await startRun({ quizId: seed.quizId, player: seed.player, executor: tx })
+    if (run.question.options[0].id !== correctId) return run
+  }
+  throw new Error('the shuffle never moved the right answer off the first position')
+}
+
 async function readAttempt(tx: TestTx, attemptId: string) {
   const [attempt] = await tx.select().from(attempts).where(eq(attempts.id, attemptId))
   return attempt
+}
+
+// Deleting a question cascades to the answers that recorded it, but not to the
+// `questionIds` snapshot on the attempt: that is a uuid[] column, which is
+// exactly why a run can still be holding an id that no longer resolves.
+async function deleteQuestions(tx: TestTx, questionIds: string[]): Promise<void> {
+  await tx.delete(questions).where(inArray(questions.id, questionIds))
 }
 
 // Answers correctly and well within the clock unless the test says otherwise.
@@ -163,7 +205,12 @@ describe('startRun', () => {
       expect(run.question.type).toBe('single')
       expect(run.question.prompt).toBe('Question 0')
       expect(run.question.imageUrl).toBeNull()
-      expect(run.question.options.map((option) => option.text)).toEqual(['Right 0', 'Wrong 0'])
+      // Sorted: which options come back is this test's business, the order they
+      // come back in belongs to the shuffle tests below.
+      expect(run.question.options.map((option) => option.text).sort()).toEqual([
+        'Right 0',
+        'Wrong 0.1',
+      ])
       expect(run.timePerQuestionSec).toBe(30)
     })
   })
@@ -253,6 +300,72 @@ describe('startRun', () => {
     })
   })
 
+  it('shuffles option order', async () => {
+    await withTestDb(async (tx) => {
+      const seed = await seedQuiz(tx, { questionCount: 1, optionsPerQuestion: 6 })
+
+      const orders = new Set<string>()
+      for (let i = 0; i < 8; i++) {
+        const run = await startRun({ quizId: seed.quizId, player: seed.player, executor: tx })
+        orders.add(orderOf(run.question))
+      }
+
+      // The seed stores the right answer first every time. Hand the stored
+      // order straight to the player and all eight runs collapse onto one
+      // signature, which is the leak this test exists to keep closed.
+      expect(orders.size).toBeGreaterThan(1)
+    })
+  })
+
+  it('never shuffles a true/false question', async () => {
+    // Shuffling exists to stop a player learning the position instead of the
+    // rule. With two options a player reads both anyway, so the leak is
+    // negligible while "False, True" is a jarring read. Many attempts, because
+    // a two-item shuffle agreeing by chance is a coin toss each time.
+    await withTestDb(async (tx) => {
+      const seed = await seedQuiz(tx, { questionCount: 1, questionType: 'boolean' })
+
+      for (let attempt = 0; attempt < 12; attempt++) {
+        const run = await startRun({ quizId: seed.quizId, player: seed.player, executor: tx })
+        expect(run.question.options.map((option) => option.text)).toEqual(['True', 'False'])
+      }
+    })
+  })
+
+  it('returns a stable order for the same attempt', async () => {
+    await withTestDb(async (tx) => {
+      const seed = await seedQuiz(tx, { questionCount: 2, optionsPerQuestion: 6 })
+      const run = await startRun({ quizId: seed.quizId, player: seed.player, executor: tx })
+      const attempt = await readAttempt(tx, run.attemptId)
+      const other = attempt.questionIds.find((id) => id !== run.question.id)
+      if (!other) throw new Error('expected a second question in the attempt')
+
+      // Answering the other question first makes the service hand this one back
+      // as `next`: a genuine second read of the same question in one attempt,
+      // which is what a retried submit or a re-render asks for.
+      const result = await answer(tx, seed, run.attemptId, other)
+
+      if (!result.next) throw new Error('expected the unanswered question back')
+      expect(result.next.id).toBe(run.question.id)
+      expect(orderOf(result.next)).toBe(orderOf(run.question))
+    })
+  })
+
+  it('gives two attempts on the same question different orders', async () => {
+    await withTestDb(async (tx) => {
+      const seed = await seedQuiz(tx, { questionCount: 1, optionsPerQuestion: 10 })
+
+      const first = await startRun({ quizId: seed.quizId, player: seed.player, executor: tx })
+      const second = await startRun({ quizId: seed.quizId, player: seed.player, executor: tx })
+
+      expect(second.attemptId).not.toBe(first.attemptId)
+      expect(second.question.id).toBe(first.question.id)
+      // Ten options: two attempts landing on the same order by chance is one in
+      // 3.6 million, so a red here is a bug and not luck.
+      expect(orderOf(second.question)).not.toBe(orderOf(first.question))
+    })
+  })
+
   it('records a guest attempt with its nickname', async () => {
     await withTestDb(async (tx) => {
       const seed = await seedQuiz(tx, { questionCount: 2 })
@@ -321,6 +434,36 @@ describe('submitAnswer', () => {
       const result = await answer(tx, seed, run.attemptId, question.id, { selectedOptionIds: [] })
 
       expect(result.correctOptionIds).toEqual(question.correctOptionIds)
+    })
+  })
+
+  it('grades correctly regardless of the order the options were presented in', async () => {
+    await withTestDb(async (tx) => {
+      const seed = await seedQuiz(tx, { questionCount: 1, optionsPerQuestion: 6 })
+      const [question] = seed.questions
+      const [correctId] = question.correctOptionIds
+
+      const displaced = await runWhereRightAnswerIsNotFirst(tx, seed)
+      // Proven rather than assumed: in this attempt the right answer sits
+      // somewhere other than the top of the list the player saw.
+      const shownAt = displaced.question.options.findIndex((option) => option.id === correctId)
+      expect(shownAt).toBeGreaterThan(0)
+
+      const right = await answer(tx, seed, displaced.attemptId, question.id, {
+        selectedOptionIds: [correctId],
+      })
+      expect(right.correct).toBe(true)
+      expect(right.correctOptionIds).toEqual([correctId])
+
+      // And the option that happened to be shown first is still wrong: grading
+      // that ever went back to comparing positions would fail one of these two
+      // halves whichever way round it did it.
+      const other = await runWhereRightAnswerIsNotFirst(tx, seed)
+      const [shownFirst] = other.question.options
+      const firstPick = await answer(tx, seed, other.attemptId, question.id, {
+        selectedOptionIds: [shownFirst.id],
+      })
+      expect(firstPick.correct).toBe(false)
     })
   })
 
@@ -516,6 +659,83 @@ describe('submitAnswer', () => {
 
       const finished = await readAttempt(tx, run.attemptId)
       expect(finished.finishedAt).toBeInstanceOf(Date)
+    })
+  })
+
+  it('skips a question deleted mid-run and serves the next surviving one', async () => {
+    await withTestDb(async (tx) => {
+      const seed = await seedQuiz(tx, { questionCount: 3 })
+      const run = await startRun({ quizId: seed.quizId, player: seed.player, executor: tx })
+      // The stored order, not the seed order: the sample decides which id is
+      // second, and this test is about the one the player would be served next.
+      const [first, second, third] = (await readAttempt(tx, run.attemptId)).questionIds
+
+      await deleteQuestions(tx, [second])
+
+      const result = await answer(tx, seed, run.attemptId, first)
+
+      // The deleted one is stepped over, not served as nothing.
+      expect(result.next?.id).toBe(third)
+      expect(result.summary).toBeNull()
+      expect((await readAttempt(tx, run.attemptId)).finishedAt).toBeNull()
+
+      // And the run still reaches its end from there.
+      const last = await answer(tx, seed, run.attemptId, third)
+      expect(last.next).toBeNull()
+      expect(last.summary).not.toBeNull()
+    })
+  })
+
+  it('finishes the run when every remaining question was deleted', async () => {
+    await withTestDb(async (tx) => {
+      const seed = await seedQuiz(tx, { questionCount: 3, maxErrors: 1 })
+      const run = await startRun({ quizId: seed.quizId, player: seed.player, executor: tx })
+      const [first, second, third] = (await readAttempt(tx, run.attemptId)).questionIds
+
+      await deleteQuestions(tx, [second, third])
+
+      const result = await answer(tx, seed, run.attemptId, first)
+
+      // next and summary both null is the stranded run: the player has nothing
+      // to press and the server never calls the run over. One of the two has to
+      // be there, and with nothing left to serve it is the summary.
+      expect(result.next).toBeNull()
+      expect(result.summary).not.toBeNull()
+      expect(result.summary).toEqual({
+        attemptId: run.attemptId,
+        score: 1,
+        errors: 0,
+        // The set the run was started with, which is what the attempt stores
+        // and what the challenge comparison reports too — the player answered
+        // fewer than that because two of them stopped existing.
+        total: 3,
+        passed: true,
+      })
+    })
+  })
+
+  it('sets finishedAt when it finishes early for that reason', async () => {
+    await withTestDb(async (tx) => {
+      const seed = await seedQuiz(tx, { questionCount: 3 })
+      const run = await startRun({ quizId: seed.quizId, player: seed.player, executor: tx })
+      const [first, second, third] = (await readAttempt(tx, run.attemptId)).questionIds
+
+      await deleteQuestions(tx, [second, third])
+
+      const result = await answer(tx, seed, run.attemptId, first)
+
+      // The separate assertion, and the one that matters: a run can come back
+      // looking finished and still have no finishedAt, because the summary is
+      // built in JS while finishedAt is written by the UPDATE. Nothing in the
+      // return value would show it, and the consequence is invisible until
+      // later — getChallenge refuses an attempt with no finishedAt, so the
+      // player is quietly denied the challenge link they earned.
+      const attempt = await readAttempt(tx, run.attemptId)
+      expect(attempt.finishedAt).toBeInstanceOf(Date)
+
+      // Pinned together so the pair can never drift: a summary is the server
+      // saying the run is over, and finishedAt is where it says so durably.
+      expect(result.summary).not.toBeNull()
     })
   })
 })

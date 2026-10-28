@@ -1,9 +1,9 @@
-import { act, fireEvent, screen, within } from '@testing-library/react'
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { TIMER_GRACE_MS } from '@/lib/run/engine'
 import type { AnswerResult, PublicQuestion, RunStart, RunSummary } from '@/lib/run/service'
 import { renderWithMessages } from '@/test/intl'
-import { RunPlayer } from './run-player'
+import { ADVANCE_LOCK_MS, RunPlayer } from './run-player'
 
 const { submitAnswerAction, fetchChallengeComparisonAction } = vi.hoisted(() => ({
   submitAnswerAction: vi.fn(),
@@ -84,6 +84,15 @@ function renderRun(question: PublicQuestion, overrides?: Partial<RunStart>) {
 
 function option(name: string) {
   return screen.getByRole('radio', { name })
+}
+
+// Option input is ignored for ADVANCE_LOCK_MS after the run advances, so a
+// test that answers the next question has to let that elapse first. Waiting on
+// the lock to lift is also the proof that it lifts on its own.
+async function optionAfterAdvance(name: string) {
+  const radio = option(name)
+  await waitFor(() => expect(radio).not.toHaveAttribute('aria-disabled', 'true'))
+  return radio
 }
 
 // The row is the <label> that owns the control, so it is where the per-option
@@ -252,7 +261,9 @@ describe('run player', () => {
     expect(screen.getByText('Question 2 of 2')).toBeVisible()
     // A fresh question, with no trace of the last verdict.
     expect(screen.queryByText('Correct')).not.toBeInTheDocument()
-    expect(screen.getByRole('radio', { name: 'Red' })).not.toHaveAttribute('aria-disabled', 'true')
+    // Answerable again once the brief post-advance lock has lifted, which it
+    // does without any further input.
+    await optionAfterAdvance('Red')
   })
 
   it('shows the summary after the final question', async () => {
@@ -296,7 +307,7 @@ describe('run player', () => {
 
     submitAnswerAction.mockResolvedValue({ ok: true, result: resultOf({ next: null, summary }) })
     await userEvent.click(screen.getByRole('button', { name: 'Next question' }))
-    await userEvent.click(screen.getByRole('radio', { name: 'Red' }))
+    await userEvent.click(await optionAfterAdvance('Red'))
 
     expect(fetchChallengeComparisonAction).toHaveBeenCalledTimes(1)
     expect(fetchChallengeComparisonAction).toHaveBeenCalledWith({ attemptId: 'attempt-1' })
@@ -393,5 +404,56 @@ describe('run player', () => {
     } finally {
       vi.useRealTimers()
     }
+  })
+
+  // The Next button sits roughly where an option lands once the feedback panel
+  // goes, so the second click of a double click can answer an unread question.
+  describe('the input lock after advancing', () => {
+    // Fake timers as in question-timer.test.tsx: the lock is a setTimeout, and
+    // fireEvent rather than userEvent because userEvent's own waits and the
+    // fake clock deadlock each other.
+    beforeEach(() => {
+      vi.useFakeTimers()
+    })
+
+    afterEach(() => {
+      vi.useRealTimers()
+    })
+
+    async function answerAndAdvance() {
+      renderRun(single)
+      fireEvent.click(option('Warning'))
+      // Lets the mocked action resolve and the feedback panel render.
+      await act(async () => {})
+      fireEvent.click(screen.getByRole('button', { name: 'Next question' }))
+      expect(screen.getByRole('heading', { name: second.prompt })).toBeVisible()
+    }
+
+    it('does not accept an option click immediately after advancing', async () => {
+      await answerAndAdvance()
+
+      fireEvent.click(screen.getByRole('radio', { name: 'Red' }))
+      await act(async () => {})
+
+      // Still only the answer to the first question: the stray click was
+      // swallowed rather than posted as an answer to a question nobody read.
+      expect(submitAnswerAction).toHaveBeenCalledTimes(1)
+      expect(submitAnswerAction).toHaveBeenCalledWith(expect.objectContaining({ questionId: 'q1' }))
+    })
+
+    it('accepts the same click once the lock has elapsed', async () => {
+      await answerAndAdvance()
+
+      await act(async () => {
+        vi.advanceTimersByTime(ADVANCE_LOCK_MS)
+      })
+      fireEvent.click(screen.getByRole('radio', { name: 'Red' }))
+      await act(async () => {})
+
+      expect(submitAnswerAction).toHaveBeenCalledTimes(2)
+      expect(submitAnswerAction).toHaveBeenLastCalledWith(
+        expect.objectContaining({ questionId: 'q2', selectedOptionIds: ['p1'] }),
+      )
+    })
   })
 })

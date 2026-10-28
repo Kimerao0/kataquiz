@@ -146,11 +146,33 @@
     "errorsTitle": "This file was not accepted",
     "signInTitle": "Sign in to upload",
     "signInCta": "Sign in",
+    "formatSummary": "What does a quiz file look like?",
+    "formatIntro": "A complete, valid quiz. Copy it and replace the content.",
+    "formatExample": "version: 1\ntitle: Road signs\nlanguage: en\nrun:\n  questionsPerRun: 2\n  maxErrors: 1\nquestions:\n  - type: single\n    prompt: What does a red triangular sign mean?\n    explanation: Triangular signs warn of danger ahead.\n    options:\n      - text: Warning\n        correct: true\n      - text: Prohibition\n        correct: false\n  - type: boolean\n    prompt: You may park on a pedestrian crossing.\n    answer: false\n  - type: multi\n    prompt: Which are mandatory when overtaking?\n    options:\n      - text: Check the road is clear\n        correct: true\n      - text: Signal your intention\n        correct: true\n      - text: Sound the horn\n        correct: false",
+    "formatRulesTitle": "The rules that catch people out",
+    "formatRuleOptions": "A single or multi question needs between 2 and 10 options.",
+    "formatRuleSingle": "A single question has exactly one option with correct: true; a multi question has at least one.",
+    "formatRuleBoolean": "A true/false question carries answer: true or answer: false, and no options.",
+    "formatRulePerRun": "questionsPerRun cannot be larger than the number of questions, and maxErrors cannot be larger than questionsPerRun.",
+    "fileCleared": "Your browser cleared the chosen file when the upload came back. Choose it again, or paste its contents below.",
+    "errorQuestion": "Question {position}",
+    "errorQuestionField": "Question {position}, {field}",
+    "errorEntry": "{location}: {message}",
     "errors": {
       "unauthorized": "You must be signed in to upload a quiz.",
       "tooLarge": "The file is larger than 1 MB.",
       "empty": "Choose a file or paste a quiz first.",
       "rateLimited": "You have uploaded a lot of quizzes recently. Try again later."
     }
+  },
+  "notFound": {
+    "title": "That link leads nowhere",
+    "body": "Nothing lives at this address. A challenge link dies with the run behind it, so one that was never finished leads here, and so does a quiz its author has removed. A mistyped address does the same.",
+    "cta": "Browse quizzes"
+  },
+  "errorPage": {
+    "title": "This page did not load",
+    "body": "Something broke on our side, not yours. Nothing you had already finished is lost. Trying again often works.",
+    "home": "Browse quizzes"
   }
 }
