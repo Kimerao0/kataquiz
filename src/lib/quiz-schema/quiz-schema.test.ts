@@ -94,6 +94,29 @@ describe('parseQuizText', () => {
     )
   })
 
+  it('rejects a question with more than 10 options', () => {
+    const options = Array.from({ length: 11 }, (_, index) => ({
+      text: `Option ${index}`,
+      correct: index === 0,
+    }))
+    const question = { ...singleQuestion, options }
+    expect(errorsOf(makeQuiz({ questions: [question, booleanQuestion] })).join('\n')).toMatch(
+      /between 2 and 10 options/,
+    )
+  })
+
+  it('rejects a prompt longer than 2000 characters', () => {
+    const question = { ...singleQuestion, prompt: 'a'.repeat(2001) }
+    expect(errorsOf(makeQuiz({ questions: [question, booleanQuestion] })).join('\n')).toMatch(
+      /prompt/,
+    )
+  })
+
+  it('accepts a prompt of exactly 2000 characters', () => {
+    const question = { ...singleQuestion, prompt: 'a'.repeat(2000) }
+    expect(parseObject(makeQuiz({ questions: [question, booleanQuestion] })).ok).toBe(true)
+  })
+
   it('rejects a multi question with no correct option', () => {
     const question = {
       ...singleQuestion,
@@ -173,6 +196,18 @@ describe('parseQuizText', () => {
     const http = { ...singleQuestion, imageUrl: 'http://example.com/a.png' }
     const https = { ...singleQuestion, imageUrl: 'https://example.com/a.png' }
     expect(parseObject(makeQuiz({ questions: [http, https] })).ok).toBe(true)
+  })
+
+  it('rejects a file with more than 1000 questions', () => {
+    // Every question is a distinct object: repeating one reference makes the
+    // YAML dump a wall of aliases, and the parser rejects that on its own,
+    // before the question count is ever looked at.
+    const questions = Array.from({ length: 1001 }, (_, index) => ({
+      ...singleQuestion,
+      prompt: `Question ${index}`,
+      options: singleQuestion.options.map((option) => ({ ...option })),
+    }))
+    expect(errorsOf(makeQuiz({ questions })).join('\n')).toMatch(/questions/)
   })
 
   it('rejects version 2', () => {

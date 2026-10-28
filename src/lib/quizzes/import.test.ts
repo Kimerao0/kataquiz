@@ -1,5 +1,6 @@
-import { eq } from 'drizzle-orm'
-import { quizzes, user } from '@/db/schema'
+import { eq, sql } from 'drizzle-orm'
+import { db } from '@/db/client'
+import { questions, quizzes, user } from '@/db/schema'
 import { parseQuizText, type QuizFile } from '@/lib/quiz-schema'
 import { type TestTx, withTestDb } from '@/test/db'
 import { importQuiz, MAX_UPLOAD_BYTES, slugify } from './import'
@@ -197,21 +198,46 @@ questions:
     })
   })
 
-  it('writes nothing when the insert fails partway', async () => {
-    await withTestDb(async (tx) => {
-      const title = `Ghost quiz ${crypto.randomUUID()}`
+  // The one import test that skips withTestDb, deliberately. The harness hands
+  // the body a transaction, and `importQuiz` only opens its own when no
+  // executor is passed — so running inside the harness would test the caller's
+  // savepoint and never the transaction this test is about. It therefore owns
+  // its rows and cleans them up in `finally`, under names generated here so
+  // they cannot collide with another test's.
+  it('writes nothing when the last insert fails', async () => {
+    const marker = crypto.randomUUID()
+    const title = `Ghost quiz ${marker}`
+    const prompt = `Ghost question ${marker}`
+    const sentinel = `Poisoned option ${marker}`
+    const constraint = `options_reject_sentinel_${marker.replaceAll('-', '_')}`
+    const authorId = `user-${marker}`
 
-      // A savepoint around the import, so the foreign key violation rolls back
-      // without aborting the transaction the assertion below still needs.
-      await expect(
-        tx.transaction((savepoint) =>
-          importQuiz({ file: quizFile({ title }), authorId: 'ghost-user', executor: savepoint }),
-        ),
-      ).rejects.toThrow()
+    await db.insert(user).values({ id: authorId, name: 'Author', email: `${authorId}@example.com` })
+    // The failure has to land on the options insert, the last of the three, so
+    // that the quiz row and the question rows are already written when it
+    // fires — a failure on the first insert would leave nothing to roll back
+    // and the assertions below would hold with no transaction at all. DDL takes
+    // no bind parameters, hence the inlined (generated) literals.
+    await db.execute(
+      sql.raw(`alter table options add constraint ${constraint} check ("text" <> '${sentinel}')`),
+    )
 
-      const rows = await tx.select().from(quizzes).where(eq(quizzes.title, title))
-      expect(rows).toHaveLength(0)
-    })
+    try {
+      const file = quizFile({ title })
+      file.questions[0].prompt = prompt
+      file.questions[1].options[0].text = sentinel
+
+      // No executor: this is the production path, where importQuiz opens the
+      // transaction itself.
+      await expect(importQuiz({ file, authorId })).rejects.toThrow()
+
+      expect(await db.select().from(quizzes).where(eq(quizzes.title, title))).toHaveLength(0)
+      expect(await db.select().from(questions).where(eq(questions.prompt, prompt))).toHaveLength(0)
+    } finally {
+      await db.execute(sql.raw(`alter table options drop constraint if exists ${constraint}`))
+      // Cascades to any quiz, question and option row that survived.
+      await db.delete(user).where(eq(user.id, authorId))
+    }
   })
 })
 

@@ -54,7 +54,8 @@
     "errors": {
       "unauthorized": "You must be signed in to upload a quiz.",
       "tooLarge": "The file is larger than 1 MB.",
-      "empty": "Choose a file or paste a quiz first."
+      "empty": "Choose a file or paste a quiz first.",
+      "rateLimited": "You have uploaded a lot of quizzes recently. Try again later."
     }
   }
 }

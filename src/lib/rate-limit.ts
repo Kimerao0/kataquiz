@@ -7,6 +7,14 @@ import { rateLimits } from '@/db/schema'
 export const RUN_START_LIMIT = 30
 export const RUN_START_WINDOW_SEC = 3600
 
+// Uploads are limited for the rows they write, not the request they cost: one
+// accepted file is up to 1 quiz, 1000 questions and 10000 options, so a loop
+// over this action is unbounded database growth from a single account. Ten an
+// hour is well past what a person curating question banks by hand will reach,
+// and the window matches RUN_START_WINDOW_SEC so both limits age the same way.
+export const UPLOAD_LIMIT = 10
+export const UPLOAD_WINDOW_SEC = 3600
+
 // The base class of both `db` and a transaction, so tests can run the limiter
 // inside the rollback harness.
 type Executor = PgDatabase<NodePgQueryResultHKT, Db['_']['fullSchema']>
