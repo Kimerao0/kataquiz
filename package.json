@@ -14,7 +14,7 @@
     "db:down": "docker compose down",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
-    "db:seed": "tsx --env-file-if-exists=.env.local scripts/seed.ts",
+    "db:seed": "tsx --env-file-if-exists=.env.local scripts/seed.mts",
     "db:studio": "drizzle-kit studio",
     "check:portability": "./scripts/check-portability.sh"
   },
@@ -48,6 +48,7 @@
     "drizzle-kit": "0.31.11",
     "jsdom": "^30.1.3",
     "tailwindcss": "^4",
+    "tsx": "^4.23.15",
     "typescript": "^5",
     "vitest": "5.0.5"
   },
