@@ -1,0 +1,51 @@
+version: 1
+title: TypeScript - Narrowing and the type system
+description: How TypeScript narrows types, and the rules people get wrong most often.
+language: en
+tags: [typescript, programming, types]
+run:
+  questionsPerRun: 5
+  maxErrors: 1
+  timePerQuestionSec: 45
+questions:
+  - type: single
+    prompt: "What is the type of `x` inside the if block?  `function f(x: string | number) { if (typeof x === 'string') { /* here */ } }`"
+    explanation: "`typeof x === 'string'` is a type guard. Inside the true branch TypeScript narrows the union to just `string`."
+    theoryUrl: https://www.typescriptlang.org/docs/handbook/2/narrowing.html
+    options:
+      - { text: string, correct: true }
+      - { text: string | number, correct: false }
+      - { text: any, correct: false }
+      - { text: unknown, correct: false }
+  - type: boolean
+    prompt: "`unknown` can be assigned to any other type without a check."
+    answer: false
+    explanation: "It is the reverse. Anything can be assigned TO `unknown`, but `unknown` cannot be assigned to anything else until you narrow it. That is exactly what makes it the safe alternative to `any`."
+  - type: multi
+    prompt: Which of these narrow a union type?
+    explanation: "`typeof`, `instanceof` and a truthiness check all narrow. A `console.log` has no effect on types at all."
+    options:
+      - { text: "typeof x === 'string'", correct: true }
+      - { text: "x instanceof Date", correct: true }
+      - { text: "if (x)", correct: true }
+      - { text: "console.log(x)", correct: false }
+  - type: single
+    prompt: "What does `satisfies` do that a type annotation does not?"
+    explanation: "`satisfies` checks the value against a type while keeping the narrower inferred type. An annotation would widen the value to the annotated type and lose the specific literal types."
+    options:
+      - { text: It checks the type without widening the inferred type, correct: true }
+      - { text: It asserts the type at runtime, correct: false }
+      - { text: It makes the value readonly, correct: false }
+      - { text: It is an alias for `as`, correct: false }
+  - type: boolean
+    prompt: "`strictNullChecks` is included in `strict: true`."
+    answer: true
+    explanation: "`strict: true` turns on a family of flags including `strictNullChecks`, `noImplicitAny` and `strictFunctionTypes`. Note it does NOT include `noUncheckedIndexedAccess`, which is separate and off by default."
+  - type: single
+    prompt: "With `noUncheckedIndexedAccess` off, what is the type of `arr[0]` for `const arr: string[]`?"
+    explanation: "By default TypeScript assumes an index access succeeds, so the type is `string`, even though the array may be empty at runtime. Turning on `noUncheckedIndexedAccess` makes it `string | undefined`."
+    options:
+      - { text: string, correct: true }
+      - { text: string | undefined, correct: false }
+      - { text: unknown, correct: false }
+      - { text: never, correct: false }

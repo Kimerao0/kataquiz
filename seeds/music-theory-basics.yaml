@@ -1,0 +1,49 @@
+version: 1
+title: Music theory - Intervals and keys
+description: The intervals, scales and key signatures that everything else is built on.
+language: en
+tags: [music, theory, beginner]
+run:
+  questionsPerRun: 5
+  maxErrors: 1
+questions:
+  - type: single
+    prompt: How many semitones are in a perfect fifth?
+    explanation: A perfect fifth spans seven semitones, for example C up to G. It is the most consonant interval after the octave, which is why it anchors so much harmony.
+    options:
+      - { text: "7", correct: true }
+      - { text: "5", correct: false }
+      - { text: "8", correct: false }
+      - { text: "12", correct: false }
+  - type: boolean
+    prompt: A major scale has the same pattern of tones and semitones in every key.
+    answer: true
+    explanation: "Every major scale follows tone-tone-semitone-tone-tone-tone-semitone. That fixed pattern is why a melody keeps its character when transposed."
+  - type: multi
+    prompt: Which of these are in the key of G major?
+    explanation: "G major has one sharp, F#. So F# belongs and F natural does not. C and D are both natural in G major."
+    options:
+      - { text: "F#", correct: true }
+      - { text: "C", correct: true }
+      - { text: "D", correct: true }
+      - { text: "Bb", correct: false }
+  - type: single
+    prompt: What is the relative minor of C major?
+    explanation: The relative minor sits a minor third below the major, sharing the same key signature. For C major, with no sharps or flats, that is A minor.
+    options:
+      - { text: A minor, correct: true }
+      - { text: E minor, correct: false }
+      - { text: G minor, correct: false }
+      - { text: F minor, correct: false }
+  - type: boolean
+    prompt: An interval of twelve semitones is called an octave.
+    answer: true
+    explanation: Twelve semitones is an octave. The two notes share a name because one is exactly double the frequency of the other.
+  - type: single
+    prompt: How many sharps are in the key of D major?
+    explanation: "D major has two sharps, F# and C#. The order sharps are added is always F C G D A E B."
+    options:
+      - { text: "2", correct: true }
+      - { text: "1", correct: false }
+      - { text: "3", correct: false }
+      - { text: "0", correct: false }

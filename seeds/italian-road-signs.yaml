@@ -1,0 +1,50 @@
+version: 1
+title: Patente B - Segnali di pericolo
+description: I segnali di pericolo del codice della strada italiano, a forma triangolare con bordo rosso.
+language: it
+tags: [patente, guida, italia, segnali]
+run:
+  questionsPerRun: 5
+  maxErrors: 1
+  timePerQuestionSec: 30
+questions:
+  - type: boolean
+    prompt: I segnali di pericolo hanno forma triangolare con il vertice in alto.
+    answer: true
+    explanation: I segnali di pericolo sono triangoli equilateri con un vertice in alto e bordo rosso. L'unica eccezione e il segnale di dare precedenza, che e un triangolo con il vertice in basso.
+  - type: single
+    prompt: Cosa indica un segnale triangolare con il simbolo di due bambini?
+    explanation: Indica un attraversamento pedonale frequentato da bambini, tipicamente vicino a una scuola. Impone di moderare la velocita e prestare particolare attenzione.
+    options:
+      - { text: Attraversamento pedonale frequentato da bambini, correct: true }
+      - { text: Divieto di transito ai minori, correct: false }
+      - { text: Zona residenziale, correct: false }
+      - { text: Parco giochi riservato, correct: false }
+  - type: single
+    prompt: Un segnale di "strada deformata" obbliga il conducente a
+    explanation: I segnali di pericolo non impongono mai un limite preciso. Obbligano a moderare la velocita in funzione del pericolo segnalato.
+    options:
+      - { text: moderare la velocita, correct: true }
+      - { text: fermarsi prima del tratto segnalato, correct: false }
+      - { text: procedere a non piu di 30 km/h, correct: false }
+      - { text: suonare il clacson, correct: false }
+  - type: multi
+    prompt: Quali tra questi sono segnali di pericolo?
+    explanation: Dosso e curva pericolosa sono segnali di pericolo, triangolari. Il divieto di sosta e un segnale di divieto, circolare. Il senso unico e un segnale di indicazione, rettangolare.
+    options:
+      - { text: Dosso, correct: true }
+      - { text: Curva pericolosa, correct: true }
+      - { text: Divieto di sosta, correct: false }
+      - { text: Senso unico, correct: false }
+  - type: boolean
+    prompt: Un segnale di pericolo va sempre collocato almeno 150 metri prima del punto pericoloso.
+    answer: true
+    explanation: Fuori dai centri abitati la distanza standard e di 150 metri. Se la distanza e diversa, deve essere indicata su un pannello integrativo sotto il segnale.
+  - type: single
+    prompt: Il segnale di "doppia curva, la prima a destra" indica che
+    explanation: Il segnale indica due curve ravvicinate. Il simbolo mostra la direzione della prima curva, in questo caso a destra.
+    options:
+      - { text: la prima curva e verso destra, correct: true }
+      - { text: bisogna tenere la destra, correct: false }
+      - { text: e vietato il sorpasso in curva, correct: false }
+      - { text: la strada e a senso unico, correct: false }
