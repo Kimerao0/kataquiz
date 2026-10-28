@@ -1,22 +1,20 @@
 'use server'
 
-import { getOrCreateGuestId } from '@/lib/guest'
 import { getQuizBySlug } from '@/lib/quizzes/search'
 import { checkRateLimit, RUN_START_LIMIT, RUN_START_WINDOW_SEC } from '@/lib/rate-limit'
+import { resolvePlayer, runLimitKey } from '@/lib/run/identity'
 import {
   type AnswerResult,
   AttemptNotFoundError,
   DuplicateAnswerError,
   EmptyQuizError,
   NotYourAttemptError,
-  type Player,
   QuestionNotInAttemptError,
   QuizNotFoundError,
   type RunStart,
   startRun,
   submitAnswer,
 } from '@/lib/run/service'
-import { getCurrentUser } from '@/lib/session'
 
 export type StartRunResult =
   | { ok: true; run: RunStart }
@@ -25,10 +23,6 @@ export type StartRunResult =
 export type SubmitResult =
   | { ok: true; result: AnswerResult }
   | { ok: false; error: 'notYours' | 'duplicate' | 'notFound' }
-
-// Stored verbatim in `attempts.nickname` and shown to whoever opens a challenge
-// link, so it is capped here rather than at render time.
-const MAX_NICKNAME_LENGTH = 40
 
 export async function startRunAction(input: {
   slug: string
@@ -39,7 +33,7 @@ export async function startRunAction(input: {
   // Keyed on the identity this server derived, never on anything in the
   // payload: a caller who could choose the key could also reset their own
   // limit by inventing a new one on every request.
-  const allowed = await checkRateLimit(limitKey(player), RUN_START_LIMIT, RUN_START_WINDOW_SEC)
+  const allowed = await checkRateLimit(runLimitKey(player), RUN_START_LIMIT, RUN_START_WINDOW_SEC)
   if (!allowed) return { ok: false, error: 'rateLimited' }
 
   // The client sends a slug, so the quiz id it plays is looked up here. A
@@ -91,25 +85,4 @@ export async function submitAnswerAction(input: {
     if (error instanceof QuestionNotInAttemptError) return { ok: false, error: 'notFound' }
     throw error
   }
-}
-
-// The only place a player identity is minted. It comes from the session cookie
-// or the signed guest cookie, never from the request body, so a client that
-// posts somebody else's id still plays as itself and fails the ownership check
-// inside submitAnswer.
-async function resolvePlayer(nickname?: string): Promise<Player> {
-  const user = await getCurrentUser()
-  if (user) return { kind: 'user', userId: user.id }
-
-  return {
-    kind: 'guest',
-    guestId: await getOrCreateGuestId(),
-    nickname: (nickname ?? '').trim().slice(0, MAX_NICKNAME_LENGTH),
-  }
-}
-
-// The prefix keeps run starts out of the way of the upload limit, which shares
-// this table's primary key.
-function limitKey(player: Player): string {
-  return player.kind === 'user' ? `run:user:${player.userId}` : `run:guest:${player.guestId}`
 }

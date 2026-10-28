@@ -5,12 +5,19 @@ import type { AnswerResult, PublicQuestion, RunStart, RunSummary } from '@/lib/r
 import { renderWithMessages } from '@/test/intl'
 import { RunPlayer } from './run-player'
 
-const { submitAnswerAction } = vi.hoisted(() => ({ submitAnswerAction: vi.fn() }))
+const { submitAnswerAction, fetchChallengeComparisonAction } = vi.hoisted(() => ({
+  submitAnswerAction: vi.fn(),
+  fetchChallengeComparisonAction: vi.fn(),
+}))
 
 // A factory mock, so the real module — and the pg Pool it builds at import
 // time through @/lib/run/service — never loads in jsdom. The action has its
 // own tests against the service.
 vi.mock('@/app/(app)/q/[slug]/actions', () => ({ submitAnswerAction }))
+
+// Imported by the player for the challenge reveal, and reached by the same pg
+// Pool if it were allowed to load for real.
+vi.mock('@/app/c/[attemptId]/actions', () => ({ fetchChallengeComparisonAction }))
 
 const single: PublicQuestion = {
   id: 'q1',
@@ -90,6 +97,13 @@ function rowOf(text: string) {
 beforeEach(() => {
   vi.clearAllMocks()
   submitAnswerAction.mockResolvedValue({ ok: true, result: resultOf() })
+  fetchChallengeComparisonAction.mockResolvedValue({
+    ok: true,
+    comparison: {
+      mine: summary,
+      theirs: { attemptId: 'attempt-0', score: 1, errors: 1, total: 2, passed: false },
+    },
+  })
 })
 
 describe('run player', () => {
@@ -256,6 +270,62 @@ describe('run player', () => {
     expect(screen.getByRole('textbox', { name: 'Challenge link' })).toHaveValue(
       'http://localhost:3000/c/attempt-1',
     )
+  })
+
+  it('never asks for a comparison on an ordinary run', async () => {
+    submitAnswerAction.mockResolvedValue({ ok: true, result: resultOf({ next: null, summary }) })
+    renderRun(single)
+
+    await userEvent.click(option('Warning'))
+    await userEvent.click(await screen.findByRole('button', { name: 'See your result' }))
+
+    expect(fetchChallengeComparisonAction).not.toHaveBeenCalled()
+    expect(screen.queryByText('Head to head')).not.toBeInTheDocument()
+  })
+
+  it('asks for the comparison only after the final answer of a challenge run', async () => {
+    renderWithMessages(
+      <RunPlayer run={runOf(single)} quizSlug="road-signs" challenge={{ opponentName: 'Ada' }} />,
+    )
+
+    // First answer of two: the run is not finished, so the opponent's score is
+    // not asked for and cannot be on the page.
+    await userEvent.click(option('Warning'))
+    await screen.findByRole('button', { name: 'Next question' })
+    expect(fetchChallengeComparisonAction).not.toHaveBeenCalled()
+
+    submitAnswerAction.mockResolvedValue({ ok: true, result: resultOf({ next: null, summary }) })
+    await userEvent.click(screen.getByRole('button', { name: 'Next question' }))
+    await userEvent.click(screen.getByRole('radio', { name: 'Red' }))
+
+    expect(fetchChallengeComparisonAction).toHaveBeenCalledTimes(1)
+    expect(fetchChallengeComparisonAction).toHaveBeenCalledWith({ attemptId: 'attempt-1' })
+
+    await userEvent.click(await screen.findByRole('button', { name: 'See your result' }))
+
+    expect(await screen.findByText('Head to head')).toBeVisible()
+    expect(screen.getByText('You won')).toBeVisible()
+  })
+
+  it('offers a retry when the comparison cannot be loaded', async () => {
+    fetchChallengeComparisonAction.mockRejectedValueOnce(new Error('fetch failed'))
+    submitAnswerAction.mockResolvedValue({ ok: true, result: resultOf({ next: null, summary }) })
+    renderWithMessages(
+      <RunPlayer run={runOf(single)} quizSlug="road-signs" challenge={{ opponentName: 'Ada' }} />,
+    )
+
+    await userEvent.click(option('Warning'))
+    await userEvent.click(await screen.findByRole('button', { name: 'See your result' }))
+
+    // The run's own result survived the failure: only the comparison is missing.
+    expect(screen.getByText('2 of 2 correct · no mistakes')).toBeVisible()
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent('The scores could not be compared')
+
+    await userEvent.click(within(alert).getByRole('button', { name: 'Try again' }))
+
+    expect(await screen.findByText('Head to head')).toBeVisible()
+    expect(fetchChallengeComparisonAction).toHaveBeenCalledTimes(2)
   })
 
   it('surfaces a submit error with a retry that works', async () => {

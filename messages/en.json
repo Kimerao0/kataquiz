@@ -98,6 +98,29 @@
     "backToQuiz": "Back to the quiz",
     "lastChance": "Last chance"
   },
+  "challenge": {
+    "invitedBy": "{name} challenged you",
+    "intro": "You play the same questions in the same order. Their score stays hidden until you finish yours.",
+    "begin": "Take the challenge",
+    "emptyTitle": "There is nothing left to play",
+    "emptyBody": "Every question from that run has since been removed from the quiz.",
+    "viewQuiz": "See the quiz",
+    "startErrorTitle": "The challenge could not be started",
+    "startErrors": {
+      "notFound": "That challenge is no longer available.",
+      "empty": "Every question from that run has since been removed from the quiz.",
+      "rateLimited": "You have started a lot of runs recently. Try again in a little while.",
+      "unexpected": "The server did not answer. Check your connection and try again."
+    },
+    "headToHead": "Head to head",
+    "you": "You",
+    "youWon": "You won",
+    "theyWon": "{name} won",
+    "draw": "A draw",
+    "comparing": "Comparing your scores…",
+    "comparisonErrorTitle": "The scores could not be compared",
+    "comparisonErrorBody": "Your own result above is safe. Only the comparison failed."
+  },
   "signIn": {
     "title": "Sign in",
     "intro": "Sign in to upload a quiz. Browsing and running quizzes needs no account.",

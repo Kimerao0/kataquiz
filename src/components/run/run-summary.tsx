@@ -4,6 +4,7 @@ import { CheckCircle2Icon, XCircleIcon } from 'lucide-react'
 import Link from 'next/link'
 import { useTranslations } from 'next-intl'
 import { useEffect, useRef, useState } from 'react'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -13,8 +14,24 @@ import { cn } from '@/lib/utils'
 
 const COPIED_FEEDBACK_MS = 2000
 
-export function RunSummary({ summary, quizSlug }: { summary: RunSummaryData; quizSlug: string }) {
+// Only a challenge run has one, and only once it is finished: the opponent's
+// score is not fetched before that, so there is no 'hidden' case here to get
+// wrong. An ordinary run leaves the prop undefined and renders as it always has.
+export type ComparisonState =
+  | { status: 'pending' }
+  | { status: 'failed'; retry: () => void }
+  | { status: 'ready'; opponentName: string; mine: RunSummaryData; theirs: RunSummaryData }
+
+type RunSummaryProps = {
+  summary: RunSummaryData
+  quizSlug: string
+  comparison?: ComparisonState
+}
+
+export function RunSummary({ summary, quizSlug, comparison }: RunSummaryProps) {
   const t = useTranslations('run')
+  // The challenger's own attempt, never the one they were challenged on: the
+  // loop only continues if beating a challenge produces a new link to pass on.
   const challengePath = `/c/${summary.attemptId}`
 
   // The origin is only knowable in the browser. Rendering it straight from
@@ -49,6 +66,14 @@ export function RunSummary({ summary, quizSlug }: { summary: RunSummaryData; qui
         </p>
       </div>
 
+      {comparison !== undefined && (
+        // One stable live region around all three states, so the reveal is
+        // announced when it lands rather than only being painted.
+        <div aria-live="polite" className="flex flex-col gap-2">
+          <Comparison state={comparison} />
+        </div>
+      )}
+
       <Separator />
 
       <ChallengeLink url={challengeUrl} />
@@ -64,6 +89,81 @@ export function RunSummary({ summary, quizSlug }: { summary: RunSummaryData; qui
           {t('backToQuiz')}
         </Link>
       </div>
+    </section>
+  )
+}
+
+function Comparison({ state }: { state: ComparisonState }) {
+  const t = useTranslations('challenge')
+  const tCommon = useTranslations('common')
+
+  if (state.status === 'pending') {
+    return <p className="text-muted-foreground">{t('comparing')}</p>
+  }
+
+  if (state.status === 'failed') {
+    return (
+      <Alert variant="destructive">
+        <AlertTitle>{t('comparisonErrorTitle')}</AlertTitle>
+        <AlertDescription className="flex flex-col items-start gap-3">
+          {/* The run itself is safe above, so this is a retry and never a
+              dead end: the score, the pass state and the share link all
+              rendered without the comparison. */}
+          <p>{t('comparisonErrorBody')}</p>
+          <Button type="button" onClick={state.retry}>
+            {tCommon('retry')}
+          </Button>
+        </AlertDescription>
+      </Alert>
+    )
+  }
+
+  return (
+    <ComparisonResult opponentName={state.opponentName} mine={state.mine} theirs={state.theirs} />
+  )
+}
+
+// Raw scores, not a ratio: both players answered the same ordered set, and the
+// two totals differ only when a question was deleted between the runs — which
+// is why each side is shown with the total it actually played.
+function verdictKeyFor(mine: RunSummaryData, theirs: RunSummaryData) {
+  if (mine.score > theirs.score) return 'youWon' as const
+  if (mine.score < theirs.score) return 'theyWon' as const
+  return 'draw' as const
+}
+
+function ComparisonResult({
+  opponentName,
+  mine,
+  theirs,
+}: {
+  opponentName: string
+  mine: RunSummaryData
+  theirs: RunSummaryData
+}) {
+  const t = useTranslations('challenge')
+  const tRun = useTranslations('run')
+
+  const verdictKey = verdictKeyFor(mine, theirs)
+  const verdict = verdictKey === 'theyWon' ? t('theyWon', { name: opponentName }) : t(verdictKey)
+
+  return (
+    <section className="flex flex-col gap-3 rounded-lg border p-4">
+      <h3 className="font-semibold text-lg">{t('headToHead')}</h3>
+      <p className="font-bold text-2xl">{verdict}</p>
+      {/* Stacked on a phone, side by side once there is room. */}
+      <dl className="flex flex-col gap-3 sm:flex-row sm:gap-10">
+        <div className="flex flex-col">
+          <dt className="text-muted-foreground text-sm">{t('you')}</dt>
+          <dd className="text-lg">{tRun('score', { score: mine.score, total: mine.total })}</dd>
+        </div>
+        <div className="flex flex-col">
+          {/* A nickname chosen by a stranger: interpolated as text, never as
+              markup, and already capped in length where it was stored. */}
+          <dt className="text-muted-foreground text-sm">{opponentName}</dt>
+          <dd className="text-lg">{tRun('score', { score: theirs.score, total: theirs.total })}</dd>
+        </div>
+      </dl>
     </section>
   )
 }

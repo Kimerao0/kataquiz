@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useTranslations } from 'next-intl'
 import { useRef, useState } from 'react'
 import { type SubmitResult, submitAnswerAction } from '@/app/(app)/q/[slug]/actions'
+import { fetchChallengeComparisonAction } from '@/app/c/[attemptId]/actions'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
@@ -11,7 +12,7 @@ import type { AnswerResult, PublicQuestion, RunStart, RunSummary } from '@/lib/r
 import { FeedbackPanel } from './feedback-panel'
 import { QuestionCard } from './question-card'
 import { QuestionTimer } from './question-timer'
-import { RunSummary as RunSummaryPanel } from './run-summary'
+import { type ComparisonState, RunSummary as RunSummaryPanel } from './run-summary'
 
 type SubmitErrorCode = Extract<SubmitResult, { ok: false }>['error']
 
@@ -21,7 +22,18 @@ type Failure = { retryable: true } | { retryable: false; code: SubmitErrorCode }
 
 type Attempt = { optionIds: string[]; elapsedMs: number }
 
-export function RunPlayer({ run, quizSlug }: { run: RunStart; quizSlug: string }) {
+type RunPlayerProps = {
+  run: RunStart
+  quizSlug: string
+  /**
+   * Set only when this run answers a challenge. The opponent's name is already
+   * public — it was on the invite — while their score is not, and is asked for
+   * only once the final answer has landed.
+   */
+  challenge?: { opponentName: string }
+}
+
+export function RunPlayer({ run, quizSlug, challenge }: RunPlayerProps) {
   const t = useTranslations('run')
   const tCommon = useTranslations('common')
 
@@ -33,6 +45,9 @@ export function RunPlayer({ run, quizSlug }: { run: RunStart; quizSlug: string }
   const [pending, setPending] = useState(false)
   const [failure, setFailure] = useState<Failure | null>(null)
   const [startedAt, setStartedAt] = useState(() => Date.now())
+  // Undefined for an ordinary run, which is what keeps the summary identical
+  // to the one it renders today.
+  const [comparison, setComparison] = useState<ComparisonState | undefined>(undefined)
   // Once the clock has run out for a question it stays out, so a failed
   // auto-submit cannot restart the timer and fire itself again.
   const [expired, setExpired] = useState(false)
@@ -58,14 +73,42 @@ export function RunPlayer({ run, quizSlug }: { run: RunStart; quizSlug: string }
         selectedOptionIds: attempt.optionIds,
         elapsedMs: attempt.elapsedMs,
       })
-      if (outcome.ok) setFeedback(outcome.result)
-      else setFailure({ retryable: false, code: outcome.error })
+      if (outcome.ok) {
+        setFeedback(outcome.result)
+        // Started here and not when the summary is opened: the run is finished
+        // as of this answer, which is the first moment the server will part
+        // with the opponent's score, and the player is still reading the last
+        // feedback panel while it travels.
+        if (outcome.result.summary !== null) void loadComparison()
+      } else setFailure({ retryable: false, code: outcome.error })
     } catch {
       // The action itself never throws for a known service error, so what lands
       // here is the network or the server being unreachable — worth retrying.
       setFailure({ retryable: true })
     } finally {
       setPending(false)
+    }
+  }
+
+  async function loadComparison() {
+    if (challenge === undefined) return
+
+    const opponentName = challenge.opponentName
+    const failed: ComparisonState = { status: 'failed', retry: () => void loadComparison() }
+    setComparison({ status: 'pending' })
+
+    try {
+      const outcome = await fetchChallengeComparisonAction({ attemptId: run.attemptId })
+      // A finished challenge run always has both summaries, so a null here is
+      // as unexpected as a rejection and gets the same retry rather than a
+      // silently missing panel.
+      if (outcome.ok && outcome.comparison !== null) {
+        setComparison({ status: 'ready', opponentName, ...outcome.comparison })
+      } else {
+        setComparison(failed)
+      }
+    } catch {
+      setComparison(failed)
     }
   }
 
@@ -97,7 +140,9 @@ export function RunPlayer({ run, quizSlug }: { run: RunStart; quizSlug: string }
     setStartedAt(Date.now())
   }
 
-  if (summary !== null) return <RunSummaryPanel summary={summary} quizSlug={quizSlug} />
+  if (summary !== null) {
+    return <RunSummaryPanel summary={summary} quizSlug={quizSlug} comparison={comparison} />
+  }
 
   const answered = feedback !== null
   const correctOptionIds = feedback?.correctOptionIds ?? null
