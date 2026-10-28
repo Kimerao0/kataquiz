@@ -1,3 +1,4 @@
+import { eq } from 'drizzle-orm'
 import { questions, quizzes, user } from '@/db/schema'
 import { type TestTx, withTestDb } from '@/test/db'
 import { getQuizBySlug, listPopularTags, PAGE_SIZE, searchQuizzes } from './search'
@@ -212,6 +213,36 @@ describe('searchQuizzes', () => {
     })
   })
 
+  it('returns a quiz whose author was deleted', async () => {
+    await withTestDb(async (tx) => {
+      const authorId = await insertUser(tx)
+      const word = uniqueWord()
+      const quiz = await seedQuiz(tx, { title: `Road signs ${word}`, authorId })
+
+      await tx.delete(user).where(eq(user.id, authorId))
+
+      const { items, total } = await searchQuizzes({ q: word, executor: tx })
+
+      // An inner join would hide the quiz here while still counting it.
+      expect(items.map((item) => item.slug)).toEqual([quiz.slug])
+      expect(total).toBe(1)
+    })
+  })
+
+  it('reports a null author name for an orphaned quiz', async () => {
+    await withTestDb(async (tx) => {
+      const authorId = await insertUser(tx, 'Giulia Rossi')
+      const word = uniqueWord()
+      await seedQuiz(tx, { title: `Road signs ${word}`, authorId })
+
+      await tx.delete(user).where(eq(user.id, authorId))
+
+      const { items } = await searchQuizzes({ q: word, executor: tx })
+
+      expect(items[0].authorName).toBeNull()
+    })
+  })
+
   it('paginates at PAGE_SIZE and reports the true total', async () => {
     await withTestDb(async (tx) => {
       const tag = uniqueWord()
@@ -260,6 +291,20 @@ describe('getQuizBySlug', () => {
       expect(quiz?.title).toBe(title)
       expect(quiz?.questionCount).toBe(2)
       expect(quiz?.authorName).toBe('Author')
+    })
+  })
+
+  it('returns a quiz whose author was deleted', async () => {
+    await withTestDb(async (tx) => {
+      const authorId = await insertUser(tx)
+      const seeded = await seedQuiz(tx, { authorId })
+
+      await tx.delete(user).where(eq(user.id, authorId))
+
+      const quiz = await getQuizBySlug(seeded.slug, tx)
+
+      expect(quiz?.slug).toBe(seeded.slug)
+      expect(quiz?.authorName).toBeNull()
     })
   })
 

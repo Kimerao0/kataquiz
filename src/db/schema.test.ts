@@ -83,22 +83,62 @@ describe('schema', () => {
     })
   })
 
-  it('deleting a user deletes the quizzes they authored', async () => {
+  it('deleting a user keeps the quizzes they authored, with a null author', async () => {
     await withTestDb(async (tx) => {
       const authorId = await insertUser(tx)
       const quizId = await insertQuiz(tx, undefined, authorId)
 
       await tx.delete(user).where(eq(user.id, authorId))
 
-      const leftQuizzes = await tx.select().from(quizzes).where(eq(quizzes.id, quizId))
-      expect(leftQuizzes).toHaveLength(0)
+      const [quiz] = await tx.select().from(quizzes).where(eq(quizzes.id, quizId))
+      expect(quiz, 'the quiz must outlive the account that authored it').toBeDefined()
+      expect(quiz.authorId).toBeNull()
+    })
+  })
+
+  it("deleting an author keeps other players' attempts on their quizzes", async () => {
+    await withTestDb(async (tx) => {
+      // The case a cascade on quizzes.authorId breaks: the author leaving used
+      // to delete the quiz, and every other player's attempt and answers with
+      // it, down to the challenge links they had shared.
+      const authorId = await insertUser(tx)
+      const quizId = await insertQuiz(tx, undefined, authorId)
+      const [question] = await tx
+        .insert(questions)
+        .values({ quizId, position: 0, type: 'single', prompt: 'A question' })
+        .returning({ id: questions.id })
+      const playerId = await insertUser(tx)
+      const [attempt] = await tx
+        .insert(attempts)
+        .values({ quizId, userId: playerId, questionIds: [question.id], score: 9 })
+        .returning({ id: attempts.id })
+      await tx.insert(attemptAnswers).values({
+        attemptId: attempt.id,
+        questionId: question.id,
+        selectedOptionIds: [],
+        isCorrect: true,
+        elapsedMs: 1100,
+      })
+
+      await tx.delete(user).where(eq(user.id, authorId))
+
+      const [row] = await tx.select().from(attempts).where(eq(attempts.id, attempt.id))
+      expect(row, "the author leaving must not delete another player's attempt").toBeDefined()
+      expect(row.userId).toBe(playerId)
+      expect(row.score).toBe(9)
+      const answers = await tx
+        .select()
+        .from(attemptAnswers)
+        .where(eq(attemptAnswers.attemptId, attempt.id))
+      expect(answers).toHaveLength(1)
     })
   })
 
   it('deleting a user leaves their attempts in place with a null userId', async () => {
     await withTestDb(async (tx) => {
-      // The quiz is somebody else's on purpose: deleting its author would take
-      // the attempt with it through the quiz cascade and prove nothing.
+      // The quiz is somebody else's, which no longer decides the outcome: an
+      // author leaving anonymises their quizzes now instead of deleting them.
+      // This test is about the attempt's own user_id, and nothing else.
       const quizId = await insertQuiz(tx, undefined, await insertUser(tx))
       const playerId = await insertUser(tx)
       const [attempt] = await tx

@@ -42,6 +42,9 @@ async function QuizDetail({ params }: { params: QuizParams }) {
 
   const t = await getTranslations('quiz')
   const tCommon = await getTranslations('common')
+  const tCatalog = await getTranslations('catalog')
+  // A quiz outlives its author's account, so the byline has to stand in for one.
+  const authorName = quiz.authorName ?? tCatalog('deletedAuthor')
   const runSettings = quiz.timePerQuestionSec
     ? t('runSettings', {
         questions: quiz.questionsPerRun,
@@ -54,7 +57,7 @@ async function QuizDetail({ params }: { params: QuizParams }) {
     <article className="flex flex-col gap-4">
       <div className="flex flex-col gap-1">
         <h1 className="font-bold text-3xl">{quiz.title}</h1>
-        <p className="opacity-70">{t('author', { name: quiz.authorName })}</p>
+        <p className="opacity-70">{t('author', { name: authorName })}</p>
       </div>
 
       {quiz.description && <p>{quiz.description}</p>}

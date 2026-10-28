@@ -35,7 +35,8 @@
     "noMatchCta": "Show every quiz",
     "noQuizzesTitle": "No quizzes yet",
     "noQuizzesBody": "The catalog is empty.",
-    "noQuizzesCta": "Upload the first one"
+    "noQuizzesCta": "Upload the first one",
+    "deletedAuthor": "Deleted account"
   },
   "quiz": {
     "author": "By {name}",

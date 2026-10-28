@@ -22,7 +22,9 @@ export type QuizSummary = {
   questionsPerRun: number
   maxErrors: number
   timePerQuestionSec: number | null
-  authorName: string
+  // Null once the author deletes their account: the quiz survives, the link does
+  // not. Every read below therefore joins `user` on the left.
+  authorName: string | null
   createdAt: Date
 }
 
@@ -75,7 +77,9 @@ export async function searchQuizzes(params: {
   const items = await executor
     .select(summaryFields)
     .from(quizzes)
-    .innerJoin(user, eq(quizzes.authorId, user.id))
+    // Left, not inner: an orphaned quiz would otherwise drop out of the catalog
+    // entirely, and the count above already includes it.
+    .leftJoin(user, eq(quizzes.authorId, user.id))
     .where(where)
     .orderBy(...orderBy)
     .limit(PAGE_SIZE)
@@ -91,7 +95,8 @@ export async function getQuizBySlug(
   const [quiz] = await executor
     .select(summaryFields)
     .from(quizzes)
-    .innerJoin(user, eq(quizzes.authorId, user.id))
+    // Left, as above: an orphaned quiz still has a page.
+    .leftJoin(user, eq(quizzes.authorId, user.id))
     .where(and(eq(quizzes.slug, slug), eq(quizzes.isHidden, false)))
     .limit(1)
 

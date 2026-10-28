@@ -1,4 +1,5 @@
 import { headers } from 'next/headers'
+import { unstable_rethrow } from 'next/navigation'
 import { auth } from './auth'
 
 export class UnauthorizedError extends Error {}
@@ -15,10 +16,14 @@ export async function getCurrentUser(): Promise<SessionUser | null> {
     const { id, name, image } = session.user
     return { id, name, image: image ?? null }
   } catch (error) {
-    // An expired or tampered cookie means "signed out", not a 500 on the page.
-    // But this catch is deliberately broad, so it also swallows a datastore
-    // outage — log it, or the operator sees nothing while every signed-in user
-    // is told they are signed out.
+    // Next signals control flow by throwing — a prerender abort, notFound(),
+    // redirect(). A blanket catch swallows those, so hand them back first.
+    unstable_rethrow(error)
+
+    // What remains is a real failure. An expired or tampered cookie means
+    // "signed out", not a 500 on the page, but this catch is broad enough to
+    // also cover a datastore outage — log it, or the operator sees nothing
+    // while every signed-in user is told they are signed out.
     console.error('[session] getSession failed; treating caller as signed out', error)
     return null
   }

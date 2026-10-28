@@ -95,9 +95,9 @@ export const quizzes = pgTable(
   {
     id: uuid('id').primaryKey().defaultRandom(),
     slug: text('slug').notNull().unique(),
-    authorId: text('author_id')
-      .notNull()
-      .references(() => user.id, { onDelete: 'cascade' }),
+    // Nullable and set null, not cascade: an account leaving must not destroy
+    // the quizzes it contributed, nor other players' attempts on them.
+    authorId: text('author_id').references(() => user.id, { onDelete: 'set null' }),
     title: text('title').notNull(),
     description: text('description'),
     language: text('language').notNull(),
@@ -155,8 +155,7 @@ export const attempts = pgTable('attempts', {
   quizId: uuid('quiz_id')
     .notNull()
     .references(() => quizzes.id, { onDelete: 'cascade' }),
-  // Set null where quizzes cascade: deleting an account anonymises its past
-  // attempts rather than destroying the scores other players were compared to.
+  // Deleting an account anonymises what it authored and what it played, never destroys either.
   userId: text('user_id').references(() => user.id, { onDelete: 'set null' }),
   guestId: text('guest_id'),
   nickname: text('nickname'),

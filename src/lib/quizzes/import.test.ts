@@ -235,7 +235,10 @@ questions:
       expect(await db.select().from(questions).where(eq(questions.prompt, prompt))).toHaveLength(0)
     } finally {
       await db.execute(sql.raw(`alter table options drop constraint if exists ${constraint}`))
-      // Cascades to any quiz, question and option row that survived.
+      // Explicit, because deleting the author only nulls author_id now: a quiz
+      // row that survived a failed assertion above would otherwise leak into
+      // the shared test database. Questions and options cascade from the quiz.
+      await db.delete(quizzes).where(eq(quizzes.title, title))
       await db.delete(user).where(eq(user.id, authorId))
     }
   })
