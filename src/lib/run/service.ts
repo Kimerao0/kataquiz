@@ -64,9 +64,10 @@ export async function startRun(params: {
   quizId: string
   player: Player
   questionIds?: string[]
+  challengeOfAttemptId?: string
   executor?: Executor
 }): Promise<RunStart> {
-  const { quizId, player, questionIds, executor = db } = params
+  const { quizId, player, questionIds, challengeOfAttemptId, executor = db } = params
 
   const [quiz] = await executor
     .select({
@@ -99,7 +100,7 @@ export async function startRun(params: {
 
   const [attempt] = await executor
     .insert(attempts)
-    .values({ quizId, questionIds: runIds, ...playerColumns(player) })
+    .values({ quizId, questionIds: runIds, challengeOfAttemptId, ...playerColumns(player) })
     .returning({ id: attempts.id })
 
   return {
