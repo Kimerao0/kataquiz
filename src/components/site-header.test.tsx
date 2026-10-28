@@ -27,4 +27,22 @@ describe('site header', () => {
     expect(screen.getByRole('button', { name: 'Sign out' })).toBeEnabled()
     expect(screen.queryByRole('link', { name: 'Sign in' })).not.toBeInTheDocument()
   })
+
+  it('keeps a long display name whole in the DOM and truncates it visually', () => {
+    const name = 'Maximilian Bartholomew Featherstonehaugh-Cholmondeley III'
+    renderWithMessages(<SessionNav user={{ ...user, name }} />)
+
+    const label = screen.getByText(`Signed in as ${name}`)
+    expect(label).toHaveAttribute('title', name)
+    expect(label).toHaveClass('lg:truncate')
+    expect(label).toHaveClass('sr-only')
+  })
+
+  it('gives the icon-only phone controls an accessible name', () => {
+    renderWithMessages(<SessionNav user={user} />)
+
+    // The visible label collapses to an icon below sm but stays the name.
+    const signOut = screen.getByRole('button', { name: 'Sign out' })
+    expect(signOut.querySelector('svg')).toHaveAttribute('aria-hidden', 'true')
+  })
 })

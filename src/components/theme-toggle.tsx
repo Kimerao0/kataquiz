@@ -52,7 +52,7 @@ export function ThemeToggle() {
       size="icon"
       aria-label={t('darkMode')}
       aria-pressed={dark}
-      className="text-ink-quiet hover:text-ink"
+      className="text-ink-quiet hover:text-ink max-sm:size-10"
       onClick={toggle}
     >
       <Sun aria-hidden className="hidden dark:block" />
