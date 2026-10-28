@@ -23,8 +23,23 @@
   --color-surface: var(--surface);
 
   /* Type scale for the sizes that carry the design. */
-  --text-question: clamp(1.5rem, 1.15rem + 1.4vw, 2.125rem);
-  --text-question--line-height: 1.4;
+  /* The question is the screen, not a paragraph on it, so it keeps growing
+     past the laptop width a reading size would stop at: 24px at 375 and
+     29.15px at 768, both exactly what they were, then 43px at 1440, 53px at
+     1920 and 67px at 2560 — where the old 34px ceiling left a question the
+     size of body copy on a display two metres wide. The ramp is drawn through
+     the old curve's value at 768 on purpose and the floor pins 375, so only
+     the slope above the tablet and the ceiling are new.
+     The leading is a length rather than a ratio because one ratio cannot do
+     both ends: 1.4 is right at 24px and far too airy at 67px, and a second
+     ramp through the same two anchors walks it down to ~1.20 by 2560. */
+  --text-question: clamp(1.5rem, 0.814rem + 2.1vw, 4.5rem);
+  --text-question--line-height: clamp(2.1rem, 1.5rem + 2.19vw, 5.1rem);
+  /* An option is operated, not read, so it tracks the question rather than the
+     prose measure: 18px up to the tablet exactly as before, 27px at 1920 and
+     31px at 2560, where an 18px option under a 67px question reads as a
+     footnote to it. */
+  --text-option: clamp(1.125rem, 0.765rem + 0.75vw, 2.25rem);
   --text-prose: 1.125rem;
   --text-prose--line-height: 1.6;
   --text-meta: 0.875rem;
@@ -96,6 +111,13 @@
   --on-ai: var(--surface);
   --page-width: 80rem;
   --spine: 2px;
+  /* The 正 tally is the one picture this product is remembered by, and it is
+     SVG, so size is the only thing standing between a mark in the corner of
+     the eye and a mark on the wall. This is the chrome ramp, the one the
+     tally gets while it shares a row with the clock: 26px at 375 and 32px at
+     768, both as before, up to 45px just under xl. From xl the drill rail
+     overrides it — see .drill-rail. */
+  --tally-size: clamp(1.625rem, 0.75rem + 2.6vw, 7rem);
 
   /* shadcn names, mapped onto the palette. */
   --background: var(--paper);
@@ -267,6 +289,107 @@
     .page-body {
       padding-inline-start: 3rem;
       padding-block: 4rem;
+    }
+  }
+
+  /* ---- The drilling screen ------------------------------------------------
+     One question, held at arm's length. Below xl this is the composition it
+     has always been: the run chrome in a row under a hairline, the question
+     centred in what is left — which is what a phone and a tablet get, byte
+     for byte. From xl up it opens into the same two columns as .page, divided
+     by the same spine: a rail on the left carrying the 正 tally and the clock,
+     the question in the wide column on the right.
+
+     The spine runs the whole height of the band rather than the height of the
+     text, so the room a large display leaves over is margin around a
+     composition instead of a void with something small adrift in it. That is
+     the same move the catalog makes with the empty space under its head
+     column, and it is why the split waits for xl: at lg the body column would
+     be barely wider than the reading measure it replaced, and the rail would
+     be emptiness with a line next to it. */
+  .drill {
+    display: grid;
+    min-width: 0;
+    flex: 1;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto 1fr;
+  }
+  .drill-rail {
+    display: flex;
+    min-width: 0;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1.5rem;
+    border-block-end: 1px solid var(--rule);
+    padding-block-end: 1rem;
+  }
+  /* One 正, five strokes, five reps. Sized from a token rather than a utility
+     so the rail below can hand it a different ramp without fighting a utility
+     it could not outrank. */
+  .tally-mark {
+    flex: none;
+    inline-size: var(--tally-size);
+    block-size: var(--tally-size);
+    overflow: visible;
+  }
+  .drill-main {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    justify-content: center;
+    gap: 2rem;
+    padding-block: 2.5rem;
+  }
+  @media (min-width: 48rem) {
+    .drill-main {
+      padding-block: 3.5rem;
+    }
+  }
+  @media (min-width: 80rem) {
+    .drill {
+      /* 3/9 rather than the page's 4/8: the rail carries one mark and a
+         clock, not a title and a lead, and every column it gives back goes to
+         the question's measure. */
+      grid-template-columns: minmax(0, 3fr) minmax(0, 9fr);
+      grid-template-rows: 1fr;
+    }
+    .drill-rail {
+      /* The rail is a wall with one mark on it, so the mark is sized for a
+         wall: 140px at 1440, 176px at 1920, 224px at 2560, where the chrome
+         size read as a speck in the corner of the eye. */
+      --tally-size: clamp(6rem, 2rem + 7.5vw, 15rem);
+      flex-direction: column;
+      align-items: stretch;
+      /* The mark hugs the spine rather than the far edge: next to the
+         question it is a seal beside the text, and the room the display
+         leaves over collects in one margin instead of two. */
+      text-align: end;
+      /* Beside the question rather than above it: a tally pinned to the top
+         of a tall rail reads as belonging to the header, not to the rep in
+         hand. */
+      justify-content: center;
+      gap: 1.75rem;
+      border-block-end: 0;
+      padding-block: 3.5rem;
+      padding-inline-end: 3rem;
+    }
+    .drill-rail > p {
+      justify-content: flex-end;
+    }
+    .drill-main {
+      gap: 2.5rem;
+      border-inline-start: var(--spine) solid var(--ink);
+      padding-inline-start: 3rem;
+    }
+    /* In the rail the characters divide the wall between them: one run of
+       five fills it up to --tally-size, and a long run shares the width with
+       as many as fit a row instead of overflowing it. */
+    .drill-rail .tally-mark {
+      flex: 1 1 4rem;
+      inline-size: auto;
+      block-size: auto;
+      max-inline-size: var(--tally-size);
+      aspect-ratio: 1;
     }
   }
 

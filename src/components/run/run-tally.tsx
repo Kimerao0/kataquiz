@@ -51,7 +51,10 @@ export function RunTally({ total, position, outcomes }: RunTallyProps) {
   const characters = Math.ceil(total / STROKES_PER_CHARACTER)
 
   return (
-    <p className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-2 sm:gap-x-2.5">
+    // flex-1 takes the slack from the clock in the chrome row; in the drill
+    // rail the two are stacked, and keeping it would stretch the tally down
+    // the whole rail and strand the clock at the bottom of it.
+    <p className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-2 sm:gap-x-2.5 xl:flex-none xl:gap-x-3 xl:gap-y-3">
       {/* The characters are a picture of this sentence, so they are hidden
           from assistive technology and the sentence carries the state. Two
           spans rather than one string: each half is a message of its own, and
@@ -68,7 +71,10 @@ export function RunTally({ total, position, outcomes }: RunTallyProps) {
           key={character}
           aria-hidden="true"
           viewBox="0 0 24 24"
-          className="size-[26px] shrink-0 overflow-visible sm:size-8"
+          // Sized by .tally-mark in globals.css: the character grows with the
+          // viewport the way the question does, and grows again once the drill
+          // rail gives it a wall. The strokes scale with it for free.
+          className="tally-mark"
         >
           {STROKES.map((path, stroke) => {
             const index = character * STROKES_PER_CHARACTER + stroke

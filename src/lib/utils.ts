@@ -8,6 +8,7 @@ import { createCn } from 'cn/config'
  */
 export const CUSTOM_TEXT_SIZES = [
   'question',
+  'option',
   'prose',
   'meta',
   'title',

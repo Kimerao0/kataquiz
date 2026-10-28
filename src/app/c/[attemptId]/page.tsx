@@ -32,12 +32,16 @@ export default function ChallengePage({ params }: { params: ChallengeParams }) {
   const t = useTranslations('common')
 
   return (
-    <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col px-6 py-6 md:px-8">
-      {/* The attempt id is request data and the session is read per request, so
-          everything below streams in and the shell stays prerendered. */}
-      <Suspense fallback={<p className="text-ink-quiet text-meta">{t('loading')}</p>}>
-        <ChallengeSetup params={params} />
-      </Suspense>
+    // Same shell as the run route: a challenge is the same drilling screen
+    // reached by a link, so it shares the page width and the alignment column.
+    <main className="mx-auto flex w-full max-w-(--page-width) flex-1 flex-col px-6 py-6 md:px-8">
+      <div className="mx-auto flex w-full max-w-measure flex-1 flex-col xl:max-w-none">
+        {/* The attempt id is request data and the session is read per request,
+            so everything below streams in and the shell stays prerendered. */}
+        <Suspense fallback={<p className="text-ink-quiet text-meta">{t('loading')}</p>}>
+          <ChallengeSetup params={params} />
+        </Suspense>
+      </div>
     </main>
   )
 }
@@ -61,7 +65,7 @@ async function ChallengeSetup({ params }: { params: ChallengeParams }) {
       {/* The measure is 62ch, read from this element's own font size, so the
           wrapper stays at the body size and the quiet line below it keeps the
           same left edge as the panel. */}
-      <div className="mx-auto w-full max-w-measure">
+      <div className="mx-auto w-full max-w-measure xl:max-w-none">
         <h1 className="text-ink-quiet text-meta">
           <Link
             href={`/q/${invite.quizSlug}`}

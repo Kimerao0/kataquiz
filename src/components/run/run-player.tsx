@@ -279,10 +279,11 @@ export function RunPlayer({ run, quizSlug, challenge }: RunPlayerProps) {
   const correctOptionIds = feedback?.correctOptionIds ?? null
 
   return (
-    <div className="mx-auto flex w-full max-w-measure flex-1 flex-col">
-      {/* The chrome, and all of it: reps counted on the left, the clock on the
-          right, a hairline under both. Everything below is the question. */}
-      <div className="flex items-start justify-between gap-6 border-rule border-b pb-4">
+    <div className="drill">
+      {/* The chrome, and all of it: reps counted and the clock. A row under a
+          hairline up to lg, a rail beside the question from xl; see .drill in
+          globals.css. Everything in the other column is the question. */}
+      <div className="drill-rail">
         <RunTally total={run.total} position={position} outcomes={outcomes} />
         <QuestionTimer
           timePerQuestionSec={run.timePerQuestionSec}
@@ -294,7 +295,7 @@ export function RunPlayer({ run, quizSlug, challenge }: RunPlayerProps) {
         />
       </div>
 
-      <div className="flex flex-1 flex-col justify-center gap-8 py-10 md:py-14">
+      <div className="drill-main">
         <QuestionCard
           key={question.id}
           question={question}
@@ -308,7 +309,9 @@ export function RunPlayer({ run, quizSlug, challenge }: RunPlayerProps) {
         />
 
         {failure !== null && (
-          <Alert variant="destructive">
+          // Prose and a way out, not part of the question: it keeps the
+          // reading measure the wide column drops.
+          <Alert variant="destructive" className="max-w-measure">
             <AlertTitle>{t('submitErrorTitle')}</AlertTitle>
             <AlertDescription className="flex flex-col items-start gap-3">
               {failure.retryable ? (

@@ -26,12 +26,20 @@ export default function RunPage({ params }: { params: QuizParams }) {
   const t = useTranslations('common')
 
   return (
-    <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col px-6 py-6 md:px-8">
-      {/* The slug is request data and the session is read per request, so
-          everything below streams in and the shell stays prerendered. */}
-      <Suspense fallback={<p className="text-ink-quiet text-meta">{t('loading')}</p>}>
-        <RunSetup params={params} />
-      </Suspense>
+    // The same width and the same gutter as the header, so the run's left edge
+    // lands under the wordmark instead of being inset a second time inside it.
+    <main className="mx-auto flex w-full max-w-(--page-width) flex-1 flex-col px-6 py-6 md:px-8">
+      {/* One alignment column for everything on this screen. Up to lg it is
+          the reading measure, which is what the quiet title line and the run
+          have always shared; from xl it steps aside and the drill composition
+          below takes the full width of the page. */}
+      <div className="mx-auto flex w-full max-w-measure flex-1 flex-col xl:max-w-none">
+        {/* The slug is request data and the session is read per request, so
+            everything below streams in and the shell stays prerendered. */}
+        <Suspense fallback={<p className="text-ink-quiet text-meta">{t('loading')}</p>}>
+          <RunSetup params={params} />
+        </Suspense>
+      </div>
     </main>
   )
 }
@@ -53,8 +61,10 @@ async function RunSetup({ params }: { params: QuizParams }) {
           back sits next to it. */}
       {/* The measure is 62ch, and ch is read from the element's own font
           size: the wrapper has to sit at the body size or this line comes out
-          narrower than the run below it and the two left edges disagree. */}
-      <div className="mx-auto w-full max-w-measure">
+          narrower than the run below it and the two left edges disagree. From
+          xl the drill below is the full width of the page and this line
+          follows it, so the two still share an edge. */}
+      <div className="mx-auto w-full max-w-measure xl:max-w-none">
         <div className="flex flex-wrap items-baseline gap-x-5 gap-y-1 text-ink-quiet text-meta">
           <h1>{quiz.title}</h1>
           <Link href={`/q/${slug}`} className="underline underline-offset-4 hover:text-ink">

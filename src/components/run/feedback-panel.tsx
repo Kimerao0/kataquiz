@@ -56,11 +56,13 @@ export function FeedbackPanel({ result, showKeys, onNext }: FeedbackPanelProps) 
           chrome, and the explanation under it is the part worth reading. */}
       <h3
         className={cn(
-          'flex items-center gap-2 font-medium text-meta tracking-normal',
+          // Still chrome, but chrome a player can find: at the chrome size a
+          // verdict next to a 67px question is a line nobody looks at.
+          'flex items-center gap-2 font-medium text-meta tracking-normal xl:text-base 2xl:text-lg',
           verdict.tone,
         )}
       >
-        <verdict.Icon aria-hidden="true" className="size-4" />
+        <verdict.Icon aria-hidden="true" className="size-4 xl:size-5" />
         {verdict.title}
       </h3>
 
@@ -69,7 +71,9 @@ export function FeedbackPanel({ result, showKeys, onNext }: FeedbackPanelProps) 
       {/* Which option was right is marked on the option itself, directly
           above; restating it here only says the same thing twice. */}
       {result.explanation && (
-        <p className="whitespace-pre-line font-reading text-prose [overflow-wrap:anywhere] [word-break:normal]">
+        // The one thing on this screen that is genuinely read, so it keeps a
+        // reading measure where the question and the options drop theirs.
+        <p className="max-w-measure whitespace-pre-line font-reading text-prose [overflow-wrap:anywhere] [word-break:normal]">
           <QuizText value={result.explanation} />
         </p>
       )}
@@ -93,7 +97,7 @@ export function FeedbackPanel({ result, showKeys, onNext }: FeedbackPanelProps) 
           type="button"
           size="lg"
           onClick={onNext}
-          className="h-11 w-full rounded-md text-base sm:w-fit sm:px-8"
+          className="h-11 w-full rounded-md text-base sm:w-fit sm:px-8 xl:h-13 xl:px-10 xl:text-lg"
         >
           {result.summary === null ? t('next') : t('seeResult')}
         </Button>

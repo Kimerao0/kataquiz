@@ -46,7 +46,7 @@ export function RunSummary({ summary, quizSlug, comparison }: RunSummaryProps) {
     : { Icon: XIcon, title: t('failed'), tone: 'text-suo' }
 
   return (
-    <section className="mx-auto flex w-full max-w-measure flex-1 flex-col justify-center gap-10 py-10 md:py-14">
+    <section className="mx-auto flex w-full max-w-measure flex-1 flex-col justify-center gap-10 py-10 md:py-14 xl:mx-0">
       <div className="flex flex-col gap-3">
         <p className="text-ink-quiet text-meta">{t('summaryTitle')}</p>
         {/* Mark and words again: pass or fail must not rest on colour. */}

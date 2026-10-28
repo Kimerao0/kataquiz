@@ -63,6 +63,7 @@ export function QuestionCard({
   // copying the prompt into an aria-label: one copy of user-supplied text on
   // the page, and the screen reader hears the question once.
   const promptId = `${question.id}-prompt`
+  const multiHintId = `${question.id}-multi`
 
   const rows = question.options.map((option, index) => ({
     id: option.id,
@@ -75,7 +76,7 @@ export function QuestionCard({
   }))
 
   return (
-    <section className="flex flex-col gap-7">
+    <section className="flex flex-col gap-7 xl:gap-9">
       {/* Plain children, never dangerouslySetInnerHTML: the prompt is
           user-supplied and public, so markup in it has to stay text. */}
       <h2
@@ -87,6 +88,22 @@ export function QuestionCard({
         <QuizText value={question.prompt} />
       </h2>
 
+      {/* Read with the question, not after scanning past the options: a player
+          who assumes one answer has already chosen by the time a line under
+          the list, or the Confirm button below it, could tell them otherwise.
+          A single-answer question says nothing here — the round control and
+          the absence of this line are what it has to say. */}
+      {multi && (
+        <p
+          id={multiHintId}
+          // Quiet, but not so quiet it loses the race with a 67px question on
+          // a wide display: it has to be read before the options are.
+          className="-mt-4 text-ink-quiet text-meta xl:-mt-5 xl:text-base 2xl:text-lg"
+        >
+          {t('multiHint')}
+        </p>
+      )}
+
       {question.code !== null && (
         <QuestionCode code={question.code} language={question.codeLanguage} />
       )}
@@ -97,6 +114,7 @@ export function QuestionCard({
       {multi ? (
         <fieldset
           aria-labelledby={promptId}
+          aria-describedby={multiHintId}
           className="grid w-full gap-0 divide-y divide-rule border-rule border-t"
         >
           {rows.map((row) => (
@@ -144,7 +162,7 @@ export function QuestionCard({
       {/* The status line of a terminal: what to do, and the keys that do it.
           It doubles as the rule under the last option. */}
       {!answered && (
-        <p className="-mt-3 border-rule border-t pt-4 text-ink-quiet text-meta">
+        <p className="-mt-3 xl:-mt-4 border-rule border-t pt-4 text-ink-quiet text-meta">
           {/* One line, not two: where the key badges are on screen they say
               what to do, and the prose version only repeats them longer. */}
           {showKeys
@@ -163,7 +181,7 @@ export function QuestionCard({
           size="lg"
           disabled={locked}
           onClick={() => onCommit(selected)}
-          className="h-11 w-full rounded-md text-base sm:w-fit sm:px-8"
+          className="h-11 w-full rounded-md text-base sm:w-fit sm:px-8 xl:h-13 xl:px-10 xl:text-lg"
         >
           {submitting ? t('checking') : t('confirm')}
         </Button>
@@ -248,18 +266,27 @@ function OptionRow({
         onActivate?.()
       }}
       className={cn(
-        'flex w-full items-start gap-4 py-4 font-normal text-prose leading-relaxed',
+        // text-option, not text-prose: an option is operated rather than read,
+        // and it has to keep up with the question above it. The leading
+        // tightens where the face is large, the way the question's does.
+        'flex w-full items-start gap-4 py-4 font-normal text-option leading-relaxed',
+        'xl:gap-5 xl:py-5 xl:leading-snug 2xl:py-6',
         locked ? 'cursor-default' : 'cursor-pointer hover:bg-surface',
         !answered && selected && 'bg-accent',
       )}
     >
-      <span className="relative mt-[0.15em] inline-flex size-7 shrink-0">
+      <span className="relative mt-[0.15em] inline-flex size-7 shrink-0 xl:size-8 2xl:size-9">
         {control.kind === 'radio' ? (
           <RadioGroupItem
             id={id}
             value={id}
             className={cn(
-              'size-7 rounded-sm',
+              // Round, where the checkbox below is square. The key cap over
+              // it hides the dot and the tick alike, so the outline is the
+              // only thing left saying how many answers this question takes —
+              // and it says it in a shape, without colour and without a
+              // sentence to read.
+              'size-full rounded-full',
               // The dot would show through the digit sitting on top of it.
               (keyHint !== null || marker !== null) &&
                 '[&_[data-slot=radio-group-indicator]]:hidden',
@@ -273,7 +300,8 @@ function OptionRow({
             disabled={locked}
             onCheckedChange={control.onCheckedChange}
             className={cn(
-              'size-7 rounded-sm',
+              // Square, and deliberately so: see the radio above.
+              'size-full rounded-sm',
               (keyHint !== null || marker !== null) && '[&_[data-slot=checkbox-indicator]]:hidden',
               marker?.controlClass,
             )}
@@ -288,11 +316,11 @@ function OptionRow({
         <span
           aria-hidden="true"
           className={cn(
-            'pointer-events-none absolute inset-0 z-10 grid place-items-center font-mono text-meta leading-none',
+            'pointer-events-none absolute inset-0 z-10 grid place-items-center font-mono text-meta leading-none xl:text-base 2xl:text-lg',
             marker?.iconClass ?? (selected ? 'text-primary-foreground' : 'text-ink-quiet'),
           )}
         >
-          {marker !== null ? <marker.Icon className="size-4" /> : keyHint}
+          {marker !== null ? <marker.Icon className="size-4 xl:size-5 2xl:size-6" /> : keyHint}
         </span>
       </span>
 

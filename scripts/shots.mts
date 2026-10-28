@@ -29,6 +29,10 @@ const VIEWPORTS = [
   { width: 375, height: 812 },
   { width: 768, height: 1024 },
   { width: 1440, height: 900 },
+  // The owner's own display is ~2000px wide. Stopping at 1440 is how a page
+  // ends up as a narrow column floating in a void that nobody photographed.
+  { width: 1920, height: 1080 },
+  { width: 2560, height: 1440 },
 ]
 const SCHEMES = ['light', 'dark'] as const
 

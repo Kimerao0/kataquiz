@@ -74,6 +74,7 @@
     "tallyCounts": "{correct} correct, {wrong} wrong",
     "chooseOne": "Pick an answer to see whether it was right.",
     "chooseAll": "Pick every correct answer, then confirm.",
+    "multiHint": "Select all that apply.",
     "keysSingle": "A number highlights, Enter answers.",
     "keysMulti": "Numbers toggle, Enter confirms.",
     "keysNext": "Enter or \u2192 continues.",

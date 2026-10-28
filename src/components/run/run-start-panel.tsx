@@ -74,7 +74,7 @@ export function RunStartPanel({
   return (
     <form
       onSubmit={begin}
-      className="mx-auto flex w-full max-w-measure flex-1 flex-col justify-center gap-8 py-10 md:py-14"
+      className="mx-auto flex w-full max-w-measure flex-1 flex-col justify-center gap-8 py-10 md:py-14 xl:mx-0"
     >
       <div className="flex flex-col gap-3">
         <h2 className="font-reading font-semibold text-title">{t('title')}</h2>
