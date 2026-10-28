@@ -18,6 +18,8 @@ export type PublicQuestion = {
   type: 'single' | 'multi' | 'boolean'
   prompt: string
   imageUrl: string | null
+  code: string | null
+  codeLanguage: string | null
   options: PublicOption[]
 }
 
@@ -239,12 +241,17 @@ async function loadPublicQuestion(
   executor: Executor,
   questionId: string,
 ): Promise<PublicQuestion | null> {
+  // Projected column by column, never a spread of the question row: the row
+  // itself is harmless today, but the projection is what guarantees a column
+  // added to `questions` later is not served to a player by accident.
   const [question] = await executor
     .select({
       id: questions.id,
       type: questions.type,
       prompt: questions.prompt,
       imageUrl: questions.imageUrl,
+      code: questions.code,
+      codeLanguage: questions.codeLanguage,
     })
     .from(questions)
     .where(eq(questions.id, questionId))
@@ -265,6 +272,8 @@ async function loadPublicQuestion(
     type: question.type,
     prompt: question.prompt,
     imageUrl: question.imageUrl,
+    code: question.code,
+    codeLanguage: question.codeLanguage,
     options: publicOptions,
   }
 }

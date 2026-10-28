@@ -7,12 +7,12 @@ import { type SubmitResult, submitAnswerAction } from '@/app/(app)/q/[slug]/acti
 import { fetchChallengeComparisonAction } from '@/app/c/[attemptId]/actions'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
-import { Progress } from '@/components/ui/progress'
 import type { AnswerResult, PublicQuestion, RunStart, RunSummary } from '@/lib/run/service'
 import { FeedbackPanel } from './feedback-panel'
 import { QuestionCard } from './question-card'
 import { QuestionTimer } from './question-timer'
 import { type ComparisonState, RunSummary as RunSummaryPanel } from './run-summary'
+import { RunTally, type TallyOutcome } from './run-tally'
 
 type SubmitErrorCode = Extract<SubmitResult, { ok: false }>['error']
 
@@ -25,9 +25,10 @@ type Attempt = { optionIds: string[]; elapsedMs: number }
 /**
  * How long option input is ignored after the run moves to the next question.
  * The Next button sits where an option is about to be, so the second click of a
- * double click — or a fast second tap — would otherwise answer a question the
- * player has not read yet. Long enough to swallow that, short enough that a
- * player who is actually reading never meets it.
+ * double click — or a fast second tap, or a number key still held down — would
+ * otherwise answer a question the player has not read yet. Long enough to
+ * swallow that, short enough that a player who is actually reading never meets
+ * it.
  */
 export const ADVANCE_LOCK_MS = 300
 
@@ -42,6 +43,23 @@ type RunPlayerProps = {
   challenge?: { opponentName: string }
 }
 
+/** '1'–'9' to a zero-based option index. Zero is skipped: it misfires. */
+function optionIndexFromKey(key: string): number | null {
+  if (key.length !== 1 || key < '1' || key > '9') return null
+  return Number(key) - 1
+}
+
+function isTextEntry(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false
+  return target.closest('input, textarea, select, [contenteditable="true"]') !== null
+}
+
+// A focused button already turns Enter into a click. Handling the same press
+// here as well would advance the run twice and skip a question unread.
+function isButton(target: EventTarget | null): boolean {
+  return target instanceof HTMLElement && target.closest('button, a[href]') !== null
+}
+
 export function RunPlayer({ run, quizSlug, challenge }: RunPlayerProps) {
   const t = useTranslations('run')
   const tCommon = useTranslations('common')
@@ -54,6 +72,9 @@ export function RunPlayer({ run, quizSlug, challenge }: RunPlayerProps) {
   const [pending, setPending] = useState(false)
   const [failure, setFailure] = useState<Failure | null>(null)
   const [startedAt, setStartedAt] = useState(() => Date.now())
+  // One entry per question the server has already graded, in order. It is the
+  // tally, and nothing else reads it: the score still comes from the summary.
+  const [outcomes, setOutcomes] = useState<TallyOutcome[]>([])
   // Undefined for an ordinary run, which is what keeps the summary identical
   // to the one it renders today.
   const [comparison, setComparison] = useState<ComparisonState | undefined>(undefined)
@@ -64,6 +85,17 @@ export function RunPlayer({ run, quizSlug, challenge }: RunPlayerProps) {
   // way out of it: a player who waits is never blocked, and unmounting during
   // the wait cannot leave a lock behind.
   const [advanceLock, setAdvanceLock] = useState(false)
+  // Whether the number-key badges are on screen. Telling a phone to press 2 is
+  // an instruction nobody there can follow, so they start off and appear for a
+  // pointer precise enough to come with a keyboard, or for the first key press.
+  const [showKeys, setShowKeys] = useState(false)
+
+  useEffect(() => {
+    // Optional because jsdom has no matchMedia at all: where the question
+    // cannot be asked, the badges simply wait for the first key press.
+    const keyboardish = window.matchMedia?.('(hover: hover) and (pointer: fine)')
+    if (keyboardish?.matches === true) setShowKeys(true)
+  }, [])
 
   useEffect(() => {
     if (!advanceLock) return
@@ -94,6 +126,9 @@ export function RunPlayer({ run, quizSlug, challenge }: RunPlayerProps) {
       })
       if (outcome.ok) {
         setFeedback(outcome.result)
+        // Appended here rather than on advancing, so the mark for the question
+        // in hand fills in the moment the verdict does.
+        setOutcomes((current) => [...current, outcome.result.correct ? 'correct' : 'wrong'])
         // Started here and not when the summary is opened: the run is finished
         // as of this answer, which is the first moment the server will part
         // with the opponent's score, and the player is still reading the last
@@ -169,6 +204,73 @@ export function RunPlayer({ run, quizSlug, challenge }: RunPlayerProps) {
     setAdvanceLock(true)
   }
 
+  function toggle(optionId: string) {
+    setSelected((current) =>
+      current.includes(optionId) ? current.filter((id) => id !== optionId) : [...current, optionId],
+    )
+  }
+
+  function handleKey(event: KeyboardEvent) {
+    // A held key repeats. Without this, holding 2 would select and then
+    // immediately commit, and the hold would carry into the next question.
+    if (event.repeat || event.altKey || event.ctrlKey || event.metaKey) return
+    if (isTextEntry(event.target)) return
+
+    if (feedback !== null) {
+      if (event.key !== 'Enter' && event.key !== 'ArrowRight') return
+      if (event.key === 'Enter' && isButton(event.target)) return
+      event.preventDefault()
+      setShowKeys(true)
+      next()
+      return
+    }
+
+    // Nothing to answer with while an answer is in flight, and nothing to
+    // answer at all in the moment after the run advanced.
+    if (pending || advanceLock) return
+
+    if (event.key === 'Enter') {
+      if (isButton(event.target)) return
+      if (question.type !== 'multi' && selected.length === 0) return
+      event.preventDefault()
+      setShowKeys(true)
+      commit(selected)
+      return
+    }
+
+    const index = optionIndexFromKey(event.key)
+    if (index === null) return
+    const option = question.options[index]
+    if (option === undefined) return
+
+    event.preventDefault()
+    setShowKeys(true)
+
+    // Multi has always needed a second, separate act to answer; single now
+    // does too. A number key highlights, and only a second press of the same
+    // key — or Enter — commits, because a habitual press must not quietly
+    // answer a question that was never read.
+    if (question.type === 'multi') toggle(option.id)
+    else if (selected[0] === option.id) commit([option.id])
+    else setSelected([option.id])
+  }
+
+  // The handler closes over every piece of state above and is rebuilt on each
+  // render; listing it as a dependency would tear the listener down and build
+  // it again every time. The ref keeps the dependency array honest about what
+  // actually changes the subscription.
+  const handleKeyRef = useRef(handleKey)
+  useEffect(() => {
+    handleKeyRef.current = handleKey
+  })
+
+  useEffect(() => {
+    if (summary !== null) return
+    const listener = (event: KeyboardEvent) => handleKeyRef.current(event)
+    window.addEventListener('keydown', listener)
+    return () => window.removeEventListener('keydown', listener)
+  }, [summary])
+
   if (summary !== null) {
     return <RunSummaryPanel summary={summary} quizSlug={quizSlug} comparison={comparison} />
   }
@@ -177,73 +279,65 @@ export function RunPlayer({ run, quizSlug, challenge }: RunPlayerProps) {
   const correctOptionIds = feedback?.correctOptionIds ?? null
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-2">
-        <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-          <p className="text-muted-foreground text-sm">
-            {t('progress', { position, total: run.total })}
-          </p>
-          <QuestionTimer
-            timePerQuestionSec={run.timePerQuestionSec}
-            startedAt={startedAt}
-            // The whole point of the timer: it measures answering only, and
-            // stops the instant an answer is in flight or graded.
-            running={!answered && !pending && !expired}
-            onExpire={expire}
-          />
-        </div>
-        <Progress aria-label={t('progressLabel')} value={((position - 1) / run.total) * 100} />
+    <div className="mx-auto flex w-full max-w-measure flex-1 flex-col">
+      {/* The chrome, and all of it: reps counted on the left, the clock on the
+          right, a hairline under both. Everything below is the question. */}
+      <div className="flex items-start justify-between gap-6 border-rule border-b pb-4">
+        <RunTally total={run.total} position={position} outcomes={outcomes} />
+        <QuestionTimer
+          timePerQuestionSec={run.timePerQuestionSec}
+          startedAt={startedAt}
+          // The whole point of the timer: it measures answering only, and
+          // stops the instant an answer is in flight or graded.
+          running={!answered && !pending && !expired}
+          onExpire={expire}
+        />
       </div>
 
-      <QuestionCard
-        key={question.id}
-        question={question}
-        selected={selected}
-        onSelect={setSelected}
-        onCommit={commit}
-        locked={pending || answered || advanceLock}
-        submitting={pending}
-        correctOptionIds={correctOptionIds}
-      />
-
-      {failure !== null && (
-        <Alert variant="destructive">
-          <AlertTitle>{t('submitErrorTitle')}</AlertTitle>
-          <AlertDescription className="flex flex-col items-start gap-3">
-            {failure.retryable ? (
-              <>
-                <p>{tCommon('error')}</p>
-                <Button
-                  type="button"
-                  disabled={pending}
-                  onClick={() => submit(lastAttempt.current)}
-                >
-                  {pending ? t('checking') : tCommon('retry')}
-                </Button>
-              </>
-            ) : (
-              <>
-                <p>{t(`submitErrors.${failure.code}`)}</p>
-                {/* Nothing to retry: the answer landed, or this run is not
-                    reachable any more. The only way on is a new run. */}
-                <Link href={`/q/${quizSlug}/run`} className="underline underline-offset-4">
-                  {t('startAgain')}
-                </Link>
-              </>
-            )}
-          </AlertDescription>
-        </Alert>
-      )}
-
-      {feedback !== null && (
-        <FeedbackPanel
-          result={feedback}
-          correctOptionTexts={question.options
-            .filter((option) => feedback.correctOptionIds.includes(option.id))
-            .map((option) => option.text)}
-          onNext={next}
+      <div className="flex flex-1 flex-col justify-center gap-8 py-10 md:py-14">
+        <QuestionCard
+          key={question.id}
+          question={question}
+          selected={selected}
+          onSelect={setSelected}
+          onCommit={commit}
+          locked={pending || answered || advanceLock}
+          submitting={pending}
+          correctOptionIds={correctOptionIds}
+          showKeys={showKeys}
         />
-      )}
+
+        {failure !== null && (
+          <Alert variant="destructive">
+            <AlertTitle>{t('submitErrorTitle')}</AlertTitle>
+            <AlertDescription className="flex flex-col items-start gap-3">
+              {failure.retryable ? (
+                <>
+                  <p>{tCommon('error')}</p>
+                  <Button
+                    type="button"
+                    disabled={pending}
+                    onClick={() => submit(lastAttempt.current)}
+                  >
+                    {pending ? t('checking') : tCommon('retry')}
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <p>{t(`submitErrors.${failure.code}`)}</p>
+                  {/* Nothing to retry: the answer landed, or this run is not
+                      reachable any more. The only way on is a new run. */}
+                  <Link href={`/q/${quizSlug}/run`} className="underline underline-offset-4">
+                    {t('startAgain')}
+                  </Link>
+                </>
+              )}
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {feedback !== null && <FeedbackPanel result={feedback} showKeys={showKeys} onNext={next} />}
+      </div>
     </div>
   )
 }

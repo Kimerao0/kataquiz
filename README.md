@@ -12,7 +12,7 @@ Built with Next.js (App Router), TypeScript, Postgres, Drizzle and Better Auth. 
 
 ## Quiz file format
 
-A quiz is one `.yaml`, `.yml` or `.json` file. This example uses every field, including the optional ones:
+A quiz is one `.yaml`, `.yml` or `.json` file. This example uses every field except the two code fields, which get their own example under [Code in questions](#code-in-questions):
 
 ```yaml
 version: 1
@@ -65,9 +65,48 @@ A file that fails validation writes nothing. Every error is reported, not just t
 | option `text`            | 1 to 500 characters.                                                                              |
 | `imageUrl`, `theoryUrl`  | Optional. Must be a valid `http:` or `https:` URL.                                                |
 | `explanation`            | Optional string.                                                                                  |
+| `code`                   | Optional, 1 to 2000 characters. Rendered as a block under the prompt.                             |
+| `codeLanguage`           | Optional, at most 20 characters, lowercase letters, digits, `+`, `#` and `-` only.                |
 | file size                | At most 1 MiB (1,048,576 bytes), checked on upload.                                               |
 
 The source of truth is [`src/lib/quiz-schema/index.ts`](src/lib/quiz-schema/index.ts). It is a zod schema that imports nothing from the app.
+
+### Code in questions
+
+Question banks about programming contain code, and a snippet pasted into a sentence is unreadable. There are two ways to write it, and they are independent — a question may use either, both or neither.
+
+**A backtick span is inline code.** Inside any `prompt`, option `text` or `explanation`, a pair of single backticks marks a short span — an identifier, a keyword, an expression — and it is rendered as inline code:
+
+```yaml
+prompt: "What is the type of `x` here?"
+```
+
+The rules are deliberately forgiving, so an author who typed a backtick for some other reason never loses the rest of their sentence:
+
+- An unpaired backtick is a literal backtick. It does not open a span that runs to the end of the text.
+- An empty pair, ` ` ``, is two literal backticks, not an empty span. The same rule makes a markdown-style ` ``double`` ` run literal.
+- `` \` `` is a literal backtick. A backslash anywhere else is itself literal.
+- A span is never trimmed, and may contain newlines.
+
+**The `code` field is a block.** For anything longer than a span — a function, several lines, anything with indentation that matters — put the snippet in `code` and let the prompt ask the question in prose. `codeLanguage` is an optional hint for highlighting:
+
+```yaml
+- type: single
+  prompt: "What is the type of `x` where the comment is?"
+  code: |
+    function f(x: string | number) {
+      if (typeof x === 'string') {
+        // here
+      }
+    }
+  codeLanguage: typescript
+  explanation: "`typeof x === 'string'` is a type guard, so the union narrows to `string`."
+  options:
+    - { text: "`string | number`", correct: false }
+    - { text: "`string`", correct: true }
+```
+
+Neither mechanism is markdown and neither produces HTML. Quiz content is user-supplied and public, so the parser in [`src/lib/quiz-schema/inline-code.ts`](src/lib/quiz-schema/inline-code.ts) returns a list of plain `{ kind, value }` segments and the UI renders them as React children. Nothing in a quiz file is ever interpreted as markup.
 
 ## Run rules
 

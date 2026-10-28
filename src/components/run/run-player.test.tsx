@@ -24,6 +24,8 @@ const single: PublicQuestion = {
   type: 'single',
   prompt: 'What does a red triangular sign mean?',
   imageUrl: null,
+  code: null,
+  codeLanguage: null,
   options: [
     { id: 'o1', text: 'Warning' },
     { id: 'o2', text: 'Prohibition' },
@@ -35,6 +37,8 @@ const second: PublicQuestion = {
   type: 'single',
   prompt: 'What colour is a stop sign?',
   imageUrl: null,
+  code: null,
+  codeLanguage: null,
   options: [
     { id: 'p1', text: 'Red' },
     { id: 'p2', text: 'Blue' },
@@ -46,6 +50,8 @@ const multi: PublicQuestion = {
   type: 'multi',
   prompt: 'Which of these warn of danger?',
   imageUrl: null,
+  code: null,
+  codeLanguage: null,
   options: [
     { id: 'm1', text: 'Triangle' },
     { id: 'm2', text: 'Circle' },
@@ -122,7 +128,9 @@ describe('run player', () => {
     expect(screen.getByRole('heading', { name: single.prompt })).toBeVisible()
     expect(option('Warning')).toBeVisible()
     expect(option('Prohibition')).toBeVisible()
-    expect(screen.getByText('Question 1 of 2')).toBeVisible()
+    // The tally draws the position; this sentence is what carries it to a
+    // screen reader, and it is deliberately not on screen.
+    expect(screen.getByText('Question 1 of 2')).toBeInTheDocument()
     // Nothing is given away before the answer: no verdict anywhere on screen.
     expect(screen.queryByText('Correct answer')).not.toBeInTheDocument()
   })
@@ -223,12 +231,16 @@ describe('run player', () => {
     await userEvent.click(option('Warning'))
 
     expect(await screen.findByText('Wrong')).toBeVisible()
-    // Marked on the option itself, in words rather than by colour…
-    expect(within(rowOf('Prohibition')).getByText('Correct answer')).toBeVisible()
-    expect(within(rowOf('Warning')).getByText('Your answer')).toBeVisible()
+    // Marked on the row itself. What is on screen there is a mark in the
+    // gutter and a struck line; these words are the same verdict for a screen
+    // reader, so the assertion is about the row's text and not its visibility
+    // — jsdom loads no CSS and could not tell those apart anyway.
+    expect(rowOf('Prohibition')).toHaveTextContent('Correct answer')
+    expect(rowOf('Warning')).toHaveTextContent('Your answer')
     expect(within(rowOf('Warning')).queryByText('Correct answer')).not.toBeInTheDocument()
-    // …and restated where the eye already is.
-    expect(screen.getByText('The correct answer: Prohibition')).toBeVisible()
+    // Not restated underneath: the rows above already say it, and repeating
+    // it in the explanation was the loudest thing on the screen.
+    expect(screen.queryByText(/The correct answer/)).not.toBeInTheDocument()
   })
 
   it('disables the options while a submission is in flight', async () => {
@@ -258,7 +270,7 @@ describe('run player', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Next question' }))
 
     expect(screen.getByRole('heading', { name: second.prompt })).toBeVisible()
-    expect(screen.getByText('Question 2 of 2')).toBeVisible()
+    expect(screen.getByText('Question 2 of 2')).toBeInTheDocument()
     // A fresh question, with no trace of the last verdict.
     expect(screen.queryByText('Correct')).not.toBeInTheDocument()
     // Answerable again once the brief post-advance lock has lifted, which it
@@ -404,6 +416,137 @@ describe('run player', () => {
     } finally {
       vi.useRealTimers()
     }
+  })
+
+  // The keys are the point of the screen: a player drills with a hand on the
+  // numbers, not on a mouse. What they must never do is answer by themselves.
+  describe('the number keys', () => {
+    it('highlights an option without answering it', async () => {
+      renderRun(single)
+
+      await userEvent.keyboard('2')
+
+      expect(option('Prohibition')).toBeChecked()
+      // The whole reason the second press exists: a habit of tapping a number
+      // must not answer a question that was never read.
+      expect(submitAnswerAction).not.toHaveBeenCalled()
+    })
+
+    it('answers on a second press of the same number', async () => {
+      renderRun(single)
+
+      await userEvent.keyboard('22')
+
+      expect(submitAnswerAction).toHaveBeenCalledTimes(1)
+      expect(submitAnswerAction).toHaveBeenCalledWith(
+        expect.objectContaining({ questionId: 'q1', selectedOptionIds: ['o2'] }),
+      )
+    })
+
+    it('moves the highlight when a different number is pressed', async () => {
+      renderRun(single)
+
+      await userEvent.keyboard('21')
+
+      expect(option('Warning')).toBeChecked()
+      expect(option('Prohibition')).not.toBeChecked()
+      expect(submitAnswerAction).not.toHaveBeenCalled()
+    })
+
+    it('answers the highlighted option on Enter', async () => {
+      renderRun(single)
+
+      await userEvent.keyboard('2{Enter}')
+
+      expect(submitAnswerAction).toHaveBeenCalledWith(
+        expect.objectContaining({ selectedOptionIds: ['o2'] }),
+      )
+    })
+
+    it('does nothing on Enter when nothing is highlighted', async () => {
+      renderRun(single)
+
+      await userEvent.keyboard('{Enter}')
+
+      expect(submitAnswerAction).not.toHaveBeenCalled()
+    })
+
+    it('ignores a number with no option behind it, and ignores zero', async () => {
+      renderRun(single)
+
+      await userEvent.keyboard('90')
+
+      expect(option('Warning')).not.toBeChecked()
+      expect(option('Prohibition')).not.toBeChecked()
+      expect(submitAnswerAction).not.toHaveBeenCalled()
+    })
+
+    it('ignores a key that is being held down', async () => {
+      renderRun(single)
+
+      // The first press of a hold selects; what must not happen is the repeat
+      // stream behind it committing the selection it has just made.
+      fireEvent.keyDown(window, { key: '2' })
+      fireEvent.keyDown(window, { key: '2', repeat: true })
+      fireEvent.keyDown(window, { key: '2', repeat: true })
+
+      expect(option('Prohibition')).toBeChecked()
+      expect(submitAnswerAction).not.toHaveBeenCalled()
+    })
+
+    it('toggles on a multi question and confirms on Enter', async () => {
+      renderRun(multi)
+
+      await userEvent.keyboard('13')
+      expect(submitAnswerAction).not.toHaveBeenCalled()
+
+      // The same key again is a toggle here, not a commit: the set is only
+      // finished when the player says so.
+      await userEvent.keyboard('3')
+      await userEvent.keyboard('{Enter}')
+
+      expect(submitAnswerAction).toHaveBeenCalledTimes(1)
+      expect(submitAnswerAction).toHaveBeenCalledWith(
+        expect.objectContaining({ questionId: 'q3', selectedOptionIds: ['m1'] }),
+      )
+    })
+
+    it('advances on Enter once the feedback is up, and only once', async () => {
+      renderRun(single)
+
+      await userEvent.click(option('Warning'))
+      await screen.findByRole('button', { name: 'Next question' })
+      await userEvent.keyboard('{Enter}')
+
+      // Two is what a double advance would look like: the Next button has
+      // focus and turns Enter into a click of its own.
+      expect(screen.getByRole('heading', { name: second.prompt })).toBeVisible()
+      expect(screen.getByText('Question 2 of 2')).toBeInTheDocument()
+    })
+
+    it('advances on the right arrow as well', async () => {
+      renderRun(single)
+
+      await userEvent.click(option('Warning'))
+      await screen.findByRole('button', { name: 'Next question' })
+      await userEvent.keyboard('{ArrowRight}')
+
+      expect(screen.getByRole('heading', { name: second.prompt })).toBeVisible()
+    })
+
+    it('does not answer the next question with a key held through the advance', async () => {
+      renderRun(single)
+
+      await userEvent.click(option('Warning'))
+      await userEvent.click(await screen.findByRole('button', { name: 'Next question' }))
+
+      // Straight after advancing, inside the input lock.
+      fireEvent.keyDown(window, { key: '1' })
+      fireEvent.keyDown(window, { key: '1' })
+
+      expect(submitAnswerAction).toHaveBeenCalledTimes(1)
+      expect(submitAnswerAction).toHaveBeenCalledWith(expect.objectContaining({ questionId: 'q1' }))
+    })
   })
 
   // The Next button sits roughly where an option lands once the feedback panel

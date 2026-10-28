@@ -32,10 +32,10 @@ export default function ChallengePage({ params }: { params: ChallengeParams }) {
   const t = useTranslations('common')
 
   return (
-    <main className="mx-auto flex w-full max-w-2xl flex-col gap-6 p-8">
+    <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col px-6 py-6 md:px-8">
       {/* The attempt id is request data and the session is read per request, so
           everything below streams in and the shell stays prerendered. */}
-      <Suspense fallback={<p className="opacity-70">{t('loading')}</p>}>
+      <Suspense fallback={<p className="text-ink-quiet text-meta">{t('loading')}</p>}>
         <ChallengeSetup params={params} />
       </Suspense>
     </main>
@@ -56,11 +56,21 @@ async function ChallengeSetup({ params }: { params: ChallengeParams }) {
 
   return (
     <>
-      <h1 className="font-bold text-3xl">
-        <Link href={`/q/${invite.quizSlug}`} className="underline-offset-4 hover:underline">
-          {invite.quizTitle}
-        </Link>
-      </h1>
+      {/* Context, not the headline: the invite below is what this page is
+          for. Same quiet line as the run page carries. */}
+      {/* The measure is 62ch, read from this element's own font size, so the
+          wrapper stays at the body size and the quiet line below it keeps the
+          same left edge as the panel. */}
+      <div className="mx-auto w-full max-w-measure">
+        <h1 className="text-ink-quiet text-meta">
+          <Link
+            href={`/q/${invite.quizSlug}`}
+            className="underline underline-offset-4 hover:text-ink"
+          >
+            {invite.quizTitle}
+          </Link>
+        </h1>
+      </div>
       <ChallengeInvitePanel
         attemptId={invite.attemptId}
         quizSlug={invite.quizSlug}

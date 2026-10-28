@@ -1,6 +1,7 @@
 import { connection } from 'next/server'
 import { useTranslations } from 'next-intl'
 import { Suspense } from 'react'
+import { PageFrame } from '@/components/page-frame'
 import { configuredProviders } from '@/lib/auth'
 import { SignInOptions } from './sign-in-options'
 
@@ -19,16 +20,14 @@ export default function SignInPage() {
   const tCommon = useTranslations('common')
 
   return (
-    <main className="mx-auto flex w-full max-w-md flex-col gap-6 p-8">
-      <div className="flex flex-col gap-1">
-        <h1 className="font-bold text-3xl">{t('title')}</h1>
-        <p className="opacity-70">{t('intro')}</p>
-      </div>
+    <PageFrame title={t('title')} lead={t('intro')}>
       {/* SignInOptions also reads `next` from the query string, which is
           request data: the shell above stays prerendered either way. */}
-      <Suspense fallback={<p className="opacity-70">{tCommon('loading')}</p>}>
-        <ProviderOptions />
-      </Suspense>
-    </main>
+      <div className="max-w-sm pt-4">
+        <Suspense fallback={<p className="text-ink-quiet text-meta">{tCommon('loading')}</p>}>
+          <ProviderOptions />
+        </Suspense>
+      </div>
+    </PageFrame>
   )
 }

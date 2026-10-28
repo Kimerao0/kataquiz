@@ -30,6 +30,8 @@ const run: RunStart = {
     type: 'single',
     prompt: 'What does a red triangular sign mean?',
     imageUrl: null,
+    code: null,
+    codeLanguage: null,
     options: [
       { id: 'o1', text: 'Warning' },
       { id: 'o2', text: 'Prohibition' },

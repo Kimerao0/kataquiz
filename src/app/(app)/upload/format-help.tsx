@@ -10,8 +10,8 @@ export function FormatHelp() {
   const t = useTranslations('upload')
 
   return (
-    <details className="rounded-lg border border-border p-3">
-      <summary className="cursor-pointer font-medium text-sm">{t('formatSummary')}</summary>
+    <details className="border-rule border-y py-3">
+      <summary className="cursor-pointer text-meta">{t('formatSummary')}</summary>
       <div className="flex flex-col gap-3 pt-3">
         <p className="text-muted-foreground text-sm">{t('formatIntro')}</p>
         {/* Scrolls sideways on a narrow screen instead of widening the page. */}

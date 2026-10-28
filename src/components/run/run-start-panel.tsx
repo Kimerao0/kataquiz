@@ -72,10 +72,13 @@ export function RunStartPanel({
         })
 
   return (
-    <form onSubmit={begin} className="flex flex-col gap-4">
-      <div className="flex flex-col gap-1">
-        <h2 className="font-semibold text-xl">{t('title')}</h2>
-        <p className="text-muted-foreground">{settings}</p>
+    <form
+      onSubmit={begin}
+      className="mx-auto flex w-full max-w-measure flex-1 flex-col justify-center gap-8 py-10 md:py-14"
+    >
+      <div className="flex flex-col gap-3">
+        <h2 className="font-reading font-semibold text-title">{t('title')}</h2>
+        <p className="text-ink-quiet text-meta">{settings}</p>
       </div>
 
       {askNickname && (
@@ -89,8 +92,9 @@ export function RunStartPanel({
             placeholder={t('nicknamePlaceholder')}
             aria-describedby="nickname-hint"
             onChange={(event) => setNickname(event.target.value)}
+            className="h-11 max-w-sm rounded-md text-base"
           />
-          <p id="nickname-hint" className="text-muted-foreground text-sm">
+          <p id="nickname-hint" className="text-ink-quiet text-meta">
             {t('nicknameHint')}
           </p>
         </div>
@@ -104,7 +108,12 @@ export function RunStartPanel({
         </Alert>
       )}
 
-      <Button type="submit" size="lg" disabled={starting}>
+      <Button
+        type="submit"
+        size="lg"
+        disabled={starting}
+        className="h-12 w-full rounded-md text-base sm:w-fit sm:px-10"
+      >
         {starting ? t('starting') : t('begin')}
       </Button>
     </form>

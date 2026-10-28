@@ -5,9 +5,45 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-  --font-heading: var(--font-geist-sans);
+  /* The UI face is the default: chrome (nav, buttons, tags, counts, inputs)
+     is the common case, reading is the exception. font-sans therefore IS the
+     mono; Literata is reached deliberately with font-reading. */
+  --font-sans: var(--font-plex-mono), ui-monospace, monospace;
+  --font-mono: var(--font-plex-mono), ui-monospace, monospace;
+  --font-reading: var(--font-literata), Georgia, serif;
+  --font-heading: var(--font-reading);
+
+  /* Palette primitives, exposed as utilities (bg-paper, text-ink-quiet, ...). */
+  --color-paper: var(--paper);
+  --color-ink: var(--ink);
+  --color-ink-quiet: var(--ink-quiet);
+  --color-ai: var(--ai);
+  --color-suo: var(--suo);
+  --color-rule: var(--rule);
+  --color-surface: var(--surface);
+
+  /* Type scale for the sizes that carry the design. */
+  --text-question: clamp(1.5rem, 1.15rem + 1.4vw, 2.125rem);
+  --text-question--line-height: 1.4;
+  --text-prose: 1.125rem;
+  --text-prose--line-height: 1.6;
+  --text-meta: 0.875rem;
+  --text-meta--line-height: 1.5;
+  --text-title: clamp(1.875rem, 1.3rem + 2.2vw, 3rem);
+  --text-title--line-height: 1.15;
+  /* Sumi weight: the page title, set the way a brushed character sits on a
+     sheet. --text-display is for copy we write; --text-display-user is for a
+     title someone else wrote, which can be long. */
+  --text-display: clamp(3rem, 1.2rem + 7vw, 5rem);
+  --text-display--line-height: 0.95;
+  --text-display-user: clamp(2.25rem, 1rem + 3.2vw, 3.25rem);
+  --text-display-user--line-height: 1.02;
+
+  /* Reading measure: max-w-measure. In rem, not ch: ch resolves against the
+     element's own font size, so 62ch on a text-meta element came out ~70px
+     narrower than on body text and columns stopped sharing an edge. 37rem is
+     what 62ch measured at body size (~595px). */
+  --container-measure: 37rem;
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -47,84 +83,248 @@
 }
 
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  color-scheme: light;
+
+  /* The palette. The only place a colour value is written. */
+  --paper: #f1f3f2;
+  --ink: #15181c;
+  --ink-quiet: #5a6169;
+  --ai: #27418c; /* indigo: primary, correct, focus */
+  --suo: #8e4a5e; /* sappanwood: wrong */
+  --rule: #d3d8d5;
+  --surface: #ffffff;
+  --on-ai: var(--surface);
+  --page-width: 80rem;
+  --spine: 2px;
+
+  /* shadcn names, mapped onto the palette. */
+  --background: var(--paper);
+  --foreground: var(--ink);
+  --card: var(--surface);
+  --card-foreground: var(--ink);
+  --popover: var(--surface);
+  --popover-foreground: var(--ink);
+  --primary: var(--ai);
+  --primary-foreground: var(--on-ai);
+  --secondary: color-mix(in oklab, var(--rule) 45%, var(--paper));
+  --secondary-foreground: var(--ink);
+  --muted: color-mix(in oklab, var(--rule) 45%, var(--paper));
+  --muted-foreground: var(--ink-quiet);
+  --accent: color-mix(in oklab, var(--ai) 10%, var(--paper));
+  --accent-foreground: var(--ink);
+  --destructive: var(--suo);
+  --border: var(--rule);
+  --input: var(--rule);
+  --ring: var(--ai);
+  --chart-1: color-mix(in oklab, var(--ai) 35%, var(--paper));
+  --chart-2: color-mix(in oklab, var(--ai) 55%, var(--paper));
+  --chart-3: color-mix(in oklab, var(--ai) 75%, var(--paper));
+  --chart-4: var(--ai);
+  --chart-5: var(--suo);
+  --radius: 0.125rem; /* near-square: the seal and the joinery agree */
+  --sidebar: var(--surface);
+  --sidebar-foreground: var(--ink);
+  --sidebar-primary: var(--ai);
+  --sidebar-primary-foreground: var(--on-ai);
+  --sidebar-accent: color-mix(in oklab, var(--ai) 10%, var(--paper));
+  --sidebar-accent-foreground: var(--ink);
+  --sidebar-border: var(--rule);
+  --sidebar-ring: var(--ai);
 }
 
+/* Only the primitives change; the mapping above re-resolves on the same element. */
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  color-scheme: dark;
+  --paper: #14171a;
+  --ink: #e8ebe9;
+  --ink-quiet: #9ba3aa;
+  --ai: #7b93d6;
+  --suo: #c98196;
+  --rule: #2a2f35;
+  --surface: #1b1f24;
+  --on-ai: var(--paper);
 }
 
 @layer base {
   * {
     border-color: var(--border);
-    outline-color: color-mix(in oklab, var(--ring) 50%, transparent);
   }
   body {
     background-color: var(--background);
     color: var(--foreground);
+    line-height: 1.6;
   }
   html {
     font-family: var(--font-sans);
   }
+  kbd,
+  samp,
+  .font-mono {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+/* A tag as a filter: plain text in the UI face, indigo only when it is the
+   one in force. Used by the catalog rail and the quiz detail page. */
+@utility tag-link {
+  display: inline-block;
+  padding-block: 0.25rem;
+  font-size: var(--text-meta);
+  line-height: var(--text-meta--line-height);
+  color: var(--ink-quiet);
+  text-underline-offset: 0.3em;
+  &:hover {
+    color: var(--ink);
+    text-decoration-line: underline;
+  }
+  &[aria-current="true"] {
+    color: var(--ai);
+    font-weight: 600;
+    text-decoration-line: underline;
+    text-decoration-thickness: 2px;
+  }
+}
+
+/* A catalog row is one big link (the title's ::after stretches over it), so
+   the focus ring belongs on the row, not on the title text alone. */
+.row-link:focus-visible {
+  outline: none;
+}
+.quiz-row:has(.row-link:focus-visible) {
+  outline: 3px solid var(--ring);
+  outline-offset: 4px;
+}
+
+/* Unlayered on purpose: the vendored ui components set outline-none and a
+   half-transparent ring, and unlayered rules beat every @layer utility. */
+:focus-visible {
+  outline: 3px solid var(--ring);
+  outline-offset: 3px;
+  box-shadow: none;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  :root {
+    --theme-transition: background-color 150ms ease, color 150ms ease, border-color 150ms ease;
+  }
+  body {
+    transition: var(--theme-transition);
+  }
+}
+
+/* ---- The page frame -------------------------------------------------------
+   One composition for every page: a head column (title, a line of lead, any
+   tools) and a body column, divided by a single ink rule, the spine. On a
+   phone the spine hangs down the left edge and both blocks stack beside it;
+   from lg up it moves to a third of the way across, the head weighted left,
+   the body right, the space under the head left empty on purpose. The header
+   uses the same two columns so the wordmark and the nav sit either side of
+   the spine. */
+@layer components {
+  .page {
+    display: grid;
+    flex: 1;
+    width: 100%;
+    max-width: var(--page-width);
+    margin-inline: auto;
+    padding-inline: 1.5rem;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto 1fr;
+  }
+  .page-head,
+  .page-body {
+    min-width: 0;
+    border-inline-start: var(--spine) solid var(--ink);
+    padding-inline-start: 1.25rem;
+  }
+  .page-head {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+    padding-block: 2.5rem 2rem;
+  }
+  .page-body {
+    padding-block: 0 4rem;
+  }
+  @media (min-width: 48rem) {
+    .page {
+      padding-inline: 2rem;
+    }
+  }
+  @media (min-width: 64rem) {
+    .page {
+      grid-template-columns: minmax(0, 4fr) minmax(0, 8fr);
+      grid-template-rows: 1fr;
+    }
+    .page-head {
+      position: sticky;
+      top: 0;
+      align-self: start;
+      border-inline-start: 0;
+      padding-inline: 0 3rem;
+      padding-block: 4rem;
+    }
+    .page-body {
+      padding-inline-start: 3rem;
+      padding-block: 4rem;
+    }
+  }
+
+  .display {
+    font-family: var(--font-reading);
+    font-size: var(--text-display);
+    line-height: var(--text-display--line-height);
+    font-weight: 800;
+    letter-spacing: -0.035em;
+    text-wrap: balance;
+    overflow-wrap: break-word;
+    hyphens: auto;
+  }
+  .display-user {
+    font-size: var(--text-display-user);
+    line-height: var(--text-display-user--line-height);
+    letter-spacing: -0.03em;
+  }
+
+  /* The hanko: a square of ink, turned a few degrees, the mark reversed out,
+     with a thin keyline inside. Sized by font-size so the glyph and keyline
+     scale with it. --seal-color picks the ink. */
+  .seal {
+    position: relative;
+    display: inline-grid;
+    flex: none;
+    place-items: center;
+    inline-size: 1em;
+    aspect-ratio: 1;
+    font-size: var(--seal-size, 1.75rem);
+    background: var(--seal-color, var(--ai));
+    color: var(--on-ai);
+    rotate: -4deg;
+    border-radius: 0.04em;
+    line-height: 1;
+  }
+  .seal::before {
+    content: "";
+    position: absolute;
+    inset: 0.09em;
+    border: 0.035em solid currentColor;
+    opacity: 0.65;
+  }
+  .seal > span {
+    position: relative;
+    font-family: var(--font-reading);
+    font-weight: 800;
+    font-size: 0.56em;
+  }
+  .seal[data-length="2"] > span {
+    font-size: 0.4em;
+  }
+  .seal[data-length="3"] > span {
+    font-size: 0.3em;
+  }
+}
+
+/* One seal per page: when a page stamps itself, the wordmark gives its up. */
+body:has([data-page-seal]) .wordmark .seal {
+  display: none;
 }

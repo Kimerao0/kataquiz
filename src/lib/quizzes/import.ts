@@ -75,6 +75,8 @@ async function insertQuiz(
         imageUrl: question.imageUrl,
         explanation: question.explanation,
         theoryUrl: question.theoryUrl,
+        code: question.code,
+        codeLanguage: question.codeLanguage,
       })),
     )
     .returning({ id: questions.id })

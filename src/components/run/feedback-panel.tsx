@@ -1,17 +1,17 @@
 'use client'
 
-import { CheckCircle2Icon, TimerOffIcon, XCircleIcon } from 'lucide-react'
+import { CheckIcon, TimerOffIcon, XIcon } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { useEffect, useRef } from 'react'
 import { Button } from '@/components/ui/button'
-import { Separator } from '@/components/ui/separator'
 import type { AnswerResult } from '@/lib/run/service'
 import { cn } from '@/lib/utils'
+import { QuizText } from './quiz-text'
 
 type FeedbackPanelProps = {
   result: AnswerResult
-  /** The texts behind result.correctOptionIds, resolved by the player. */
-  correctOptionTexts: string[]
+  /** Whether the keyboard way on is worth mentioning; see RunPlayer. */
+  showKeys: boolean
   onNext: () => void
 }
 
@@ -31,7 +31,7 @@ function httpUrlOrNull(value: string | null): string | null {
   }
 }
 
-export function FeedbackPanel({ result, correctOptionTexts, onNext }: FeedbackPanelProps) {
+export function FeedbackPanel({ result, showKeys, onNext }: FeedbackPanelProps) {
   const t = useTranslations('run')
   const nextRef = useRef<HTMLButtonElement>(null)
   const safeTheoryUrl = httpUrlOrNull(result.theoryUrl)
@@ -45,36 +45,33 @@ export function FeedbackPanel({ result, correctOptionTexts, onNext }: FeedbackPa
   // Three verdicts, not two: running out of time is wrong, but saying only
   // "wrong" hides why.
   const verdict = result.timedOut
-    ? { Icon: TimerOffIcon, title: t('feedbackTimedOut') }
+    ? { Icon: TimerOffIcon, title: t('feedbackTimedOut'), tone: 'text-suo' }
     : result.correct
-      ? { Icon: CheckCircle2Icon, title: t('feedbackCorrect') }
-      : { Icon: XCircleIcon, title: t('feedbackWrong') }
+      ? { Icon: CheckIcon, title: t('feedbackCorrect'), tone: 'text-ai' }
+      : { Icon: XIcon, title: t('feedbackWrong'), tone: 'text-suo' }
 
   return (
-    <section
-      aria-live="polite"
-      className={cn(
-        'flex flex-col gap-4 rounded-lg border p-4',
-        result.correct ? 'border-primary' : 'border-destructive',
-      )}
-    >
-      {/* An icon and words, never colour alone. */}
-      <h3 className="flex items-center gap-2 font-semibold text-lg">
-        <verdict.Icon aria-hidden="true" className="size-5" />
+    <section aria-live="polite" className="flex flex-col gap-5 border-rule border-t pt-6">
+      {/* A mark and a word, never colour alone. Mono and small: the verdict is
+          chrome, and the explanation under it is the part worth reading. */}
+      <h3
+        className={cn(
+          'flex items-center gap-2 font-medium text-meta tracking-normal',
+          verdict.tone,
+        )}
+      >
+        <verdict.Icon aria-hidden="true" className="size-4" />
         {verdict.title}
       </h3>
 
-      {result.timedOut && <p>{t('feedbackTimedOutBody')}</p>}
+      {result.timedOut && <p className="text-ink-quiet text-meta">{t('feedbackTimedOutBody')}</p>}
 
-      {!result.correct && correctOptionTexts.length > 0 && (
-        <p>{t('correctAnswerWas', { options: correctOptionTexts.join(', ') })}</p>
-      )}
-
+      {/* Which option was right is marked on the option itself, directly
+          above; restating it here only says the same thing twice. */}
       {result.explanation && (
-        <>
-          <Separator />
-          <p className="whitespace-pre-line">{result.explanation}</p>
-        </>
+        <p className="whitespace-pre-line font-reading text-prose [overflow-wrap:anywhere] [word-break:normal]">
+          <QuizText value={result.explanation} />
+        </p>
       )}
 
       {safeTheoryUrl && (
@@ -84,15 +81,24 @@ export function FeedbackPanel({ result, correctOptionTexts, onNext }: FeedbackPa
           href={safeTheoryUrl}
           target="_blank"
           rel="noreferrer noopener"
-          className="w-fit underline underline-offset-4"
+          className="w-fit text-ink-quiet text-meta underline underline-offset-4 hover:text-ink"
         >
           {t('theoryLink')}
         </a>
       )}
 
-      <Button ref={nextRef} type="button" size="lg" onClick={onNext}>
-        {result.summary === null ? t('next') : t('seeResult')}
-      </Button>
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+        <Button
+          ref={nextRef}
+          type="button"
+          size="lg"
+          onClick={onNext}
+          className="h-11 w-full rounded-md text-base sm:w-fit sm:px-8"
+        >
+          {result.summary === null ? t('next') : t('seeResult')}
+        </Button>
+        {showKeys && <p className="text-ink-quiet text-meta">{t('keysNext')}</p>}
+      </div>
     </section>
   )
 }

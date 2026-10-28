@@ -1,17 +1,21 @@
 import type { Metadata } from 'next'
-import { Geist, Geist_Mono } from 'next/font/google'
+import { IBM_Plex_Mono, Literata } from 'next/font/google'
 import { NextIntlClientProvider } from 'next-intl'
 import { getMessages } from 'next-intl/server'
 import { SiteHeader } from '@/components/site-header'
+import { themeInitScript } from '@/lib/theme'
 import './globals.css'
 
-const geistSans = Geist({
-  variable: '--font-geist-sans',
+const literata = Literata({
+  variable: '--font-literata',
+  // The opsz axis is what gives large Literata its higher stroke contrast.
+  axes: ['opsz'],
   subsets: ['latin'],
 })
 
-const geistMono = Geist_Mono({
-  variable: '--font-geist-mono',
+const plexMono = IBM_Plex_Mono({
+  variable: '--font-plex-mono',
+  weight: ['400', '500', '600'],
   subsets: ['latin'],
 })
 
@@ -24,7 +28,14 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const messages = await getMessages()
 
   return (
-    <html lang="en" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
+    <html
+      lang="en"
+      suppressHydrationWarning
+      className={`${literata.variable} ${plexMono.variable} h-full antialiased`}
+    >
+      <head>
+        <script>{themeInitScript}</script>
+      </head>
       <body className="flex min-h-full flex-col">
         <NextIntlClientProvider messages={messages}>
           <SiteHeader />

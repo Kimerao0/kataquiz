@@ -3,10 +3,14 @@
 import { useTranslations } from 'next-intl'
 import { useEffect, useRef, useState } from 'react'
 import { TIMER_GRACE_MS } from '@/lib/run/engine'
+import { cn } from '@/lib/utils'
 
 // Sub-second, so the countdown never visibly skips a number and the auto-submit
 // lands promptly once the deadline passes.
 const TICK_MS = 250
+
+/** Below this the clock turns sappanwood: the last few seconds read differently. */
+const LOW_TIME_SEC = 5
 
 type QuestionTimerProps = {
   timePerQuestionSec: number | null
@@ -72,7 +76,12 @@ export function QuestionTimer({
     <p
       role="timer"
       aria-label={t('timerLabel')}
-      className="text-muted-foreground text-sm tabular-nums"
+      // The number itself says the same thing; the colour only makes it
+      // harder to miss in the corner of the eye.
+      className={cn(
+        'shrink-0 pt-px font-mono text-meta tabular-nums',
+        seconds <= LOW_TIME_SEC ? 'text-suo' : 'text-ink-quiet',
+      )}
     >
       {seconds === 0 ? t('lastChance') : t('timeLeft', { seconds })}
     </p>

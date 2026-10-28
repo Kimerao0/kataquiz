@@ -205,6 +205,8 @@ describe('startRun', () => {
       expect(run.question.type).toBe('single')
       expect(run.question.prompt).toBe('Question 0')
       expect(run.question.imageUrl).toBeNull()
+      expect(run.question.code).toBeNull()
+      expect(run.question.codeLanguage).toBeNull()
       // Sorted: which options come back is this test's business, the order they
       // come back in belongs to the shuffle tests below.
       expect(run.question.options.map((option) => option.text).sort()).toEqual([
@@ -212,6 +214,23 @@ describe('startRun', () => {
         'Wrong 0.1',
       ])
       expect(run.timePerQuestionSec).toBe(30)
+    })
+  })
+
+  it('serves the code block and its language on the public question', async () => {
+    await withTestDb(async (tx) => {
+      const seed = await seedQuiz(tx, { questionCount: 1 })
+      const code =
+        "function f(x: string | number) {\n  if (typeof x === 'string') {\n    // here\n  }\n}"
+      await tx
+        .update(questions)
+        .set({ code, codeLanguage: 'typescript' })
+        .where(eq(questions.id, seed.questions[0].id))
+
+      const run = await startRun({ quizId: seed.quizId, player: seed.player, executor: tx })
+
+      expect(run.question.code).toBe(code)
+      expect(run.question.codeLanguage).toBe('typescript')
     })
   })
 
@@ -224,6 +243,18 @@ describe('startRun', () => {
       for (const option of run.question.options) {
         expect(Object.keys(option).sort()).toEqual(['id', 'text'])
       }
+      // The question is projected column by column for the same reason, so its
+      // key set is pinned here too: a spread of the question row would widen
+      // this silently every time a column is added to the table.
+      expect(Object.keys(run.question).sort()).toEqual([
+        'code',
+        'codeLanguage',
+        'id',
+        'imageUrl',
+        'options',
+        'prompt',
+        'type',
+      ])
       // Replacing the projection with a spread of the option row would put
       // isCorrect in here, and nothing else in this file would notice.
       const payload = JSON.stringify(run)

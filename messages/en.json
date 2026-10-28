@@ -9,11 +9,12 @@
     "upload": "Upload a quiz",
     "signIn": "Sign in",
     "signOut": "Sign out",
-    "signingOut": "Signing out\u2026",
-    "signedInAs": "Signed in as {name}"
+    "signingOut": "Signing out…",
+    "signedInAs": "Signed in as {name}",
+    "darkMode": "Dark mode"
   },
   "common": {
-    "loading": "Loading\u2026",
+    "loading": "Loading…",
     "error": "Something went wrong.",
     "retry": "Try again",
     "cancel": "Cancel",
@@ -21,9 +22,8 @@
   },
   "catalog": {
     "title": "Browse quizzes",
-    "intro": "Search the public catalog, or narrow it down by tag.",
     "searchLabel": "Search quizzes",
-    "searchPlaceholder": "Search by title or description",
+    "searchPlaceholder": "Title or description",
     "searchSubmit": "Search",
     "tagsLabel": "Popular tags",
     "paginationLabel": "Pagination",
@@ -36,13 +36,24 @@
     "noQuizzesTitle": "No quizzes yet",
     "noQuizzesBody": "The catalog is empty.",
     "noQuizzesCta": "Upload the first one",
-    "deletedAuthor": "Deleted account"
+    "emptySeal": "0",
+    "deletedAuthor": "Deleted account",
+    "resultCount": "{count, plural, =1 {# quiz} other {# quizzes}}",
+    "clearTag": "Clear tag filter"
   },
   "quiz": {
     "author": "By {name}",
     "runSettings": "{questions, plural, =1 {# question} other {# questions}}, {errors, plural, =0 {no mistakes allowed} =1 {up to # mistake} other {up to # mistakes}}, {seconds}s each",
     "runSettingsUntimed": "{questions, plural, =1 {# question} other {# questions}}, {errors, plural, =0 {no mistakes allowed} =1 {up to # mistake} other {up to # mistakes}}, no time limit",
-    "start": "Start"
+    "start": "Start",
+    "tagsLabel": "Tags",
+    "questionsInBank": "Questions in the quiz",
+    "questionsPerRun": "Questions per run",
+    "mistakesAllowed": "Mistakes allowed",
+    "timePerQuestion": "Time per question",
+    "seconds": "{seconds}s",
+    "untimed": "No limit",
+    "settingsLabel": "Run settings"
   },
   "run": {
     "title": "Ready to drill",
@@ -50,7 +61,7 @@
     "nicknamePlaceholder": "How should we call you?",
     "nicknameHint": "Optional, and only used on challenges you share.",
     "begin": "Begin",
-    "starting": "Starting\u2026",
+    "starting": "Starting…",
     "startErrorTitle": "The run could not be started",
     "startAgain": "Start a new run",
     "startErrors": {
@@ -60,11 +71,14 @@
       "unexpected": "The server did not answer. Check your connection and try again."
     },
     "progress": "Question {position} of {total}",
-    "progressLabel": "Run progress",
+    "tallyCounts": "{correct} correct, {wrong} wrong",
     "chooseOne": "Pick an answer to see whether it was right.",
     "chooseAll": "Pick every correct answer, then confirm.",
+    "keysSingle": "A number highlights, Enter answers.",
+    "keysMulti": "Numbers toggle, Enter confirms.",
+    "keysNext": "Enter or \u2192 continues.",
     "confirm": "Confirm answer",
-    "checking": "Checking\u2026",
+    "checking": "Checking…",
     "correctMark": "Correct answer",
     "yourAnswer": "Your answer",
     "timeLeft": "{seconds}s left",
@@ -73,7 +87,6 @@
     "feedbackWrong": "Wrong",
     "feedbackTimedOut": "Out of time",
     "feedbackTimedOutBody": "The clock ran out, so this one counts as wrong. Take your time reading on.",
-    "correctAnswerWas": "The correct answer: {options}",
     "theoryLink": "Read the theory",
     "next": "Next question",
     "seeResult": "See your result",
@@ -125,7 +138,7 @@
     "title": "Sign in",
     "intro": "Sign in to upload a quiz. Browsing and running quizzes needs no account.",
     "continueWith": "Continue with {provider}",
-    "redirecting": "Redirecting\u2026",
+    "redirecting": "Redirecting…",
     "errorTitle": "Sign-in could not be started",
     "errorBody": "The provider did not answer. Check your connection and try again.",
     "noProvidersTitle": "No sign-in provider is configured",
@@ -142,7 +155,7 @@
     "textLabel": "Or paste the file contents",
     "textPlaceholder": "Paste your YAML or JSON quiz here",
     "submit": "Upload quiz",
-    "submitting": "Uploading\u2026",
+    "submitting": "Uploading…",
     "errorsTitle": "This file was not accepted",
     "signInTitle": "Sign in to upload",
     "signInCta": "Sign in",
@@ -168,11 +181,13 @@
   "notFound": {
     "title": "That link leads nowhere",
     "body": "Nothing lives at this address. A challenge link dies with the run behind it, so one that was never finished leads here, and so does a quiz its author has removed. A mistyped address does the same.",
-    "cta": "Browse quizzes"
+    "cta": "Browse quizzes",
+    "seal": "404"
   },
   "errorPage": {
     "title": "This page did not load",
     "body": "Something broke on our side, not yours. Nothing you had already finished is lost. Trying again often works.",
-    "home": "Browse quizzes"
+    "home": "Browse quizzes",
+    "seal": "!"
   }
 }

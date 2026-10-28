@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { useTranslations } from 'next-intl'
 import { getTranslations } from 'next-intl/server'
 import { Suspense } from 'react'
+import { PageFrame } from '@/components/page-frame'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { getCurrentUser } from '@/lib/session'
 import { FormatHelp } from './format-help'
@@ -12,20 +13,18 @@ export default function UploadPage() {
   const tCommon = useTranslations('common')
 
   return (
-    <main className="mx-auto flex w-full max-w-2xl flex-col gap-6 p-8">
-      <div className="flex flex-col gap-1">
-        <h1 className="font-bold text-3xl">{t('title')}</h1>
-        <p className="opacity-70">{t('intro')}</p>
+    <PageFrame title={t('title')} lead={t('intro')}>
+      <div className="flex max-w-measure flex-col gap-8 pt-4">
+        {/* Above the session boundary on purpose: the format does not depend on
+            who is asking, so it is part of the static shell and is there for a
+            signed-out visitor too. */}
+        <FormatHelp />
+        {/* The session is read per request, so it cannot be part of the static shell. */}
+        <Suspense fallback={<p className="text-ink-quiet text-meta">{tCommon('loading')}</p>}>
+          <UploadSection />
+        </Suspense>
       </div>
-      {/* Above the session boundary on purpose: the format does not depend on
-          who is asking, so it is part of the static shell and is there for a
-          signed-out visitor too. */}
-      <FormatHelp />
-      {/* The session is read per request, so it cannot be part of the static shell. */}
-      <Suspense fallback={<p className="opacity-70">{tCommon('loading')}</p>}>
-        <UploadSection />
-      </Suspense>
-    </main>
+    </PageFrame>
   )
 }
 

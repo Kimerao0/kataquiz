@@ -178,6 +178,76 @@ describe('parseQuizText', () => {
     expect(result.data.run.timePerQuestionSec).toBeUndefined()
   })
 
+  it('accepts a question with a code block and a language', () => {
+    const question = {
+      ...singleQuestion,
+      prompt: 'What is the type of `x` where the comment is?',
+      code: "function f(x: string | number) {\n  if (typeof x === 'string') {\n    // here\n  }\n}",
+      codeLanguage: 'typescript',
+    }
+    const result = parseObject(makeQuiz({ questions: [question, booleanQuestion] }))
+    if (!result.ok) throw new Error(`expected ok: ${result.errors.join(', ')}`)
+    expect(result.data.questions[0].code).toBe(question.code)
+    expect(result.data.questions[0].codeLanguage).toBe('typescript')
+  })
+
+  it('accepts a boolean question carrying code', () => {
+    const question = { ...booleanQuestion, code: 'const x: unknown = 1', codeLanguage: 'ts' }
+    const result = parseObject(makeQuiz({ questions: [singleQuestion, question] }))
+    if (!result.ok) throw new Error(`expected ok: ${result.errors.join(', ')}`)
+    expect(result.data.questions[1].code).toBe('const x: unknown = 1')
+    expect(result.data.questions[1].codeLanguage).toBe('ts')
+  })
+
+  it('accepts a question with neither code nor codeLanguage', () => {
+    const result = parseObject(makeQuiz())
+    if (!result.ok) throw new Error('expected ok')
+    expect(result.data.questions[0].code).toBeUndefined()
+    expect(result.data.questions[0].codeLanguage).toBeUndefined()
+  })
+
+  it('accepts code of exactly 2000 characters', () => {
+    const question = { ...singleQuestion, code: 'a'.repeat(2000) }
+    expect(parseObject(makeQuiz({ questions: [question, booleanQuestion] })).ok).toBe(true)
+  })
+
+  it('rejects code longer than 2000 characters', () => {
+    const question = { ...singleQuestion, code: 'a'.repeat(2001) }
+    expect(errorsOf(makeQuiz({ questions: [question, booleanQuestion] })).join('\n')).toMatch(
+      /code/,
+    )
+  })
+
+  it('rejects an empty code block', () => {
+    const question = { ...singleQuestion, code: '' }
+    expect(errorsOf(makeQuiz({ questions: [question, booleanQuestion] })).join('\n')).toMatch(
+      /code/,
+    )
+  })
+
+  it('rejects a codeLanguage with uppercase or spaces', () => {
+    for (const codeLanguage of ['TypeScript', 'type script', 'ts;rm -rf', '<script>']) {
+      const question = { ...singleQuestion, codeLanguage }
+      expect(errorsOf(makeQuiz({ questions: [question, booleanQuestion] })).join('\n')).toMatch(
+        /codeLanguage/,
+      )
+    }
+  })
+
+  it('rejects a codeLanguage longer than 20 characters', () => {
+    const question = { ...singleQuestion, codeLanguage: 'a'.repeat(21) }
+    expect(errorsOf(makeQuiz({ questions: [question, booleanQuestion] })).join('\n')).toMatch(
+      /codeLanguage/,
+    )
+  })
+
+  it('accepts the punctuation real language tags use', () => {
+    for (const codeLanguage of ['ts', 'c++', 'c#', 'objective-c', 'html5']) {
+      const question = { ...singleQuestion, codeLanguage }
+      expect(parseObject(makeQuiz({ questions: [question, booleanQuestion] })).ok).toBe(true)
+    }
+  })
+
   it('rejects a javascript: imageUrl', () => {
     const question = { ...singleQuestion, imageUrl: 'javascript:alert(1)' }
     expect(errorsOf(makeQuiz({ questions: [question, booleanQuestion] })).join('\n')).toMatch(

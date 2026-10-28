@@ -82,6 +82,8 @@ const run = {
     type: 'single' as const,
     prompt: 'Why?',
     imageUrl: null,
+    code: null,
+    codeLanguage: null,
     options: [],
   },
   total: 5,

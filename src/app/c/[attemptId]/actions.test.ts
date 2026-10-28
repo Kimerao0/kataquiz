@@ -66,7 +66,15 @@ const invite = {
 
 const run = {
   attemptId: 'attempt-2',
-  question: { id: 'q1', type: 'single' as const, prompt: 'Why?', imageUrl: null, options: [] },
+  question: {
+    id: 'q1',
+    type: 'single' as const,
+    prompt: 'Why?',
+    imageUrl: null,
+    code: null,
+    codeLanguage: null,
+    options: [],
+  },
   total: 8,
   timePerQuestionSec: 30,
 }

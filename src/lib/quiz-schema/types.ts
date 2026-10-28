@@ -8,6 +8,9 @@ export type ParsedQuestion = {
   imageUrl?: string
   explanation?: string
   theoryUrl?: string
+  // A snippet shown as its own block, rather than crammed into the prompt.
+  code?: string
+  codeLanguage?: string
   // Always present after parsing, including for boolean questions
   options: ParsedOption[]
 }

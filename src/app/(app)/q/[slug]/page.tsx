@@ -4,7 +4,7 @@ import { notFound } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { getTranslations } from 'next-intl/server'
 import { cache, Suspense } from 'react'
-import { Badge } from '@/components/ui/badge'
+import { PageFrame } from '@/components/page-frame'
 import { buttonVariants } from '@/components/ui/button'
 import { getQuizBySlug } from '@/lib/quizzes/search'
 
@@ -26,12 +26,16 @@ export default function QuizPage({ params }: { params: QuizParams }) {
   const t = useTranslations('common')
 
   return (
-    <main className="mx-auto flex w-full max-w-2xl flex-col gap-6 p-8">
-      {/* The slug is request data, so the quiz streams in below the shell. */}
-      <Suspense fallback={<p className="opacity-70">{t('loading')}</p>}>
-        <QuizDetail params={params} />
-      </Suspense>
-    </main>
+    // The slug is request data, so the quiz streams in below the shell.
+    <Suspense
+      fallback={
+        <PageFrame>
+          <p className="pt-4 text-ink-quiet text-meta">{t('loading')}</p>
+        </PageFrame>
+      }
+    >
+      <QuizDetail params={params} />
+    </Suspense>
   )
 }
 
@@ -41,7 +45,6 @@ async function QuizDetail({ params }: { params: QuizParams }) {
   if (!quiz) notFound()
 
   const t = await getTranslations('quiz')
-  const tCommon = await getTranslations('common')
   const tCatalog = await getTranslations('catalog')
   // A quiz outlives its author's account, so the byline has to stand in for one.
   const authorName = quiz.authorName ?? tCatalog('deletedAuthor')
@@ -49,41 +52,64 @@ async function QuizDetail({ params }: { params: QuizParams }) {
   // fewer questions than questionsPerRun plays what it has, and promising more
   // here than the run panel then offers reads as a bug.
   const questionsPerRun = Math.min(quiz.questionsPerRun, quiz.questionCount)
-  const runSettings = quiz.timePerQuestionSec
-    ? t('runSettings', {
-        questions: questionsPerRun,
-        errors: quiz.maxErrors,
-        seconds: quiz.timePerQuestionSec,
-      })
-    : t('runSettingsUntimed', { questions: questionsPerRun, errors: quiz.maxErrors })
+  const timeValue = quiz.timePerQuestionSec
+    ? t('seconds', { seconds: quiz.timePerQuestionSec })
+    : t('untimed')
+  const settings = [
+    ...(quiz.questionCount > questionsPerRun
+      ? [{ label: t('questionsInBank'), value: quiz.questionCount }]
+      : []),
+    { label: t('questionsPerRun'), value: questionsPerRun },
+    { label: t('mistakesAllowed'), value: quiz.maxErrors },
+    { label: t('timePerQuestion'), value: timeValue },
+  ]
 
+  // The title and its byline take the head column; the reading, the run
+  // settings and the way in take the body. Start comes last, after the numbers
+  // it is about to commit you to.
   return (
-    <article className="flex flex-col gap-4">
-      <div className="flex flex-col gap-1">
-        <h1 className="font-bold text-3xl">{quiz.title}</h1>
-        <p className="opacity-70">{t('author', { name: authorName })}</p>
+    <PageFrame
+      title={quiz.title}
+      userTitle
+      lead={null}
+      tools={<p className="text-ink-quiet text-meta">{t('author', { name: authorName })}</p>}
+    >
+      <div className="flex max-w-measure flex-col gap-8 pt-4">
+        {quiz.description && <p className="font-reading text-prose">{quiz.description}</p>}
+
+        {quiz.tags.length > 0 && (
+          <ul aria-label={t('tagsLabel')} className="flex flex-wrap gap-x-4">
+            {quiz.tags.map((tag) => (
+              <li key={tag}>
+                <Link href={`/?tag=${encodeURIComponent(tag)}`} className="tag-link">
+                  {tag}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        <section aria-label={t('settingsLabel')} className="flex flex-col gap-8">
+          <dl className="divide-y divide-rule border-rule border-y">
+            {settings.map(({ label, value }) => (
+              <div key={label} className="flex items-baseline justify-between gap-6 py-3">
+                <dt className="text-ink-quiet text-meta">{label}</dt>
+                <dd className="font-reading font-semibold text-xl">{value}</dd>
+              </div>
+            ))}
+          </dl>
+
+          <Link
+            href={`/q/${quiz.slug}/run`}
+            className={buttonVariants({
+              size: 'lg',
+              className: 'h-12 w-full text-base sm:w-fit sm:px-12',
+            })}
+          >
+            {t('start')}
+          </Link>
+        </section>
       </div>
-
-      {quiz.description && <p>{quiz.description}</p>}
-
-      {quiz.tags.length > 0 && (
-        <div className="flex flex-wrap gap-2">
-          {quiz.tags.map((tag) => (
-            <Badge key={tag} variant="outline">
-              {tag}
-            </Badge>
-          ))}
-        </div>
-      )}
-
-      <ul className="flex flex-col gap-1 opacity-70">
-        <li>{tCommon('questionCount', { count: quiz.questionCount })}</li>
-        <li>{runSettings}</li>
-      </ul>
-
-      <Link href={`/q/${quiz.slug}/run`} className={buttonVariants({ size: 'lg' })}>
-        {t('start')}
-      </Link>
-    </article>
+    </PageFrame>
   )
 }

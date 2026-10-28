@@ -79,12 +79,19 @@ export function ChallengeInvitePanel({
   // the way on is the quiz itself.
   if (questionCount === 0) {
     return (
-      <section className="flex flex-col gap-4">
-        <div className="flex flex-col gap-1">
-          <h2 className="font-semibold text-xl">{t('emptyTitle')}</h2>
-          <p className="text-muted-foreground">{t('emptyBody')}</p>
+      <section className="mx-auto flex w-full max-w-measure flex-col gap-6 py-10">
+        <div className="flex flex-col gap-3">
+          <h2 className="font-reading font-semibold text-title">{t('emptyTitle')}</h2>
+          <p className="font-reading text-prose">{t('emptyBody')}</p>
         </div>
-        <Link href={`/q/${quizSlug}`} className={buttonVariants({ variant: 'outline' })}>
+        <Link
+          href={`/q/${quizSlug}`}
+          className={buttonVariants({
+            variant: 'outline',
+            size: 'lg',
+            className: 'h-11 w-full rounded-md text-base sm:w-fit sm:px-8',
+          })}
+        >
           {t('viewQuiz')}
         </Link>
       </section>
@@ -92,14 +99,19 @@ export function ChallengeInvitePanel({
   }
 
   return (
-    <form onSubmit={begin} className="flex flex-col gap-4">
-      <div className="flex flex-col gap-1">
+    <form
+      onSubmit={begin}
+      className="mx-auto flex w-full max-w-measure flex-1 flex-col justify-center gap-8 py-10 md:py-14"
+    >
+      <div className="flex flex-col gap-3">
         {/* A name a stranger chose, interpolated as text and nothing else. */}
-        <h2 className="font-semibold text-xl">{t('invitedBy', { name: opponentName })}</h2>
-        <p className="text-muted-foreground">
+        <h2 className="font-reading font-semibold text-title [overflow-wrap:anywhere]">
+          {t('invitedBy', { name: opponentName })}
+        </h2>
+        <p className="text-ink-quiet text-meta">
           {tCommon('questionCount', { count: questionCount })}
         </p>
-        <p className="text-muted-foreground">{t('intro')}</p>
+        <p className="font-reading text-prose">{t('intro')}</p>
       </div>
 
       {askNickname && (
@@ -113,8 +125,9 @@ export function ChallengeInvitePanel({
             placeholder={tRun('nicknamePlaceholder')}
             aria-describedby="nickname-hint"
             onChange={(event) => setNickname(event.target.value)}
+            className="h-11 max-w-sm rounded-md text-base"
           />
-          <p id="nickname-hint" className="text-muted-foreground text-sm">
+          <p id="nickname-hint" className="text-ink-quiet text-meta">
             {tRun('nicknameHint')}
           </p>
         </div>
@@ -128,7 +141,12 @@ export function ChallengeInvitePanel({
         </Alert>
       )}
 
-      <Button type="submit" size="lg" disabled={starting}>
+      <Button
+        type="submit"
+        size="lg"
+        disabled={starting}
+        className="h-12 w-full rounded-md text-base sm:w-fit sm:px-10"
+      >
         {starting ? tRun('starting') : t('begin')}
       </Button>
     </form>

@@ -1,5 +1,7 @@
 import Link from 'next/link'
 import { useTranslations } from 'next-intl'
+import { PageFrame } from '@/components/page-frame'
+import { Seal } from '@/components/seal'
 import { buttonVariants } from '@/components/ui/button'
 
 // One page serves every 404: a challenge link whose run was abandoned, an
@@ -13,12 +15,13 @@ export default function NotFound() {
   const t = useTranslations('notFound')
 
   return (
-    <main className="mx-auto flex w-full max-w-2xl flex-col items-start gap-4 p-8">
-      <h1 className="font-bold text-3xl">{t('title')}</h1>
-      <p className="text-muted-foreground">{t('body')}</p>
-      <Link href="/" className={buttonVariants({ size: 'lg' })}>
-        {t('cta')}
-      </Link>
-    </main>
+    <PageFrame seal={<Seal glyph={t('seal')} size="6rem" color="suo" page />} title={t('title')}>
+      <div className="flex max-w-measure flex-col items-start gap-6 pt-4">
+        <p className="font-reading text-ink-quiet text-prose">{t('body')}</p>
+        <Link href="/" className={buttonVariants({ size: 'lg', className: 'h-12 px-8 text-base' })}>
+          {t('cta')}
+        </Link>
+      </div>
+    </PageFrame>
   )
 }

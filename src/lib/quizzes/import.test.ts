@@ -144,6 +144,36 @@ describe('importQuiz', () => {
     })
   })
 
+  it('persists a code block and its language, and reads them back intact', async () => {
+    await withTestDb(async (tx) => {
+      const authorId = await insertUser(tx)
+      const code =
+        "function f(x: string | number) {\n  if (typeof x === 'string') {\n    // here\n  }\n}"
+      const file = quizFile()
+      file.questions[0].code = code
+      file.questions[0].codeLanguage = 'typescript'
+
+      const { quizId } = await importQuiz({ file, authorId, executor: tx })
+
+      const quiz = await readQuiz(tx, quizId)
+      // Byte for byte: indentation and newlines are the point of a code block.
+      expect(quiz?.questions[0].code).toBe(code)
+      expect(quiz?.questions[0].codeLanguage).toBe('typescript')
+    })
+  })
+
+  it('stores null code for a question that has none', async () => {
+    await withTestDb(async (tx) => {
+      const authorId = await insertUser(tx)
+
+      const { quizId } = await importQuiz({ file: quizFile(), authorId, executor: tx })
+
+      const quiz = await readQuiz(tx, quizId)
+      expect(quiz?.questions[0].code).toBeNull()
+      expect(quiz?.questions[0].codeLanguage).toBeNull()
+    })
+  })
+
   it('stores the run settings and tags from the file', async () => {
     await withTestDb(async (tx) => {
       const authorId = await insertUser(tx)

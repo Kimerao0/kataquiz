@@ -132,6 +132,10 @@ export const questions = pgTable(
     imageUrl: text('image_url'),
     explanation: text('explanation'),
     theoryUrl: text('theory_url'),
+    // A snippet rendered as its own block. Nullable: most questions have none,
+    // and every question written before this column existed has none either.
+    code: text('code'),
+    codeLanguage: text('code_language'),
   },
   (table) => [unique().on(table.quizId, table.position)],
 )

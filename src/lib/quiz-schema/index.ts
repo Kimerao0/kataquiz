@@ -21,11 +21,23 @@ const optionsBetween = z
 
 const countCorrect = (options: { correct: boolean }[]) => options.filter((o) => o.correct).length
 
+// A language tag, not free text: it is a hint a renderer looks up, and the set
+// of real tags is lowercase alphanumerics plus the punctuation in 'c++', 'c#'
+// and 'objective-c'.
+const codeLanguage = z
+  .string()
+  .max(20)
+  .regex(/^[a-z0-9+#-]+$/, {
+    error: 'must be lowercase letters, digits, +, # or -',
+  })
+
 const baseQuestionShape = {
   prompt: z.string().min(1).max(2000),
   imageUrl: httpUrl.optional(),
   explanation: z.string().optional(),
   theoryUrl: httpUrl.optional(),
+  code: z.string().min(1).max(2000).optional(),
+  codeLanguage: codeLanguage.optional(),
 }
 
 const singleQuestionSchema = z.object({

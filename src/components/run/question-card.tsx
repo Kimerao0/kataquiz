@@ -1,15 +1,22 @@
 'use client'
 
-import { CheckIcon } from 'lucide-react'
+import { CheckIcon, XIcon } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { useState } from 'react'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import type { PublicQuestion } from '@/lib/run/service'
 import { cn } from '@/lib/utils'
+import { QuizText } from './quiz-text'
+
+/**
+ * How many options a number key can reach. Zero is deliberately not one of
+ * them: it misfires on some layouts, and an option nobody can see the key for
+ * is better than one that answers by accident.
+ */
+const KEYED_OPTIONS = 9
 
 type QuestionCardProps = {
   question: PublicQuestion
@@ -31,6 +38,12 @@ type QuestionCardProps = {
   submitting: boolean
   /** Null until the server has graded this question; the client never derives it. */
   correctOptionIds: string[] | null
+  /**
+   * Whether the number-key badges are shown. A badge that says "press 2" on a
+   * phone with no keyboard is an instruction nobody can follow, so the player
+   * decides this by owning a keyboard rather than the component by assuming it.
+   */
+  showKeys: boolean
 }
 
 export function QuestionCard({
@@ -41,147 +54,168 @@ export function QuestionCard({
   locked,
   submitting,
   correctOptionIds,
+  showKeys,
 }: QuestionCardProps) {
   const t = useTranslations('run')
   const multi = question.type === 'multi'
+  const answered = correctOptionIds !== null
   // The option group is named by pointing at the heading rather than by
   // copying the prompt into an aria-label: one copy of user-supplied text on
   // the page, and the screen reader hears the question once.
   const promptId = `${question.id}-prompt`
 
+  const rows = question.options.map((option, index) => ({
+    id: option.id,
+    text: option.text,
+    // Shown only while the key would do something, and only for the options a
+    // single key can reach.
+    keyHint: showKeys && !answered && index < KEYED_OPTIONS ? index + 1 : null,
+    selected: selected.includes(option.id),
+    isCorrect: correctOptionIds?.includes(option.id) ?? false,
+  }))
+
   return (
-    <section className="flex flex-col gap-4">
+    <section className="flex flex-col gap-7">
       {/* Plain children, never dangerouslySetInnerHTML: the prompt is
           user-supplied and public, so markup in it has to stay text. */}
-      <h2 id={promptId} className="font-semibold text-xl">
-        {question.prompt}
+      <h2
+        id={promptId}
+        // Literata, and heavy: the default face is mono, and the question is
+        // the one thing on this screen that is read rather than operated.
+        className="text-balance font-reading font-semibold text-question [overflow-wrap:anywhere] [word-break:normal]"
+      >
+        <QuizText value={question.prompt} />
       </h2>
+
+      {question.code !== null && (
+        <QuestionCode code={question.code} language={question.codeLanguage} />
+      )}
 
       {/* Keyed on the URL so a new question starts with a fresh error state. */}
       {question.imageUrl && <QuestionImage key={question.imageUrl} src={question.imageUrl} />}
 
-      <p className="text-muted-foreground text-sm">{multi ? t('chooseAll') : t('chooseOne')}</p>
-
       {multi ? (
-        <MultiOptions
-          promptId={promptId}
-          question={question}
-          selected={selected}
-          onSelect={onSelect}
-          onCommit={onCommit}
-          locked={locked}
-          submitting={submitting}
-          correctOptionIds={correctOptionIds}
-        />
+        <fieldset
+          aria-labelledby={promptId}
+          className="grid w-full gap-0 divide-y divide-rule border-rule border-t"
+        >
+          {rows.map((row) => (
+            <OptionRow
+              key={row.id}
+              {...row}
+              answered={answered}
+              locked={locked}
+              control={{
+                kind: 'checkbox',
+                onCheckedChange: (checked: boolean) => {
+                  onSelect(checked ? [...selected, row.id] : selected.filter((id) => id !== row.id))
+                },
+              }}
+              // No commit on click: only the player knows when the set is finished.
+              onActivate={undefined}
+            />
+          ))}
+        </fieldset>
       ) : (
-        <SingleOptions
-          promptId={promptId}
-          question={question}
-          selected={selected}
-          onSelect={onSelect}
-          onCommit={onCommit}
-          locked={locked}
-          submitting={submitting}
-          correctOptionIds={correctOptionIds}
-        />
+        <RadioGroup
+          aria-labelledby={promptId}
+          disabled={locked}
+          value={selected[0] ?? null}
+          // Selection only. Arrow keys move through a radio group by changing its
+          // value, so committing here would submit the first option a keyboard
+          // player arrowed past.
+          onValueChange={(value: string) => onSelect([value])}
+          className="gap-0 divide-y divide-rule border-rule border-t"
+        >
+          {rows.map((row) => (
+            <OptionRow
+              key={row.id}
+              {...row}
+              answered={answered}
+              locked={locked}
+              control={{ kind: 'radio' }}
+              // A click — pointer or Space on the focused radio — is the commit.
+              onActivate={() => onCommit([row.id])}
+            />
+          ))}
+        </RadioGroup>
+      )}
+
+      {/* The status line of a terminal: what to do, and the keys that do it.
+          It doubles as the rule under the last option. */}
+      {!answered && (
+        <p className="-mt-3 border-rule border-t pt-4 text-ink-quiet text-meta">
+          {/* One line, not two: where the key badges are on screen they say
+              what to do, and the prose version only repeats them longer. */}
+          {showKeys
+            ? multi
+              ? t('keysMulti')
+              : t('keysSingle')
+            : multi
+              ? t('chooseAll')
+              : t('chooseOne')}
+        </p>
+      )}
+
+      {multi && !answered && (
+        <Button
+          type="button"
+          size="lg"
+          disabled={locked}
+          onClick={() => onCommit(selected)}
+          className="h-11 w-full rounded-md text-base sm:w-fit sm:px-8"
+        >
+          {submitting ? t('checking') : t('confirm')}
+        </Button>
       )}
     </section>
   )
 }
 
-function SingleOptions({
-  promptId,
-  question,
-  selected,
-  onSelect,
-  onCommit,
-  locked,
-  correctOptionIds,
-}: QuestionCardProps & { promptId: string }) {
-  return (
-    <RadioGroup
-      aria-labelledby={promptId}
-      disabled={locked}
-      value={selected[0] ?? null}
-      // Selection only. Arrow keys move through a radio group by changing its
-      // value, so committing here would submit the first option a keyboard
-      // player arrowed past.
-      onValueChange={(value: string) => onSelect([value])}
-    >
-      {question.options.map((option) => (
-        <OptionRow
-          key={option.id}
-          id={option.id}
-          text={option.text}
-          locked={locked}
-          correctOptionIds={correctOptionIds}
-          selected={selected.includes(option.id)}
-          // A click — pointer or Space on the focused radio — is the commit.
-          onActivate={() => onCommit([option.id])}
-        >
-          <RadioGroupItem id={option.id} value={option.id} />
-        </OptionRow>
-      ))}
-    </RadioGroup>
-  )
-}
-
-function MultiOptions({
-  promptId,
-  question,
-  selected,
-  onSelect,
-  onCommit,
-  locked,
-  submitting,
-  correctOptionIds,
-}: QuestionCardProps & { promptId: string }) {
-  const t = useTranslations('run')
-
-  return (
-    <div className="flex flex-col gap-4">
-      <fieldset aria-labelledby={promptId} className="grid w-full gap-2">
-        {question.options.map((option) => (
-          <OptionRow
-            key={option.id}
-            id={option.id}
-            text={option.text}
-            locked={locked}
-            correctOptionIds={correctOptionIds}
-            selected={selected.includes(option.id)}
-            // No commit on click: only the player knows when the set is finished.
-            onActivate={undefined}
-          >
-            <Checkbox
-              id={option.id}
-              checked={selected.includes(option.id)}
-              disabled={locked}
-              onCheckedChange={(checked: boolean) => {
-                onSelect(
-                  checked ? [...selected, option.id] : selected.filter((id) => id !== option.id),
-                )
-              }}
-            />
-          </OptionRow>
-        ))}
-      </fieldset>
-      {correctOptionIds === null && (
-        <Button type="button" size="lg" disabled={locked} onClick={() => onCommit(selected)}>
-          {submitting ? t('checking') : t('confirm')}
-        </Button>
-      )}
-    </div>
-  )
-}
+type OptionControl =
+  | { kind: 'radio' }
+  | { kind: 'checkbox'; onCheckedChange: (checked: boolean) => void }
 
 type OptionRowProps = {
   id: string
   text: string
-  locked: boolean
+  keyHint: number | null
   selected: boolean
-  correctOptionIds: string[] | null
+  isCorrect: boolean
+  answered: boolean
+  locked: boolean
+  control: OptionControl
   onActivate: (() => void) | undefined
-  children: React.ReactNode
+}
+
+/**
+ * Once the answer is graded the row carries the verdict itself: a mark in the
+ * gutter, a struck line through what was picked and turned out wrong, and a
+ * word for a screen reader. Not a badge per row — three "Correct answer" pills
+ * on a multi question shout over the text they are annotating.
+ */
+function rowMarker(selected: boolean, isCorrect: boolean) {
+  if (isCorrect) {
+    return {
+      // Filled means "you picked this one", so a correct option nobody picked
+      // is an outline: the fill and the mark say different things.
+      Icon: CheckIcon,
+      iconClass: selected ? 'text-primary-foreground' : 'text-ai',
+      controlClass: 'border-ai',
+    }
+  }
+  if (selected) {
+    return {
+      Icon: XIcon,
+      iconClass: 'text-primary-foreground',
+      // The checked radio paints itself indigo, which is the one colour a
+      // wrong answer must not be, so the checked state is overridden rather
+      // than merely sat on top of.
+      controlClass:
+        'border-suo data-checked:border-suo data-checked:bg-suo dark:data-checked:bg-suo',
+    }
+  }
+  return null
 }
 
 // The row is the label, so the whole line is the hit target and the control
@@ -189,14 +223,17 @@ type OptionRowProps = {
 function OptionRow({
   id,
   text,
-  locked,
+  keyHint,
   selected,
-  correctOptionIds,
+  isCorrect,
+  answered,
+  locked,
+  control,
   onActivate,
-  children,
 }: OptionRowProps) {
   const t = useTranslations('run')
-  const isCorrect = correctOptionIds?.includes(id) ?? false
+  const marker = answered ? rowMarker(selected, isCorrect) : null
+  const struck = answered && selected && !isCorrect
 
   return (
     // The click handler rides on the label rather than on the control: a
@@ -211,23 +248,93 @@ function OptionRow({
         onActivate?.()
       }}
       className={cn(
-        'flex w-full flex-wrap items-center gap-3 rounded-md border p-3 text-base font-normal',
-        locked ? 'cursor-default' : 'cursor-pointer hover:bg-muted',
-        isCorrect && 'border-primary bg-muted',
+        'flex w-full items-start gap-4 py-4 font-normal text-prose leading-relaxed',
+        locked ? 'cursor-default' : 'cursor-pointer hover:bg-surface',
+        !answered && selected && 'bg-accent',
       )}
     >
-      {children}
-      <span className="min-w-0 flex-1 break-words">{text}</span>
-      {/* Words and an icon, not colour: the verdict has to survive a
-          monochrome screen and a colour-blind reader alike. */}
-      {isCorrect && (
-        <Badge variant="default">
-          <CheckIcon aria-hidden="true" />
-          {t('correctMark')}
-        </Badge>
-      )}
-      {correctOptionIds !== null && selected && <Badge variant="outline">{t('yourAnswer')}</Badge>}
+      <span className="relative mt-[0.15em] inline-flex size-7 shrink-0">
+        {control.kind === 'radio' ? (
+          <RadioGroupItem
+            id={id}
+            value={id}
+            className={cn(
+              'size-7 rounded-sm',
+              // The dot would show through the digit sitting on top of it.
+              (keyHint !== null || marker !== null) &&
+                '[&_[data-slot=radio-group-indicator]]:hidden',
+              marker?.controlClass,
+            )}
+          />
+        ) : (
+          <Checkbox
+            id={id}
+            checked={selected}
+            disabled={locked}
+            onCheckedChange={control.onCheckedChange}
+            className={cn(
+              'size-7 rounded-sm',
+              (keyHint !== null || marker !== null) && '[&_[data-slot=checkbox-indicator]]:hidden',
+              marker?.controlClass,
+            )}
+          />
+        )}
+
+        {/* Laid over the control, not beside it: the key cap is the control.
+            Absolute, because the control is itself positioned and would
+            otherwise paint over anything sharing its box. Hidden from
+            assistive technology — a key is a way to act, not part of the
+            option's name. */}
+        <span
+          aria-hidden="true"
+          className={cn(
+            'pointer-events-none absolute inset-0 z-10 grid place-items-center font-mono text-meta leading-none',
+            marker?.iconClass ?? (selected ? 'text-primary-foreground' : 'text-ink-quiet'),
+          )}
+        >
+          {marker !== null ? <marker.Icon className="size-4" /> : keyHint}
+        </span>
+      </span>
+
+      <span
+        className={cn(
+          'min-w-0 flex-1 font-reading [overflow-wrap:anywhere] [word-break:normal]',
+          struck && 'text-suo line-through decoration-suo/50',
+          answered && !selected && !isCorrect && 'text-ink-quiet',
+          answered && isCorrect && 'font-medium',
+        )}
+      >
+        <QuizText value={text} />
+      </span>
+
+      {/* The mark above is the verdict for anyone who can see it; this is the
+          same verdict for anyone who cannot, and it never becomes a pill. */}
+      {answered && isCorrect && <span className="sr-only">{t('correctMark')}</span>}
+      {answered && selected && <span className="sr-only">{t('yourAnswer')}</span>}
     </Label>
+  )
+}
+
+/**
+ * A snippet the question is about, which is not a sentence and must not be set
+ * as one. It scrolls sideways rather than wrapping: a function body folded
+ * across five lines mid-token is the thing this block exists to stop.
+ */
+function QuestionCode({ code, language }: { code: string; language: string | null }) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      {language !== null && <p className="text-ink-quiet text-meta">{language}</p>}
+      {/* Focusable because it scrolls: a region a mouse can pan and a keyboard
+          cannot is unreachable for anyone without the mouse. */}
+      <pre
+        // biome-ignore lint/a11y/noNoninteractiveTabindex: a region that scrolls has to be reachable by keyboard (WCAG 2.1.1), and this one pans sideways rather than wrapping
+        tabIndex={0}
+        className="overflow-x-auto rounded-md border border-rule bg-rule/35 p-4 font-mono text-[0.9375rem] leading-relaxed"
+      >
+        {/* Plain children: the snippet is author-supplied and stays text. */}
+        <code>{code}</code>
+      </pre>
+    </div>
   )
 }
 
@@ -250,7 +357,7 @@ function QuestionImage({ src }: { src: string }) {
       alt=""
       decoding="async"
       onError={() => setBroken(true)}
-      className="max-h-64 w-full rounded-md object-contain"
+      className="max-h-64 w-full object-contain object-left"
     />
   )
 }

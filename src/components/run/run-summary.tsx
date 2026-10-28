@@ -1,6 +1,6 @@
 'use client'
 
-import { CheckCircle2Icon, XCircleIcon } from 'lucide-react'
+import { CheckIcon, XIcon } from 'lucide-react'
 import Link from 'next/link'
 import { useTranslations } from 'next-intl'
 import { useEffect, useRef, useState } from 'react'
@@ -8,7 +8,6 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Separator } from '@/components/ui/separator'
 import type { RunSummary as RunSummaryData } from '@/lib/run/service'
 import { cn } from '@/lib/utils'
 
@@ -43,24 +42,24 @@ export function RunSummary({ summary, quizSlug, comparison }: RunSummaryProps) {
   }, [challengePath])
 
   const verdict = summary.passed
-    ? { Icon: CheckCircle2Icon, title: t('passed') }
-    : { Icon: XCircleIcon, title: t('failed') }
+    ? { Icon: CheckIcon, title: t('passed'), tone: 'text-ink' }
+    : { Icon: XIcon, title: t('failed'), tone: 'text-suo' }
 
   return (
-    <section className="flex flex-col gap-6">
-      <div className="flex flex-col gap-2">
-        <p className="text-muted-foreground text-sm">{t('summaryTitle')}</p>
-        {/* Icon and words again: pass or fail must not rest on colour. */}
+    <section className="mx-auto flex w-full max-w-measure flex-1 flex-col justify-center gap-10 py-10 md:py-14">
+      <div className="flex flex-col gap-3">
+        <p className="text-ink-quiet text-meta">{t('summaryTitle')}</p>
+        {/* Mark and words again: pass or fail must not rest on colour. */}
         <h2
           className={cn(
-            'flex items-center gap-2 font-bold text-3xl',
-            summary.passed ? 'text-foreground' : 'text-destructive',
+            'flex items-center gap-3 font-reading font-semibold text-title',
+            verdict.tone,
           )}
         >
-          <verdict.Icon aria-hidden="true" className="size-7" />
+          <verdict.Icon aria-hidden="true" className="size-[0.8em]" />
           {verdict.title}
         </h2>
-        <p className="text-lg">
+        <p className="text-base">
           {t('score', { score: summary.score, total: summary.total })} &middot;{' '}
           {t('errorCount', { errors: summary.errors })}
         </p>
@@ -74,17 +73,22 @@ export function RunSummary({ summary, quizSlug, comparison }: RunSummaryProps) {
         </div>
       )}
 
-      <Separator />
-
       <ChallengeLink url={challengeUrl} />
 
-      <div className="flex flex-wrap gap-3">
-        <Link href={`/q/${quizSlug}/run`} className={buttonVariants({ size: 'lg' })}>
+      <div className="flex flex-col gap-3 sm:flex-row">
+        <Link
+          href={`/q/${quizSlug}/run`}
+          className={buttonVariants({ size: 'lg', className: 'h-11 rounded-md text-base sm:px-8' })}
+        >
           {t('playAgain')}
         </Link>
         <Link
           href={`/q/${quizSlug}`}
-          className={buttonVariants({ variant: 'outline', size: 'lg' })}
+          className={buttonVariants({
+            variant: 'outline',
+            size: 'lg',
+            className: 'h-11 rounded-md text-base sm:px-8',
+          })}
         >
           {t('backToQuiz')}
         </Link>
@@ -98,7 +102,7 @@ function Comparison({ state }: { state: ComparisonState }) {
   const tCommon = useTranslations('common')
 
   if (state.status === 'pending') {
-    return <p className="text-muted-foreground">{t('comparing')}</p>
+    return <p className="text-ink-quiet text-meta">{t('comparing')}</p>
   }
 
   if (state.status === 'failed') {
@@ -148,20 +152,20 @@ function ComparisonResult({
   const verdict = verdictKey === 'theyWon' ? t('theyWon', { name: opponentName }) : t(verdictKey)
 
   return (
-    <section className="flex flex-col gap-3 rounded-lg border p-4">
-      <h3 className="font-semibold text-lg">{t('headToHead')}</h3>
-      <p className="font-bold text-2xl">{verdict}</p>
+    <section className="flex flex-col gap-4 border-rule border-t pt-6">
+      <h3 className="text-ink-quiet text-meta">{t('headToHead')}</h3>
+      <p className="font-reading font-semibold text-2xl">{verdict}</p>
       {/* Stacked on a phone, side by side once there is room. */}
-      <dl className="flex flex-col gap-3 sm:flex-row sm:gap-10">
+      <dl className="flex flex-col gap-3 sm:flex-row sm:gap-12">
         <div className="flex flex-col">
-          <dt className="text-muted-foreground text-sm">{t('you')}</dt>
-          <dd className="text-lg">{tRun('score', { score: mine.score, total: mine.total })}</dd>
+          <dt className="text-ink-quiet text-meta">{t('you')}</dt>
+          <dd>{tRun('score', { score: mine.score, total: mine.total })}</dd>
         </div>
-        <div className="flex flex-col">
+        <div className="flex min-w-0 flex-col">
           {/* A nickname chosen by a stranger: interpolated as text, never as
               markup, and already capped in length where it was stored. */}
-          <dt className="text-muted-foreground text-sm">{opponentName}</dt>
-          <dd className="text-lg">{tRun('score', { score: theirs.score, total: theirs.total })}</dd>
+          <dt className="truncate text-ink-quiet text-meta">{opponentName}</dt>
+          <dd>{tRun('score', { score: theirs.score, total: theirs.total })}</dd>
         </div>
       </dl>
     </section>
@@ -192,21 +196,27 @@ function ChallengeLink({ url }: { url: string }) {
   }
 
   return (
-    <div className="flex flex-col gap-2">
-      <h3 className="font-semibold text-lg">{t('shareTitle')}</h3>
-      <p className="text-muted-foreground text-sm">{t('shareBody')}</p>
+    <div className="flex flex-col gap-3 border-rule border-t pt-6">
+      <h3 className="text-ink-quiet text-meta">{t('shareTitle')}</h3>
+      <p className="font-reading text-prose">{t('shareBody')}</p>
       <Label htmlFor="challenge-link" className="sr-only">
         {t('shareLabel')}
       </Label>
       <div className="flex flex-col gap-2 sm:flex-row">
-        <Input id="challenge-link" ref={inputRef} readOnly value={url} className="sm:flex-1" />
-        <Button type="button" onClick={copy}>
+        <Input
+          id="challenge-link"
+          ref={inputRef}
+          readOnly
+          value={url}
+          className="h-10 rounded-md sm:flex-1"
+        />
+        <Button type="button" onClick={copy} className="h-10 rounded-md">
           {state === 'copied' ? t('copied') : t('copy')}
         </Button>
       </div>
       {/* Announced rather than silently swapped in, since the button it
           belongs to has already moved on. */}
-      <p aria-live="polite" className="text-muted-foreground text-sm">
+      <p aria-live="polite" className="text-ink-quiet text-meta">
         {state === 'failed' ? t('copyFailed') : ''}
       </p>
     </div>

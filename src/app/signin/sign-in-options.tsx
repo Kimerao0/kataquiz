@@ -66,6 +66,7 @@ export function SignInOptions({ providers }: { providers: SocialProviderId[] }) 
           key={provider}
           type="button"
           size="lg"
+          className="h-12 text-base"
           disabled={pendingProvider !== null}
           onClick={() => startSignIn(provider)}
         >
