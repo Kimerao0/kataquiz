@@ -45,13 +45,17 @@ async function QuizDetail({ params }: { params: QuizParams }) {
   const tCatalog = await getTranslations('catalog')
   // A quiz outlives its author's account, so the byline has to stand in for one.
   const authorName = quiz.authorName ?? tCatalog('deletedAuthor')
+  // What a run will actually serve, not what the author asked for: a quiz with
+  // fewer questions than questionsPerRun plays what it has, and promising more
+  // here than the run panel then offers reads as a bug.
+  const questionsPerRun = Math.min(quiz.questionsPerRun, quiz.questionCount)
   const runSettings = quiz.timePerQuestionSec
     ? t('runSettings', {
-        questions: quiz.questionsPerRun,
+        questions: questionsPerRun,
         errors: quiz.maxErrors,
         seconds: quiz.timePerQuestionSec,
       })
-    : t('runSettingsUntimed', { questions: quiz.questionsPerRun, errors: quiz.maxErrors })
+    : t('runSettingsUntimed', { questions: questionsPerRun, errors: quiz.maxErrors })
 
   return (
     <article className="flex flex-col gap-4">
