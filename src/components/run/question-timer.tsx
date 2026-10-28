@@ -62,6 +62,9 @@ export function QuestionTimer({
 
   const remainingMs = startedAt + timePerQuestionSec * 1000 - now
   const seconds = Math.max(0, Math.ceil(remainingMs / 1000))
+  // At zero the answer has not been taken yet: the auto-submit waits out the
+  // grace so the server can honestly record a timeout. Saying "time is up"
+  // while an answer would still count would be a lie the player can catch.
 
   return (
     // role="timer" is a live region that defaults to aria-live="off": a value
@@ -71,7 +74,7 @@ export function QuestionTimer({
       aria-label={t('timerLabel')}
       className="text-muted-foreground text-sm tabular-nums"
     >
-      {seconds === 0 ? t('timeUp') : t('timeLeft', { seconds })}
+      {seconds === 0 ? t('lastChance') : t('timeLeft', { seconds })}
     </p>
   )
 }

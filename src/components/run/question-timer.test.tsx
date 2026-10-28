@@ -99,7 +99,9 @@ describe('question timer', () => {
     renderWithMessages(<TimerHarness timePerQuestionSec={LIMIT_SEC} />)
 
     advance(LIMIT_SEC * 1000)
-    expect(timerText()).toBe('Time is up')
+    // "Last chance", not "Time is up": an answer landed now still counts, and
+    // a countdown that claims otherwise is a lie the player can catch.
+    expect(timerText()).toBe('Last chance')
     // Still inside the grace the server allows, so the player can still land a
     // Confirm and nothing has fired yet.
     expect(onExpire).not.toHaveBeenCalled()

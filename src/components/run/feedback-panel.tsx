@@ -17,9 +17,24 @@ type FeedbackPanelProps = {
 
 // Deliberately untimed. The clock stopped the instant the answer was submitted,
 // and reading this is the part of the run that teaches anything.
+// Quiz content is uploaded by strangers. Upload validation already restricts
+// theoryUrl to http(s), so this is a second line rather than the only one —
+// but the Milestone 2 editor will be a second way into the same column, and a
+// javascript: href here would run in the player's session.
+function httpUrlOrNull(value: string | null): string | null {
+  if (!value) return null
+  try {
+    const url = new URL(value)
+    return url.protocol === 'http:' || url.protocol === 'https:' ? url.toString() : null
+  } catch {
+    return null
+  }
+}
+
 export function FeedbackPanel({ result, correctOptionTexts, onNext }: FeedbackPanelProps) {
   const t = useTranslations('run')
   const nextRef = useRef<HTMLButtonElement>(null)
+  const safeTheoryUrl = httpUrlOrNull(result.theoryUrl)
 
   // The panel appears below the options the player has just left, so keyboard
   // focus moves to the one control that continues the run.
@@ -62,11 +77,11 @@ export function FeedbackPanel({ result, correctOptionTexts, onNext }: FeedbackPa
         </>
       )}
 
-      {result.theoryUrl && (
+      {safeTheoryUrl && (
         // External and author-supplied, so a plain anchor rather than the
         // internal Link, and no opener handed to the destination.
         <a
-          href={result.theoryUrl}
+          href={safeTheoryUrl}
           target="_blank"
           rel="noreferrer noopener"
           className="w-fit underline underline-offset-4"

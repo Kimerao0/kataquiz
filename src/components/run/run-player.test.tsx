@@ -170,6 +170,26 @@ describe('run player', () => {
     )
   })
 
+  it.each([
+    ['javascript:alert(1)'],
+    ['data:text/html,<script>alert(1)</script>'],
+    ['vbscript:msgbox(1)'],
+  ])('does not render %s as a theory link', async (hostileUrl) => {
+    // Upload validation rejects these, so this is the second line of defence.
+    // It matters because the Milestone 2 editor writes the same column, and a
+    // javascript: href would run in the player's own session.
+    submitAnswerAction.mockResolvedValue({
+      ok: true,
+      result: resultOf({ explanation: 'Why.', theoryUrl: hostileUrl }),
+    })
+    renderRun(single)
+
+    await userEvent.click(option('Warning'))
+
+    expect(await screen.findByText('Why.')).toBeVisible()
+    expect(screen.queryByRole('link', { name: 'Read the theory' })).toBeNull()
+  })
+
   it('shows the correct options after a wrong answer', async () => {
     submitAnswerAction.mockResolvedValue({
       ok: true,
