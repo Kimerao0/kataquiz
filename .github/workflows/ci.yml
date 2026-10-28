@@ -14,19 +14,19 @@ jobs:
       postgres:
         image: postgres:17-alpine
         env:
-          POSTGRES_USER: grindstone
-          POSTGRES_PASSWORD: grindstone
-          POSTGRES_DB: grindstone_test
+          POSTGRES_USER: kataquiz
+          POSTGRES_PASSWORD: kataquiz
+          POSTGRES_DB: kataquiz_test
         ports:
           - 5432:5432
         options: >-
-          --health-cmd "pg_isready -U grindstone -d grindstone_test"
+          --health-cmd "pg_isready -U kataquiz -d kataquiz_test"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
 
     env:
-      DATABASE_URL: postgres://grindstone:grindstone@localhost:5432/grindstone_test
+      DATABASE_URL: postgres://kataquiz:kataquiz@localhost:5432/kataquiz_test
 
     steps:
       - uses: actions/checkout@v4

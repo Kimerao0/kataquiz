@@ -1,4 +1,4 @@
-# Grindstone Milestone 1 — Upload, Play, Share — Implementation Plan
+# Kataquiz Milestone 1 — Upload, Play, Share — Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -8,7 +8,7 @@
 
 **Tech Stack:** Next.js 16.4.3, React 19.3.1, TypeScript strict, pnpm 11, Biome 2.6.3, Vitest 5.0.5, zod 4.6.7, Drizzle 0.45.4 + drizzle-kit 0.31.11, pg 8.23.1, Better Auth 1.7.14, Tailwind 4.3.3 + shadcn/ui, next-intl 4.14.9.
 
-**Spec:** `docs/specs/2026-10-27-grindstone-v1.md`
+**Spec:** `docs/specs/2026-10-27-kataquiz-v1.md`
 
 ## Global Constraints
 
@@ -622,7 +622,7 @@ Expected: no matches. This is the test for the portability constraint.
 
 - [ ] **Step 3: Write the README and the self-hosting note**
 
-README covers what Grindstone is, the quiz file format with a working example, local setup, and the environment variables. `docs/self-hosting.md` states plainly: any Postgres via `DATABASE_URL`, no Docker image yet, open an issue if you want one.
+README covers what Kataquiz is, the quiz file format with a working example, local setup, and the environment variables. `docs/self-hosting.md` states plainly: any Postgres via `DATABASE_URL`, no Docker image yet, open an issue if you want one.
 
 - [ ] **Step 4: Verify the production build**
 

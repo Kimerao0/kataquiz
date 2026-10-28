@@ -1,7 +1,7 @@
 import { createHmac, timingSafeEqual } from 'node:crypto'
 import { cookies } from 'next/headers'
 
-export const GUEST_COOKIE = 'gs_guest'
+export const GUEST_COOKIE = 'kq_guest'
 
 const ONE_YEAR_SEC = 60 * 60 * 24 * 365
 

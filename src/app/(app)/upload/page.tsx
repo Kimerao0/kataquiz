@@ -33,7 +33,7 @@ async function UploadSection() {
     <Alert>
       <AlertTitle>{t('signInTitle')}</AlertTitle>
       <AlertDescription>
-        <Link href="/api/auth/signin">{t('signInCta')}</Link>
+        <Link href="/signin?next=/upload">{t('signInCta')}</Link>
       </AlertDescription>
     </Alert>
   )

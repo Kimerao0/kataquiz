@@ -1,13 +1,16 @@
 {
   "app": {
-    "name": "Grindstone",
+    "name": "Kataquiz",
     "tagline": "Upload a question bank, drill it, challenge people with a link."
   },
   "nav": {
+    "label": "Main",
     "browse": "Browse quizzes",
     "upload": "Upload a quiz",
     "signIn": "Sign in",
-    "signOut": "Sign out"
+    "signOut": "Sign out",
+    "signingOut": "Signing out…",
+    "signedInAs": "Signed in as {name}"
   },
   "common": {
     "loading": "Loading\u2026",
@@ -39,6 +42,20 @@
     "runSettings": "{questions, plural, =1 {# question} other {# questions}}, {errors, plural, =0 {no mistakes allowed} =1 {up to # mistake} other {up to # mistakes}}, {seconds}s each",
     "runSettingsUntimed": "{questions, plural, =1 {# question} other {# questions}}, {errors, plural, =0 {no mistakes allowed} =1 {up to # mistake} other {up to # mistakes}}, no time limit",
     "start": "Start"
+  },
+  "signIn": {
+    "title": "Sign in",
+    "intro": "Sign in to upload a quiz. Browsing and running quizzes needs no account.",
+    "continueWith": "Continue with {provider}",
+    "redirecting": "Redirecting…",
+    "errorTitle": "Sign-in could not be started",
+    "errorBody": "The provider did not answer. Check your connection and try again.",
+    "noProvidersTitle": "No sign-in provider is configured",
+    "noProvidersBody": "This instance has no OAuth credentials. Set GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET, or the GOOGLE_ pair, then restart the server. See .env.example.",
+    "providers": {
+      "github": "GitHub",
+      "google": "Google"
+    }
   },
   "upload": {
     "title": "Upload a quiz",

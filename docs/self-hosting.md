@@ -15,14 +15,14 @@ Self-hosting today means: build it with Node, point `DATABASE_URL` at your Postg
 
 ## Environment variables
 
-| Variable | Required | Notes |
-| --- | --- | --- |
-| `DATABASE_URL` | Yes | Postgres connection string. |
-| `BETTER_AUTH_SECRET` | Yes | Random secret, see below. |
-| `BETTER_AUTH_URL` | Yes | Public base URL of your instance, for example `https://quiz.example.com`. |
-| `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` | No | Enables GitHub sign-in. |
-| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | No | Enables Google sign-in. |
-| `NEXT_PUBLIC_BETTER_AUTH_URL` | No | Read by the browser auth client. Left unset, the client uses the current origin, which is correct for a single-host deployment. It is inlined at build time. |
+| Variable                                   | Required | Notes                                                                                                                                                        |
+| ------------------------------------------ | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `DATABASE_URL`                             | Yes      | Postgres connection string.                                                                                                                                  |
+| `BETTER_AUTH_SECRET`                       | Yes      | Random secret, see below.                                                                                                                                    |
+| `BETTER_AUTH_URL`                          | Yes      | Public base URL of your instance, for example `https://quiz.example.com`.                                                                                    |
+| `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` | No       | Enables GitHub sign-in.                                                                                                                                      |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | No       | Enables Google sign-in.                                                                                                                                      |
+| `NEXT_PUBLIC_BETTER_AUTH_URL`              | No       | Read by the browser auth client. Left unset, the client uses the current origin, which is correct for a single-host deployment. It is inlined at build time. |
 
 Generate the secret:
 
@@ -48,10 +48,10 @@ pnpm start
 
 Sign-in is GitHub and Google OAuth only; there is no email or password login. Without at least one provider configured the app runs but nobody can sign in. Replace `{BETTER_AUTH_URL}` with the value you set.
 
-| Provider | Register at | Callback URL |
-| --- | --- | --- |
-| GitHub | https://github.com/settings/developers | `{BETTER_AUTH_URL}/api/auth/callback/github` |
-| Google | https://console.cloud.google.com/apis/credentials | `{BETTER_AUTH_URL}/api/auth/callback/google` |
+| Provider | Register at                                       | Callback URL                                 |
+| -------- | ------------------------------------------------- | -------------------------------------------- |
+| GitHub   | https://github.com/settings/developers            | `{BETTER_AUTH_URL}/api/auth/callback/github` |
+| Google   | https://console.cloud.google.com/apis/credentials | `{BETTER_AUTH_URL}/api/auth/callback/google` |
 
 Put the resulting client ID and secret in the matching variables. A provider appears on the sign-in page only when both its variables are set.
 

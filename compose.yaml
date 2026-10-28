@@ -1,24 +1,24 @@
 # Local development database.
-# This is NOT deployment packaging — Grindstone itself is not containerised yet.
+# This is NOT deployment packaging — Kataquiz itself is not containerised yet.
 # It exists so `pnpm test` and `pnpm dev` have a Postgres to talk to, matching CI.
 services:
   postgres:
     image: postgres:17-alpine
-    container_name: grindstone-db
+    container_name: kataquiz-db
     environment:
-      POSTGRES_USER: grindstone
-      POSTGRES_PASSWORD: grindstone
-      POSTGRES_DB: grindstone
+      POSTGRES_USER: kataquiz
+      POSTGRES_PASSWORD: kataquiz
+      POSTGRES_DB: kataquiz
     ports:
       - "5432:5432"
     volumes:
-      - grindstone-pgdata:/var/lib/postgresql/data
+      - kataquiz-pgdata:/var/lib/postgresql/data
       - ./scripts/init-test-db.sql:/docker-entrypoint-initdb.d/init-test-db.sql:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U grindstone -d grindstone"]
+      test: ["CMD-SHELL", "pg_isready -U kataquiz -d kataquiz"]
       interval: 5s
       timeout: 5s
       retries: 10
 
 volumes:
-  grindstone-pgdata:
+  kataquiz-pgdata:
