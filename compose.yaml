@@ -1,6 +1,10 @@
 # Local development database.
 # This is NOT deployment packaging — Kataquiz itself is not containerised yet.
 # It exists so `pnpm test` and `pnpm dev` have a Postgres to talk to, matching CI.
+# Pinned so the project name does not follow the directory: renaming the
+# checkout would otherwise orphan the running container and its volume.
+name: kataquiz
+
 services:
   postgres:
     image: postgres:17-alpine
