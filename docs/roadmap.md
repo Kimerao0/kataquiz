@@ -125,9 +125,6 @@ Closed items: `docs/roadmap-archive-2026-10.md`.
 
 - [ ] KQ35: The dev server silently serves stale CSS
   `globals.css` edits repeatedly failed to reach the bundle; a whole screenshot round was a picture of CSS that was never applied. Verify design work against `pnpm build`, not `pnpm dev`.
-- [ ] KQ36: No CI job runs `pnpm build`
-  `pnpm check` is lint + types + tests + portability. A build-only break would reach main.
-  _`.github/workflows/ci.yml`_
 
 ## Accepted — recorded so they are not rediscovered
 

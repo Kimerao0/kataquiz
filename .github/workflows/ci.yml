@@ -37,3 +37,9 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm check
+      # Deliberately not inside `pnpm check`, which is lint, types, tests and
+      # portability: a break that only shows at build time would otherwise
+      # reach main unseen. It needs DATABASE_URL set, because src/db/client.ts
+      # throws without one, but it never connects — verified 2026-10-29 by
+      # building against a database that does not exist.
+      - run: pnpm build

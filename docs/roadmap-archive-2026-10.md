@@ -35,3 +35,11 @@ must still resolve.
   defended in the script and named in its comments: the start panel's nickname `label[for]`, the
   advance lock, and a scenario that fails rather than photographing a rate-limit error.
   _`scripts/shots.mts`_
+
+- [x] KQ36: No CI job ran `pnpm build`
+  Closed by the commit below. `pnpm check` is lint, types, tests and portability, so a break that
+  only shows at build time reached main unseen — this session caught one only because the build was
+  run by hand for screenshots. Verified before adding the step: the build needs `DATABASE_URL` set,
+  because `src/db/client.ts` throws without one, but never connects — it succeeds with no
+  `.env.local` and a database that does not exist, so it needs no secrets and no step ordering.
+  _`.github/workflows/ci.yml`_
