@@ -22,6 +22,21 @@ const CHROME_START_TIMEOUT_MS = 15_000
 const PAGE_LOAD_TIMEOUT_MS = 30_000
 const SETTLE_MS = 400
 
+// The copy a scenario presses is read from the catalogue rather than written
+// out here: that file is the only place the words exist, and a reworded button
+// should fail loudly instead of quietly turning a scenario into a timeout.
+const MESSAGES_FILE = 'messages/en.json'
+// Longer than `ADVANCE_LOCK_MS` in src/components/run/run-player.tsx, which is
+// 300ms: a click sooner than the lock is swallowed on purpose, so the driver
+// has to be slower than it, never faster. Copied and not imported — the real
+// one lives in a 'use client' component.
+const ADVANCE_LOCK_WAIT_MS = 500
+const SCENARIO_STEP_TIMEOUT_MS = 15_000
+const SCENARIO_POLL_MS = 100
+// A run is a few dozen questions at most. The cap is only here so a scenario
+// that stops making progress ends as an error instead of spinning.
+const MAX_QUESTIONS = 100
+
 // Phone, tablet, laptop. The height is only the window the page lays out in —
 // every capture is full-page regardless, so vh units still read as they would
 // on the device.
@@ -63,11 +78,64 @@ const MEASURE_EXPRESSION = `(() => {
   }
 })()`
 
+// What tells Next's not-found page apart from the page that was asked for. The
+// obvious check is the response status and it does not work: a dead /q/<slug>
+// answers HTTP 200, because `notFound()` is thrown inside a Suspense boundary
+// after streaming has already started (docs/roadmap.md, "Accepted"). The
+// pathname assertion misses it too — not-found renders at the requested path.
+// What is left is the robots meta: Next marks a not-found page noindex, and
+// nothing in this app does so on purpose. Do not simplify this back.
+const NOINDEX_EXPRESSION = `Array.from(document.querySelectorAll('meta[name="robots"]')).some(
+  (meta) => (meta.getAttribute('content') ?? '').toLowerCase().includes('noindex'),
+)`
+
+// The handles a scenario takes on the page, installed once per load. Every
+// lookup is by the copy a player reads rather than by a CSS path, so a restyle
+// cannot quietly break the driver.
+const DRIVER_HELPERS = `
+  window.__shots = {
+    button: (text) =>
+      Array.from(document.querySelectorAll('button')).find(
+        (element) => element.textContent.trim() === text,
+      ) ?? null,
+    // Scoped to .drill-main, and the scope is the whole point: the start
+    // panel's nickname field owns a label[for] of its own that is still on
+    // screen while the run mounts, so an unscoped "first label" click lands
+    // there, answers nothing, and the driver waits for a feedback panel that
+    // is never coming.
+    options: () => Array.from(document.querySelectorAll('.drill-main label[for]')),
+    picked: () => document.querySelector('.drill-main [data-checked]') !== null,
+  }
+  true
+`
+
 type CdpMessage = {
   id?: number
   method?: string
   result?: unknown
   error?: { message: string }
+}
+
+/** The run copy a scenario presses, exactly as the player reads it. */
+type RunCopy = {
+  begin: string
+  confirm: string
+  next: string
+  seeResult: string
+  summaryTitle: string
+}
+
+type Scenario = {
+  /** Whether to play the run out, or stop on the first feedback panel. */
+  playToTheEnd: boolean
+  /**
+   * The page expression that proves the promised state actually arrived. A
+   * scenario that failed still photographs perfectly, which is the whole
+   * danger: every viewport and scheme pair starts a run of its own, so they
+   * land in quick succession and the rate limiter is a realistic way for one
+   * of them to end on an error alert that photographs like a screen.
+   */
+  arrived: (copy: RunCopy) => string
 }
 
 type Measurement = {
@@ -88,6 +156,10 @@ const delay = (ms: number) =>
   new Promise<void>((resolve) => {
     setTimeout(resolve, ms)
   })
+
+// Copy enters a page expression as a literal, never spliced in raw: an
+// apostrophe in a translation would otherwise be a syntax error in the page.
+const js = (value: string) => JSON.stringify(value)
 
 async function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined
@@ -206,16 +278,174 @@ async function openPageSocket(port: number) {
   return { socket, send, once, evaluate }
 }
 
-const [pathArg, labelArg] = process.argv.slice(2)
-if (!pathArg?.startsWith('/')) {
-  console.error('usage: pnpm shots <path> [label]')
+type Page = Awaited<ReturnType<typeof openPageSocket>>
+
+// Every graded question is on screen with one of these two buttons under it:
+// the last question offers the summary where the others offer the next one.
+const feedbackShown = (copy: RunCopy) =>
+  `__shots.button(${js(copy.next)}) !== null || __shots.button(${js(copy.seeResult)}) !== null`
+
+// The interactive states worth a photograph, and deliberately not a step DSL:
+// this app has exactly these two, and a generic driver would be a second,
+// vaguer description of a run that already has one shape.
+const SCENARIOS: Record<'answer' | 'summary', Scenario> = {
+  // Stops with the feedback panel open on question one. The verdict, the
+  // struck-through wrong option and the explanation exist nowhere else.
+  answer: { playToTheEnd: false, arrived: feedbackShown },
+  // The summary exists only once every question has been graded, which is why
+  // a script that loads a URL and stops could never reach it.
+  summary: {
+    playToTheEnd: true,
+    arrived: (copy) => `document.body.innerText.includes(${js(copy.summaryTitle)})`,
+  },
+}
+
+type ScenarioName = keyof typeof SCENARIOS
+
+function isScenarioName(value: string | undefined): value is ScenarioName {
+  return value !== undefined && value in SCENARIOS
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null
+}
+
+function runString(run: Record<string, unknown>, key: string) {
+  const value = run[key]
+  if (typeof value !== 'string') {
+    throw new Error(`${MESSAGES_FILE} has no run.${key} string for the driver to press.`)
+  }
+  return value
+}
+
+function readRunCopy(): RunCopy {
+  const parsed: unknown = JSON.parse(readFileSync(MESSAGES_FILE, 'utf8'))
+  const run = isRecord(parsed) ? parsed.run : undefined
+  if (!isRecord(run)) throw new Error(`${MESSAGES_FILE} has no "run" section to read copy from.`)
+
+  return {
+    begin: runString(run, 'begin'),
+    confirm: runString(run, 'confirm'),
+    next: runString(run, 'next'),
+    seeResult: runString(run, 'seeResult'),
+    summaryTitle: runString(run, 'summaryTitle'),
+  }
+}
+
+// The first screenful of what the page actually says. Every failure below is
+// one a photograph would hide, so the operator is handed the words instead —
+// the rate-limit alert, or the start error, rather than a picture of it.
+async function pageText(page: Page) {
+  const text = await page.evaluate<string>('document.body.innerText.slice(0, 400)')
+  return `The page says: ${text}`
+}
+
+// Polling, because every state a scenario waits for is a React render and
+// there is no protocol event that fires for one.
+async function reachedWithin(page: Page, expression: string) {
+  const deadline = Date.now() + SCENARIO_STEP_TIMEOUT_MS
+  while (Date.now() < deadline) {
+    if (await page.evaluate<boolean>(expression)) return true
+    await delay(SCENARIO_POLL_MS)
+  }
+  return false
+}
+
+async function waitInPage(page: Page, expression: string, what: string) {
+  if (await reachedWithin(page, expression)) return
+  throw new Error(`Waited ${SCENARIO_STEP_TIMEOUT_MS}ms for ${what}. ${await pageText(page)}`)
+}
+
+async function answerQuestion(page: Page, copy: RunCopy, answered: number) {
+  const position = answered + 1
+  await waitInPage(page, '__shots.options().length > 0', `the options of question ${position}`)
+
+  // Rotating the pick rather than always taking the first: a summary where
+  // every answer is right, or every one wrong, is not the screen worth looking
+  // at.
+  await page.evaluate(`(() => {
+    const options = __shots.options()
+    options[${answered} % options.length].click()
+  })()`)
+
+  // A multi-answer question commits only when its Confirm button is pressed; a
+  // single or boolean one has already committed on the click above. The button
+  // is on screen from the moment the question is, so its presence is what
+  // tells the two kinds apart.
+  const confirm = `__shots.button(${js(copy.confirm)})`
+  if (await page.evaluate<boolean>(`${confirm} !== null`)) {
+    // Confirm submits the set React has recorded, so pressing it before the
+    // click has landed in state would submit an empty answer.
+    await waitInPage(page, '__shots.picked()', `the pick on question ${position}`)
+    await page.evaluate(`${confirm}.click()`)
+  }
+
+  await waitInPage(page, feedbackShown(copy), `the feedback on question ${position}`)
+}
+
+async function playScenario(page: Page, name: ScenarioName, copy: RunCopy) {
+  const scenario = SCENARIOS[name]
+
+  await page.evaluate(DRIVER_HELPERS)
+  await waitInPage(page, `__shots.button(${js(copy.begin)}) !== null`, 'the Begin button')
+  await page.evaluate(`__shots.button(${js(copy.begin)}).click()`)
+
+  for (let answered = 0; answered < MAX_QUESTIONS; answered += 1) {
+    await answerQuestion(page, copy, answered)
+    if (!scenario.playToTheEnd) break
+
+    const last = await page.evaluate<boolean>(`__shots.button(${js(copy.seeResult)}) !== null`)
+    await page.evaluate(`__shots.button(${js(last ? copy.seeResult : copy.next)}).click()`)
+    if (last) break
+    await delay(ADVANCE_LOCK_WAIT_MS)
+  }
+
+  // Polled rather than read once: the screen the last click asked for is still
+  // a React render away from the click itself.
+  if (await reachedWithin(page, scenario.arrived(copy))) return
+  throw new Error(
+    `The ${name} scenario never reached its state — refusing to photograph it. ${await pageText(page)}`,
+  )
+}
+
+const args = process.argv.slice(2)
+const positional: string[] = []
+let scenarioArg: string | undefined
+let allowNoindex = false
+
+for (let index = 0; index < args.length; index += 1) {
+  const arg = args[index]
+  if (arg === '--allow-noindex') {
+    allowNoindex = true
+    continue
+  }
+  if (arg === '--play') {
+    index += 1
+    scenarioArg = args[index]
+    continue
+  }
+  positional.push(arg)
+}
+
+const [pathArg, labelArg] = positional
+if (!pathArg?.startsWith('/') || (scenarioArg !== undefined && !isScenarioName(scenarioArg))) {
+  console.error(
+    `usage: pnpm shots <path> [label] [--play ${Object.keys(SCENARIOS).join('|')}] [--allow-noindex]`,
+  )
   console.error('   eg: pnpm shots /q/patente-b-segnali-di-pericolo quiz-detail')
+  console.error('   eg: pnpm shots /q/patente-b-segnali-di-pericolo/run feedback --play answer')
+  console.error('   eg: pnpm shots /q/patente-b-segnali-di-pericolo/run summary --play summary')
+  console.error('   eg: pnpm shots /q/patente-b-segnali-di-pericolo detail --allow-noindex')
   process.exit(1)
 }
 
 const url = new URL(pathArg, BASE_URL)
 const expectedPathname = url.pathname
 const label = labelArg ?? slugify(expectedPathname)
+// Read once, before Chrome starts: a key missing from the catalogue is a
+// complaint about the catalogue, not something to meet halfway through the
+// ninth screenshot.
+const play = scenarioArg === undefined ? null : { name: scenarioArg, copy: readRunCopy() }
 
 mkdirSync(SHOTS_DIR, { recursive: true })
 
@@ -308,6 +538,24 @@ try {
         throw new Error(
           `Asked for ${expectedPathname} but landed on ${pathname} — refusing to photograph it.`,
         )
+      }
+
+      // See NOINDEX_EXPRESSION: the pathname above cannot see a not-found page,
+      // and neither can a response status.
+      if (!allowNoindex && (await page.evaluate<boolean>(NOINDEX_EXPRESSION))) {
+        throw new Error(
+          `${url.href} is Next's not-found page — refusing to photograph it. A seeded slug carries a generated suffix, so check the one you asked for; pass --allow-noindex if this page is meant to be noindexed.`,
+        )
+      }
+
+      // Each pair re-navigates, so the scenario is replayed on every load.
+      // That is the cost of photographing a state only a live run produces,
+      // and it is cheaper than carrying one run across viewport changes.
+      if (play !== null) {
+        await playScenario(page, play.name, play.copy)
+        // The arrival assertion only proves the DOM is there; what has just
+        // replaced the options still has to be laid out and painted.
+        await delay(SETTLE_MS)
       }
 
       const measurement = await page.evaluate<Measurement>(MEASURE_EXPRESSION)
