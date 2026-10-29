@@ -1,7 +1,7 @@
 'use client'
 
 import { useTranslations } from 'next-intl'
-import type { AnswerResult, PublicOption, PublicQuestion } from '@/lib/run/service'
+import type { PublicOption, RunHistoryEntry } from '@/lib/run/service'
 import { cn } from '@/lib/utils'
 import { Explanation, TheoryLink, verdictFor } from './feedback-parts'
 import { QuestionCode, QuestionImage } from './question-media'
@@ -13,12 +13,11 @@ import { httpUrlOrNull } from './safe-url'
  * sends back is a score and nothing else, and the feedback panel that held the
  * explanation is gone by the time the run ends, so what the review needs has
  * to be the player's own copy.
+ *
+ * An alias and not a second declaration: a run resumed after a refresh is
+ * handed this very shape by the server, which is where it is now defined.
  */
-export type Reviewed = {
-  question: PublicQuestion
-  selectedOptionIds: string[]
-  result: AnswerResult
-}
+export type Reviewed = RunHistoryEntry
 
 function optionsWithIds(options: PublicOption[], ids: string[]): PublicOption[] {
   return options.filter((option) => ids.includes(option.id))

@@ -3,14 +3,17 @@ import { attemptAnswers, attempts, options, questions, quizzes, user } from '@/d
 import { type TestTx, withTestDb } from '@/test/db'
 import { TIMER_GRACE_MS } from './engine'
 import {
+  AttemptNotFoundError,
   DuplicateAnswerError,
   EmptyQuizError,
+  findResumableRun,
   NotYourAttemptError,
   type Player,
   type PublicQuestion,
   QuestionNotInAttemptError,
   QuizNotFoundError,
   type RunStart,
+  resumeRun,
   startRun,
   submitAnswer,
 } from './service'
@@ -177,6 +180,16 @@ async function answer(
     player: seed.player,
     executor: tx,
   })
+}
+
+// Plays every question the run holds, in the stored order, and returns the last
+// result: the one that carries the summary.
+async function playToTheEnd(tx: TestTx, seed: Seed, attemptId: string) {
+  const { questionIds } = await readAttempt(tx, attemptId)
+  let last: Awaited<ReturnType<typeof answer>> | undefined
+  for (const id of questionIds) last = await answer(tx, seed, attemptId, id)
+  if (!last) throw new Error('expected the attempt to hold questions')
+  return last
 }
 
 describe('startRun', () => {
@@ -767,6 +780,405 @@ describe('submitAnswer', () => {
       // Pinned together so the pair can never drift: a summary is the server
       // saying the run is over, and finishedAt is where it says so durably.
       expect(result.summary).not.toBeNull()
+    })
+  })
+})
+
+describe('findResumableRun', () => {
+  it('finds the run in flight with how far it got', async () => {
+    await withTestDb(async (tx) => {
+      const seed = await seedQuiz(tx, { questionCount: 5, questionsPerRun: 3 })
+      const run = await startRun({ quizId: seed.quizId, player: seed.player, executor: tx })
+      await answer(tx, seed, run.attemptId, run.question.id)
+
+      const found = await findResumableRun({
+        quizId: seed.quizId,
+        player: seed.player,
+        executor: tx,
+      })
+
+      expect(found).toEqual({ attemptId: run.attemptId, answered: 1, total: run.total })
+    })
+  })
+
+  it('ignores a finished run', async () => {
+    await withTestDb(async (tx) => {
+      const seed = await seedQuiz(tx, { questionCount: 2 })
+      const run = await startRun({ quizId: seed.quizId, player: seed.player, executor: tx })
+      await playToTheEnd(tx, seed, run.attemptId)
+
+      const found = await findResumableRun({
+        quizId: seed.quizId,
+        player: seed.player,
+        executor: tx,
+      })
+
+      expect(found).toBeNull()
+    })
+  })
+
+  it('ignores an attempt nobody answered', async () => {
+    await withTestDb(async (tx) => {
+      const seed = await seedQuiz(tx, { questionCount: 2 })
+      await startRun({ quizId: seed.quizId, player: seed.player, executor: tx })
+
+      const found = await findResumableRun({
+        quizId: seed.quizId,
+        player: seed.player,
+        executor: tx,
+      })
+
+      // Offering to resume this would be offering a run the player never began.
+      expect(found).toBeNull()
+    })
+  })
+
+  it("ignores another player's run", async () => {
+    await withTestDb(async (tx) => {
+      const seed = await seedQuiz(tx, { questionCount: 2 })
+      const run = await startRun({ quizId: seed.quizId, player: seed.player, executor: tx })
+      await answer(tx, seed, run.attemptId, run.question.id)
+      const otherUser: Player = { kind: 'user', userId: `user-${crypto.randomUUID()}` }
+      const guest: Player = { kind: 'guest', guestId: crypto.randomUUID(), nickname: '' }
+
+      // The ownership guard: drop it and a stranger is offered somebody else's
+      // run, which resumeRun would then refuse to open.
+      for (const player of [otherUser, guest]) {
+        const found = await findResumableRun({ quizId: seed.quizId, player, executor: tx })
+        expect(found).toBeNull()
+      }
+    })
+  })
+
+  it('finds a guest their own run', async () => {
+    await withTestDb(async (tx) => {
+      const seed = await seedQuiz(tx, { questionCount: 2 })
+      const guest: Player = { kind: 'guest', guestId: crypto.randomUUID(), nickname: 'Fast Fox' }
+      const run = await startRun({ quizId: seed.quizId, player: guest, executor: tx })
+      await answer(tx, { ...seed, player: guest }, run.attemptId, run.question.id)
+
+      const found = await findResumableRun({ quizId: seed.quizId, player: guest, executor: tx })
+
+      expect(found?.attemptId).toBe(run.attemptId)
+    })
+  })
+
+  it('ignores a challenge run', async () => {
+    await withTestDb(async (tx) => {
+      const seed = await seedQuiz(tx, { questionCount: 2 })
+      // The run being challenged belongs to somebody else, which is what a
+      // challenge is. It also has to: started by this player it would be a
+      // second unfinished attempt of their own, and the zero-answer guard
+      // would answer null whether the challenge filter existed or not — the
+      // test would pass against a function that had lost it.
+      const opponent: Player = { kind: 'guest', guestId: crypto.randomUUID(), nickname: 'Rival' }
+      const original = await startRun({ quizId: seed.quizId, player: opponent, executor: tx })
+      const challenge = await startRun({
+        quizId: seed.quizId,
+        player: seed.player,
+        challengeOfAttemptId: original.attemptId,
+        executor: tx,
+      })
+      await answer(tx, seed, challenge.attemptId, challenge.question.id)
+
+      const found = await findResumableRun({
+        quizId: seed.quizId,
+        player: seed.player,
+        executor: tx,
+      })
+
+      // Resumed from the plain quiz page it would lose its head-to-head framing.
+      expect(found).toBeNull()
+    })
+  })
+
+  it('takes the most recent of two runs', async () => {
+    await withTestDb(async (tx) => {
+      const seed = await seedQuiz(tx, { questionCount: 2 })
+      const older = await startRun({ quizId: seed.quizId, player: seed.player, executor: tx })
+      const newer = await startRun({ quizId: seed.quizId, player: seed.player, executor: tx })
+      await answer(tx, seed, older.attemptId, older.question.id)
+      await answer(tx, seed, newer.attemptId, newer.question.id)
+      // started_at defaults to now(), which Postgres fixes at the start of the
+      // transaction: inside this harness both rows carry the same instant and
+      // "latest" would be a tie. So the times are written explicitly, and the
+      // run inserted first is made the later one, so insertion order cannot
+      // produce the right answer by accident.
+      await tx
+        .update(attempts)
+        .set({ startedAt: new Date('2026-01-02T00:00:00Z') })
+        .where(eq(attempts.id, older.attemptId))
+      await tx
+        .update(attempts)
+        .set({ startedAt: new Date('2026-01-01T00:00:00Z') })
+        .where(eq(attempts.id, newer.attemptId))
+
+      const found = await findResumableRun({
+        quizId: seed.quizId,
+        player: seed.player,
+        executor: tx,
+      })
+
+      expect(found?.attemptId).toBe(older.attemptId)
+    })
+  })
+
+  it('looks past an attempt nobody answered', async () => {
+    await withTestDb(async (tx) => {
+      const seed = await seedQuiz(tx, { questionCount: 2 })
+      const played = await startRun({ quizId: seed.quizId, player: seed.player, executor: tx })
+      await answer(tx, seed, played.attemptId, played.question.id)
+      const abandoned = await startRun({ quizId: seed.quizId, player: seed.player, executor: tx })
+      // Written explicitly for the reason the test above gives: inside one
+      // transaction both rows carry the same now(), so without this the order
+      // is a tie and a function that only looks at the latest row could pass by
+      // luck.
+      await tx
+        .update(attempts)
+        .set({ startedAt: new Date('2026-01-02T00:00:00Z') })
+        .where(eq(attempts.id, abandoned.attemptId))
+      await tx
+        .update(attempts)
+        .set({ startedAt: new Date('2026-01-01T00:00:00Z') })
+        .where(eq(attempts.id, played.attemptId))
+
+      const found = await findResumableRun({
+        quizId: seed.quizId,
+        player: seed.player,
+        executor: tx,
+      })
+
+      // A Start over the player walked away from immediately must not hide the
+      // run that still has their work in it.
+      expect(found?.attemptId).toBe(played.attemptId)
+    })
+  })
+})
+
+describe('resumeRun', () => {
+  it('serves the question the server is waiting for', async () => {
+    await withTestDb(async (tx) => {
+      const seed = await seedQuiz(tx, { questionCount: 4 })
+      const run = await startRun({ quizId: seed.quizId, player: seed.player, executor: tx })
+      const [first, second] = (await readAttempt(tx, run.attemptId)).questionIds
+      await answer(tx, seed, run.attemptId, first)
+
+      const resumed = await resumeRun({
+        quizId: seed.quizId,
+        attemptId: run.attemptId,
+        player: seed.player,
+        executor: tx,
+      })
+
+      if (resumed.status !== 'playing') throw new Error('expected a run still in play')
+      expect(resumed.answered).toBe(1)
+      expect(resumed.total).toBe(run.total)
+      expect(resumed.question.id).toBe(second)
+    })
+  })
+
+  it('returns the history in played order with the option order the player saw', async () => {
+    await withTestDb(async (tx) => {
+      const seed = await seedQuiz(tx, { questionCount: 4, optionsPerQuestion: 4 })
+      const run = await startRun({ quizId: seed.quizId, player: seed.player, executor: tx })
+      const [first, second] = (await readAttempt(tx, run.attemptId)).questionIds
+      const firstPick = seededQuestion(seed, first).wrongOptionIds.slice(0, 1)
+      const afterFirst = await answer(tx, seed, run.attemptId, first, {
+        selectedOptionIds: firstPick,
+      })
+      if (!afterFirst.next) throw new Error('expected a second question')
+      const secondPick = seededQuestion(seed, second).correctOptionIds
+      await answer(tx, seed, run.attemptId, second, { selectedOptionIds: secondPick })
+
+      const resumed = await resumeRun({
+        quizId: seed.quizId,
+        attemptId: run.attemptId,
+        player: seed.player,
+        executor: tx,
+      })
+
+      expect(resumed.history.map((entry) => entry.question.id)).toEqual([first, second])
+      expect(resumed.history.map((entry) => entry.selectedOptionIds)).toEqual([
+        firstPick,
+        secondPick,
+      ])
+      // Seeded on the attempt: a resumed question that reshuffled would quietly
+      // relabel what the player picked.
+      expect(orderOf(resumed.history[0].question)).toBe(orderOf(run.question))
+      expect(orderOf(resumed.history[1].question)).toBe(orderOf(afterFirst.next))
+    })
+  })
+
+  it('carries the verdict, the explanation and the theory link', async () => {
+    await withTestDb(async (tx) => {
+      const seed = await seedQuiz(tx, { questionCount: 3 })
+      const run = await startRun({ quizId: seed.quizId, player: seed.player, executor: tx })
+      const [first, second] = (await readAttempt(tx, run.attemptId)).questionIds
+      await answer(tx, seed, run.attemptId, first, {
+        selectedOptionIds: seededQuestion(seed, first).wrongOptionIds,
+      })
+      await answer(tx, seed, run.attemptId, second)
+
+      const resumed = await resumeRun({
+        quizId: seed.quizId,
+        attemptId: run.attemptId,
+        player: seed.player,
+        executor: tx,
+      })
+
+      const [wrong, right] = resumed.history.map((entry) => entry.result)
+      const wrongSource = seededQuestion(seed, first)
+      const rightSource = seededQuestion(seed, second)
+      expect(wrong.correct).toBe(false)
+      expect(right.correct).toBe(true)
+      expect(wrong.correctOptionIds).toEqual(wrongSource.correctOptionIds)
+      expect(right.correctOptionIds).toEqual(rightSource.correctOptionIds)
+      expect(wrong.explanation).toBe(wrongSource.explanation)
+      expect(wrong.theoryUrl).toBe(wrongSource.theoryUrl)
+      expect(right.explanation).toBe(rightSource.explanation)
+      expect(right.theoryUrl).toBe(rightSource.theoryUrl)
+      // What the server said next at grading time is not something a replay may
+      // invent.
+      for (const result of [wrong, right]) {
+        expect(result.next).toBeNull()
+        expect(result.summary).toBeNull()
+      }
+    })
+  })
+
+  it('carries a timeout as a timeout', async () => {
+    await withTestDb(async (tx) => {
+      const seed = await seedQuiz(tx, { questionCount: 3, timePerQuestionSec: 30 })
+      const run = await startRun({ quizId: seed.quizId, player: seed.player, executor: tx })
+      // The right selection, so only the clock can be what made it wrong.
+      await answer(tx, seed, run.attemptId, run.question.id, {
+        elapsedMs: 30_000 + TIMER_GRACE_MS + 1,
+      })
+
+      const resumed = await resumeRun({
+        quizId: seed.quizId,
+        attemptId: run.attemptId,
+        player: seed.player,
+        executor: tx,
+      })
+
+      expect(resumed.history[0].result.timedOut).toBe(true)
+      expect(resumed.history[0].result.correct).toBe(false)
+    })
+  })
+
+  it("refuses another player's attempt", async () => {
+    await withTestDb(async (tx) => {
+      const seed = await seedQuiz(tx, { questionCount: 2 })
+      const run = await startRun({ quizId: seed.quizId, player: seed.player, executor: tx })
+      const stranger: Player = { kind: 'user', userId: `user-${crypto.randomUUID()}` }
+
+      await expect(
+        resumeRun({
+          quizId: seed.quizId,
+          attemptId: run.attemptId,
+          player: stranger,
+          executor: tx,
+        }),
+      ).rejects.toThrow(NotYourAttemptError)
+    })
+  })
+
+  it('refuses an attempt that does not exist', async () => {
+    await withTestDb(async (tx) => {
+      const seed = await seedQuiz(tx, { questionCount: 2 })
+
+      await expect(
+        resumeRun({
+          quizId: seed.quizId,
+          attemptId: crypto.randomUUID(),
+          player: seed.player,
+          executor: tx,
+        }),
+      ).rejects.toThrow(AttemptNotFoundError)
+    })
+  })
+
+  it('refuses a run on a quiz that has since been hidden', async () => {
+    await withTestDb(async (tx) => {
+      const seed = await seedQuiz(tx, { questionCount: 2 })
+      const run = await startRun({ quizId: seed.quizId, player: seed.player, executor: tx })
+      await tx.update(quizzes).set({ isHidden: true }).where(eq(quizzes.id, seed.quizId))
+
+      await expect(
+        resumeRun({
+          quizId: seed.quizId,
+          attemptId: run.attemptId,
+          player: seed.player,
+          executor: tx,
+        }),
+      ).rejects.toThrow(QuizNotFoundError)
+    })
+  })
+
+  it('returns finished for a run that is already over', async () => {
+    await withTestDb(async (tx) => {
+      const seed = await seedQuiz(tx, { questionCount: 3, maxErrors: 1 })
+      const run = await startRun({ quizId: seed.quizId, player: seed.player, executor: tx })
+      const [first, second, third] = (await readAttempt(tx, run.attemptId)).questionIds
+      await answer(tx, seed, run.attemptId, first, {
+        selectedOptionIds: seededQuestion(seed, first).wrongOptionIds,
+      })
+      await answer(tx, seed, run.attemptId, second)
+      const last = await answer(tx, seed, run.attemptId, third)
+
+      const resumed = await resumeRun({
+        quizId: seed.quizId,
+        attemptId: run.attemptId,
+        player: seed.player,
+        executor: tx,
+      })
+
+      if (resumed.status !== 'finished') throw new Error('expected a finished run')
+      expect(last.summary).not.toBeNull()
+      expect(resumed.summary).toEqual(last.summary)
+      expect(resumed.answered).toBe(3)
+      expect(resumed.history).toHaveLength(3)
+    })
+  })
+
+  it('finishes a run whose remaining questions were all deleted', async () => {
+    await withTestDb(async (tx) => {
+      const seed = await seedQuiz(tx, { questionCount: 3 })
+      const run = await startRun({ quizId: seed.quizId, player: seed.player, executor: tx })
+      const [first, second, third] = (await readAttempt(tx, run.attemptId)).questionIds
+      await answer(tx, seed, run.attemptId, first)
+      await deleteQuestions(tx, [second, third])
+
+      const resumed = await resumeRun({
+        quizId: seed.quizId,
+        attemptId: run.attemptId,
+        player: seed.player,
+        executor: tx,
+      })
+
+      expect(resumed.status).toBe('finished')
+      // The write is the point: without it the dead attempt is offered for ever.
+      expect((await readAttempt(tx, run.attemptId)).finishedAt).toBeInstanceOf(Date)
+    })
+  })
+
+  it('refuses an attempt from another quiz', async () => {
+    await withTestDb(async (tx) => {
+      const seed = await seedQuiz(tx, { questionCount: 2 })
+      const otherQuiz = await seedQuiz(tx, { questionCount: 2 })
+      const run = await startRun({ quizId: seed.quizId, player: seed.player, executor: tx })
+
+      // Opened from the other quiz's page the run would take that quiz's slug
+      // on every link and on its summary.
+      await expect(
+        resumeRun({
+          quizId: otherQuiz.quizId,
+          attemptId: run.attemptId,
+          player: seed.player,
+          executor: tx,
+        }),
+      ).rejects.toThrow(AttemptNotFoundError)
     })
   })
 })

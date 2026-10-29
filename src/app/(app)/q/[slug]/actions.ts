@@ -1,8 +1,14 @@
 'use server'
 
 import { getQuizBySlug } from '@/lib/quizzes/search'
-import { checkRateLimit, RUN_START_LIMIT, RUN_START_WINDOW_SEC } from '@/lib/rate-limit'
-import { resolvePlayer, runLimitKey } from '@/lib/run/identity'
+import {
+  checkRateLimit,
+  RESUME_LIMIT,
+  RESUME_WINDOW_SEC,
+  RUN_START_LIMIT,
+  RUN_START_WINDOW_SEC,
+} from '@/lib/rate-limit'
+import { resolvePlayer, resumeLimitKey, runLimitKey } from '@/lib/run/identity'
 import {
   type AnswerResult,
   AttemptNotFoundError,
@@ -11,7 +17,9 @@ import {
   NotYourAttemptError,
   QuestionNotInAttemptError,
   QuizNotFoundError,
+  type RunResume,
   type RunStart,
+  resumeRun,
   startRun,
   submitAnswer,
 } from '@/lib/run/service'
@@ -24,6 +32,10 @@ export type StartRunResult =
 export type SubmitResult =
   | { ok: true; result: AnswerResult }
   | { ok: false; error: 'notYours' | 'duplicate' | 'notFound' }
+
+export type ResumeRunResult =
+  | { ok: true; run: RunResume }
+  | { ok: false; error: 'gone' | 'rateLimited' }
 
 export async function startRunAction(input: {
   slug: string
@@ -99,6 +111,46 @@ export async function submitAnswerAction(input: {
     // Asking for a question this attempt never sampled is the same dead end as
     // an attempt that does not exist: there is nothing for the player to retry.
     if (error instanceof QuestionNotInAttemptError) return { ok: false, error: 'notFound' }
+    throw error
+  }
+}
+
+// One error code for every refusal on purpose: an attempt that is gone, one
+// that belongs to somebody else, one whose quiz was hidden and one that belongs
+// to another quiz all mean the same thing to the player, and saying "not yours"
+// out loud would tell a crafted caller something about an attempt that is not
+// theirs.
+//
+// Limited on its own key: it writes no rows, but rebuilding the history costs a
+// round trip per answered question, and that cost is not the run-start budget's
+// to carry.
+export async function resumeRunAction(input: {
+  slug: string
+  attemptId: string
+}): Promise<ResumeRunResult> {
+  // The same guard submitAnswerAction carries, for the same reason: a malformed
+  // uuid reaches Postgres as a query error rather than as no rows.
+  if (!isUuid(input.attemptId)) return { ok: false, error: 'gone' }
+
+  const player = await resolvePlayer()
+
+  const allowed = await checkRateLimit(resumeLimitKey(player), RESUME_LIMIT, RESUME_WINDOW_SEC)
+  if (!allowed) return { ok: false, error: 'rateLimited' }
+
+  // The run is scoped to the quiz whose page asked for it, so the slug is
+  // resolved here and the attempt is opened against that quiz and no other.
+  const quiz = await getQuizBySlug(input.slug)
+  if (!quiz) return { ok: false, error: 'gone' }
+
+  try {
+    return {
+      ok: true,
+      run: await resumeRun({ quizId: quiz.id, attemptId: input.attemptId, player }),
+    }
+  } catch (error) {
+    if (error instanceof AttemptNotFoundError) return { ok: false, error: 'gone' }
+    if (error instanceof NotYourAttemptError) return { ok: false, error: 'gone' }
+    if (error instanceof QuizNotFoundError) return { ok: false, error: 'gone' }
     throw error
   }
 }

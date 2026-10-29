@@ -6,7 +6,8 @@ import { getTranslations } from 'next-intl/server'
 import { cache, Suspense } from 'react'
 import { RunStartPanel } from '@/components/run/run-start-panel'
 import { getQuizBySlug } from '@/lib/quizzes/search'
-import { getCurrentUser } from '@/lib/session'
+import { readPlayer } from '@/lib/run/identity'
+import { findResumableRun } from '@/lib/run/service'
 
 type QuizParams = Promise<{ slug: string }>
 
@@ -50,9 +51,12 @@ async function RunSetup({ params }: { params: QuizParams }) {
   if (!quiz) notFound()
 
   const t = await getTranslations('run')
-  // Who is playing is settled again inside startRunAction; this only decides
-  // whether to ask for a nickname.
-  const user = await getCurrentUser()
+  // Read-only, because this is a render: a visitor with no guest cookie yet has
+  // played nothing, so there is nothing to look up and no cookie to mint. Who
+  // is playing is settled again inside startRunAction; here it decides only
+  // whether to ask for a nickname and whether there is a run to pick back up.
+  const player = await readPlayer()
+  const resumable = player ? await findResumableRun({ quizId: quiz.id, player }) : null
 
   return (
     <>
@@ -79,7 +83,8 @@ async function RunSetup({ params }: { params: QuizParams }) {
         questionsPerRun={Math.min(quiz.questionsPerRun, quiz.questionCount)}
         maxErrors={quiz.maxErrors}
         timePerQuestionSec={quiz.timePerQuestionSec}
-        askNickname={user === null}
+        askNickname={player?.kind !== 'user'}
+        resumable={resumable}
       />
     </>
   )

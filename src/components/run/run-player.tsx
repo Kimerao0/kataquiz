@@ -3,11 +3,21 @@
 import Link from 'next/link'
 import { useTranslations } from 'next-intl'
 import { useEffect, useRef, useState } from 'react'
-import { type SubmitResult, submitAnswerAction } from '@/app/(app)/q/[slug]/actions'
+import {
+  resumeRunAction,
+  type SubmitResult,
+  submitAnswerAction,
+} from '@/app/(app)/q/[slug]/actions'
 import { fetchChallengeComparisonAction } from '@/app/c/[attemptId]/actions'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
-import type { AnswerResult, PublicQuestion, RunStart, RunSummary } from '@/lib/run/service'
+import type {
+  AnswerResult,
+  PublicQuestion,
+  RunResume,
+  RunStart,
+  RunSummary,
+} from '@/lib/run/service'
 import { FeedbackPanel } from './feedback-panel'
 import { QuestionCard } from './question-card'
 import { QuestionTimer } from './question-timer'
@@ -19,7 +29,12 @@ type SubmitErrorCode = Extract<SubmitResult, { ok: false }>['error']
 
 // A failed submission is either worth retrying or it is a dead end, and the two
 // need different offers: a button that replays the same request, or a way out.
-type Failure = { retryable: true } | { retryable: false; code: SubmitErrorCode }
+// A duplicate is the one dead end with a third offer — the run is alive on the
+// server — and resumeFailed is what takes that offer back once it has been
+// tried and refused.
+type Failure =
+  | { retryable: true }
+  | { retryable: false; code: SubmitErrorCode; resumeFailed?: boolean }
 
 type Attempt = { optionIds: string[]; elapsedMs: number }
 
@@ -42,6 +57,13 @@ type RunPlayerProps = {
    * only once the final answer has landed.
    */
   challenge?: { opponentName: string }
+  /**
+   * Set only when this run was picked up where the server had it. The tally and
+   * the review both read what is below, so without the part of the run that was
+   * played before the refresh a resumed run would show no strokes and review
+   * only what came after it.
+   */
+  resumed?: { answered: number; history: Reviewed[] }
 }
 
 /** '1'–'9' to a zero-based option index. Zero is skipped: it misfires. */
@@ -61,12 +83,12 @@ function isButton(target: EventTarget | null): boolean {
   return target instanceof HTMLElement && target.closest('button, a[href]') !== null
 }
 
-export function RunPlayer({ run, quizSlug, challenge }: RunPlayerProps) {
+export function RunPlayer({ run, quizSlug, challenge, resumed }: RunPlayerProps) {
   const t = useTranslations('run')
   const tCommon = useTranslations('common')
 
   const [question, setQuestion] = useState<PublicQuestion>(run.question)
-  const [position, setPosition] = useState(1)
+  const [position, setPosition] = useState(resumed ? resumed.answered + 1 : 1)
   const [selected, setSelected] = useState<string[]>([])
   const [feedback, setFeedback] = useState<AnswerResult | null>(null)
   const [summary, setSummary] = useState<RunSummary | null>(null)
@@ -77,7 +99,7 @@ export function RunPlayer({ run, quizSlug, challenge }: RunPlayerProps) {
   // both the tally and the review on the summary screen, which is why the
   // whole answer is kept and not only its verdict; the score still comes from
   // the summary.
-  const [reviewed, setReviewed] = useState<Reviewed[]>([])
+  const [reviewed, setReviewed] = useState<Reviewed[]>(resumed?.history ?? [])
   // Undefined for an ordinary run, which is what keeps the summary identical
   // to the one it renders today.
   const [comparison, setComparison] = useState<ComparisonState | undefined>(undefined)
@@ -170,6 +192,51 @@ export function RunPlayer({ run, quizSlug, challenge }: RunPlayerProps) {
     } catch {
       setComparison(failed)
     }
+  }
+
+  // The way out of a duplicate: that answer did land, so rather than a dead end
+  // the run is read back and carried on from wherever the server has it.
+  async function resync() {
+    if (pending) return
+
+    setPending(true)
+    try {
+      const outcome = await resumeRunAction({ slug: quizSlug, attemptId: run.attemptId })
+      if (outcome.ok) {
+        continueFrom(outcome.run)
+        return
+      }
+      // The alert keeps the text it has — the answer still landed — and loses
+      // only the offer, so what is left is the way out to a new run.
+      setFailure({ retryable: false, code: 'duplicate', resumeFailed: true })
+    } catch {
+      setFailure({ retryable: false, code: 'duplicate', resumeFailed: true })
+    } finally {
+      setPending(false)
+    }
+  }
+
+  function continueFrom(resume: RunResume) {
+    setReviewed(resume.history)
+
+    if (resume.status === 'finished') {
+      setSummary(resume.summary)
+      // Finished as of the answer this tab never saw acknowledged, which is the
+      // first moment the server will part with the opponent's score.
+      void loadComparison()
+      return
+    }
+
+    setQuestion(resume.question)
+    setPosition(resume.answered + 1)
+    setSelected([])
+    setFeedback(null)
+    setFailure(null)
+    setExpired(false)
+    setStartedAt(Date.now())
+    // The button this click landed on sits where the options are about to be,
+    // exactly like the Next button it stands in for.
+    setAdvanceLock(true)
   }
 
   function commit(optionIds: string[]) {
@@ -295,6 +362,20 @@ export function RunPlayer({ run, quizSlug, challenge }: RunPlayerProps) {
   const outcomes: TallyOutcome[] = reviewed.map((entry) =>
     entry.result.correct ? 'correct' : 'wrong',
   )
+  // A duplicate means the answer landed, so the run is alive and one request
+  // away — until a resume has itself been refused, and then the only way on is
+  // a new run, which is also all the other dead ends have.
+  const canResume =
+    failure?.retryable === false && failure.code === 'duplicate' && !failure.resumeFailed
+  const wayOut = canResume ? (
+    <Button type="button" disabled={pending} onClick={() => resync()}>
+      {pending ? t('resuming') : t('resume')}
+    </Button>
+  ) : (
+    <Link href={`/q/${quizSlug}/run`} className="underline underline-offset-4">
+      {t('startAgain')}
+    </Link>
+  )
 
   return (
     <div className="drill">
@@ -347,10 +428,8 @@ export function RunPlayer({ run, quizSlug, challenge }: RunPlayerProps) {
                 <>
                   <p>{t(`submitErrors.${failure.code}`)}</p>
                   {/* Nothing to retry: the answer landed, or this run is not
-                      reachable any more. The only way on is a new run. */}
-                  <Link href={`/q/${quizSlug}/run`} className="underline underline-offset-4">
-                    {t('startAgain')}
-                  </Link>
+                      reachable any more. */}
+                  {wayOut}
                 </>
               )}
             </AlertDescription>

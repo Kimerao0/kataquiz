@@ -1,4 +1,4 @@
-import { and, asc, eq, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, isNull, sql } from 'drizzle-orm'
 import type { NodePgQueryResultHKT } from 'drizzle-orm/node-postgres'
 import type { PgDatabase } from 'drizzle-orm/pg-core'
 import { type Db, db } from '@/db/client'
@@ -47,6 +47,34 @@ export type RunStart = {
   total: number
   timePerQuestionSec: number | null
 }
+
+// One graded question as the server can still reconstruct it, which is what a
+// run picked up after a refresh has instead of the copy the browser kept.
+export type RunHistoryEntry = {
+  question: PublicQuestion
+  selectedOptionIds: string[]
+  result: AnswerResult
+}
+
+export type ResumableRun = { attemptId: string; answered: number; total: number }
+
+export type RunResume =
+  | {
+      status: 'playing'
+      attemptId: string
+      question: PublicQuestion
+      total: number
+      timePerQuestionSec: number | null
+      answered: number
+      history: RunHistoryEntry[]
+    }
+  | {
+      status: 'finished'
+      attemptId: string
+      summary: RunSummary
+      answered: number
+      history: RunHistoryEntry[]
+    }
 
 export class RunError extends Error {}
 export class QuizNotFoundError extends RunError {}
@@ -224,6 +252,146 @@ export async function submitAnswer(params: {
   })
 }
 
+// The run this player walked away from on this quiz, if there is one. A refresh
+// orphans the attempt rather than ending it: the row says which questions, and
+// attempt_answers says how far they got.
+export async function findResumableRun(params: {
+  quizId: string
+  player: Player
+  executor?: Executor
+}): Promise<ResumableRun | null> {
+  const { quizId, player, executor = db } = params
+
+  const [row] = await executor
+    .select({
+      attemptId: attempts.id,
+      questionIds: attempts.questionIds,
+      // Cast in SQL: node-postgres hands a bigint count back as a string.
+      answered: sql<number>`count(${attemptAnswers.id})::int`,
+    })
+    .from(attempts)
+    .leftJoin(attemptAnswers, eq(attemptAnswers.attemptId, attempts.id))
+    .where(
+      and(
+        eq(attempts.quizId, quizId),
+        isNull(attempts.finishedAt),
+        // A challenge run is excluded on purpose: resuming it from the plain
+        // quiz page would drop the head-to-head framing it was started with.
+        isNull(attempts.challengeOfAttemptId),
+        ownedBy(player),
+      ),
+    )
+    .groupBy(attempts.id)
+    // An attempt nobody answered is indistinguishable from starting fresh, so
+    // offering to resume it would be noise. It has to be excluded here and not
+    // after the query: the limit chooses its row before any JS runs, so a Start
+    // over that was abandoned straight away would hide the older run with the
+    // player's answers in it rather than being looked past.
+    .having(sql`count(${attemptAnswers.id}) > 0`)
+    .orderBy(desc(attempts.startedAt))
+    .limit(1)
+  if (!row) return null
+
+  return { attemptId: row.attemptId, answered: row.answered, total: row.questionIds.length }
+}
+
+// Everything the browser needs to carry on where it left off: the question the
+// server is waiting for, and the questions already graded so the tally and the
+// review are not empty for the half of the run that was played before.
+export async function resumeRun(params: {
+  quizId: string
+  attemptId: string
+  player: Player
+  executor?: Executor
+}): Promise<RunResume> {
+  const { quizId, attemptId, player, executor = db } = params
+
+  const [attempt] = await executor
+    .select({
+      quizId: attempts.quizId,
+      userId: attempts.userId,
+      guestId: attempts.guestId,
+      questionIds: attempts.questionIds,
+      score: attempts.score,
+      errors: attempts.errors,
+      finishedAt: attempts.finishedAt,
+      maxErrors: quizzes.maxErrors,
+      timePerQuestionSec: quizzes.timePerQuestionSec,
+      isHidden: quizzes.isHidden,
+    })
+    .from(attempts)
+    .innerJoin(quizzes, eq(quizzes.id, attempts.quizId))
+    .where(eq(attempts.id, attemptId))
+  if (!attempt) throw new AttemptNotFoundError('that attempt does not exist')
+  // Scoped to the quiz whose page is asking: opened from another one the run
+  // would take that quiz's slug on every link and on its summary. To this quiz
+  // the attempt does not exist, which is why it is not an error of its own.
+  if (attempt.quizId !== quizId) throw new AttemptNotFoundError('that attempt does not exist')
+  // An attempt id travels in the request payload: it says which run this is,
+  // never who is playing it.
+  if (!isPlayedBy(attempt, player)) throw new NotYourAttemptError('that attempt is not yours')
+  if (attempt.isHidden) throw new QuizNotFoundError('that quiz does not exist')
+
+  const answers = await executor
+    .select({
+      questionId: attemptAnswers.questionId,
+      selectedOptionIds: attemptAnswers.selectedOptionIds,
+      isCorrect: attemptAnswers.isCorrect,
+      timedOut: attemptAnswers.timedOut,
+    })
+    .from(attemptAnswers)
+    .where(eq(attemptAnswers.attemptId, attemptId))
+
+  const history = await buildHistory(executor, attemptId, attempt.questionIds, answers)
+  // The number of answer rows and never history.length: the two part company
+  // only when a question is deleted between the read above and the loads below,
+  // and then the player still got through it and the tally's position still has
+  // to agree with what the live run showed. Only that race — attempt_answers
+  // cascades from questions, so a deletion a later read can see has already
+  // taken its answer row with it.
+  const answered = answers.length
+
+  const answeredIds = new Set(answers.map((row) => row.questionId))
+  const remainingIds = attempt.questionIds.filter((id) => !answeredIds.has(id))
+  const next = await loadNextSurvivingQuestion(executor, remainingIds)
+
+  if (next !== null && attempt.finishedAt === null) {
+    return {
+      status: 'playing',
+      attemptId,
+      question: withSeededOptionOrder(next, attemptId),
+      total: attempt.questionIds.length,
+      timePerQuestionSec: attempt.timePerQuestionSec,
+      answered,
+      history,
+    }
+  }
+
+  // Every question that was left has been deleted while the player was away.
+  // That is the same end of the run submitAnswer writes for itself, and leaving
+  // finishedAt unset would offer the dead attempt for ever.
+  if (attempt.finishedAt === null) {
+    await executor
+      .update(attempts)
+      .set({ finishedAt: sql`now()` })
+      .where(eq(attempts.id, attemptId))
+  }
+
+  return {
+    status: 'finished',
+    attemptId,
+    summary: {
+      attemptId,
+      score: attempt.score,
+      errors: attempt.errors,
+      total: attempt.questionIds.length,
+      passed: hasPassed(attempt.errors, attempt.maxErrors),
+    },
+    answered,
+    history,
+  }
+}
+
 function playerColumns(player: Player) {
   if (player.kind === 'user') return { userId: player.userId }
   return { guestId: player.guestId, nickname: player.nickname }
@@ -235,6 +403,79 @@ function isPlayedBy(
 ): boolean {
   if (player.kind === 'user') return attempt.userId === player.userId
   return attempt.guestId === player.guestId
+}
+
+// The same question isPlayedBy asks of a row, asked of the table: a lookup that
+// never sees an attempt it would have to refuse.
+function ownedBy(player: Player) {
+  if (player.kind === 'user') return eq(attempts.userId, player.userId)
+  return eq(attempts.guestId, player.guestId)
+}
+
+type StoredAnswer = {
+  questionId: string
+  selectedOptionIds: string[]
+  isCorrect: boolean
+  timedOut: boolean
+}
+
+// Walked in the attempt's own order rather than the order the answer rows came
+// back in: that is the order the run was played, and the review is numbered by
+// it. Loaded one question at a time through the loaders the live run already
+// uses rather than batched into one query — this is a cold path, run once per
+// resume, and a second set of readers would be a second place the projection a
+// player is served could drift.
+async function buildHistory(
+  executor: Executor,
+  attemptId: string,
+  questionIds: string[],
+  answers: StoredAnswer[],
+): Promise<RunHistoryEntry[]> {
+  const byQuestionId = new Map(answers.map((answer) => [answer.questionId, answer]))
+  const history: RunHistoryEntry[] = []
+
+  for (const questionId of questionIds) {
+    const answer = byQuestionId.get(questionId)
+    if (!answer) continue
+
+    const entry = await toHistoryEntry(executor, attemptId, answer)
+    if (entry) history.push(entry)
+  }
+
+  return history
+}
+
+// Null for a question deleted while this resume was reading: its answer row was
+// already in hand, and there is no prompt left to review, so the entry is
+// dropped rather than shown half empty.
+async function toHistoryEntry(
+  executor: Executor,
+  attemptId: string,
+  answer: StoredAnswer,
+): Promise<RunHistoryEntry | null> {
+  const question = await loadPublicQuestion(executor, answer.questionId)
+  if (!question) return null
+
+  const [source] = await executor
+    .select({ explanation: questions.explanation, theoryUrl: questions.theoryUrl })
+    .from(questions)
+    .where(eq(questions.id, answer.questionId))
+
+  return {
+    question: withSeededOptionOrder(question, attemptId),
+    selectedOptionIds: answer.selectedOptionIds,
+    result: {
+      correct: answer.isCorrect,
+      timedOut: answer.timedOut,
+      correctOptionIds: await loadCorrectOptionIds(executor, answer.questionId),
+      explanation: source?.explanation ?? null,
+      theoryUrl: source?.theoryUrl ?? null,
+      // Both null: they describe what the server said next at grading time,
+      // which a replay has no business inventing.
+      next: null,
+      summary: null,
+    },
+  }
 }
 
 async function loadPublicQuestion(

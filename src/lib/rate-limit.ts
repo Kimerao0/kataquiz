@@ -15,6 +15,14 @@ export const RUN_START_WINDOW_SEC = 3600
 export const UPLOAD_LIMIT = 10
 export const UPLOAD_WINDOW_SEC = 3600
 
+// Resuming is limited for what the request costs, not for the rows it writes:
+// it writes none, but the history is rebuilt one question at a time, so a long
+// run is well over a hundred sequential round trips per call. Sixty an hour is
+// far past what picking a run back up and refreshing it can reach, and the
+// window matches the others so every limit ages the same way.
+export const RESUME_LIMIT = 60
+export const RESUME_WINDOW_SEC = 3600
+
 // The base class of both `db` and a transaction, so tests can run the limiter
 // inside the rollback harness.
 type Executor = PgDatabase<NodePgQueryResultHKT, Db['_']['fullSchema']>

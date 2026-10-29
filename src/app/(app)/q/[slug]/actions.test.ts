@@ -1,4 +1,9 @@
-import { RUN_START_LIMIT, RUN_START_WINDOW_SEC } from '@/lib/rate-limit'
+import {
+  RESUME_LIMIT,
+  RESUME_WINDOW_SEC,
+  RUN_START_LIMIT,
+  RUN_START_WINDOW_SEC,
+} from '@/lib/rate-limit'
 import {
   AttemptNotFoundError,
   DuplicateAnswerError,
@@ -7,7 +12,7 @@ import {
   QuestionNotInAttemptError,
   QuizNotFoundError,
 } from '@/lib/run/service'
-import { startRunAction, submitAnswerAction } from './actions'
+import { resumeRunAction, startRunAction, submitAnswerAction } from './actions'
 
 const {
   getCurrentUser,
@@ -16,6 +21,7 @@ const {
   getQuizBySlug,
   startRun,
   submitAnswer,
+  resumeRun,
 } = vi.hoisted(() => ({
   getCurrentUser: vi.fn<typeof import('@/lib/session').getCurrentUser>(),
   getOrCreateGuestId: vi.fn<typeof import('@/lib/guest').getOrCreateGuestId>(),
@@ -23,6 +29,7 @@ const {
   getQuizBySlug: vi.fn<typeof import('@/lib/quizzes/search').getQuizBySlug>(),
   startRun: vi.fn<typeof import('@/lib/run/service').startRun>(),
   submitAnswer: vi.fn<typeof import('@/lib/run/service').submitAnswer>(),
+  resumeRun: vi.fn<typeof import('@/lib/run/service').resumeRun>(),
 }))
 
 // Replaced wholesale: the action only ever asks these two modules who the
@@ -43,13 +50,14 @@ vi.mock('@/lib/quizzes/search', async (importOriginal) => ({
   getQuizBySlug,
 }))
 
-// Only the two writes are stubbed. The error classes have to stay real: the
+// Only the three entry points are stubbed. The error classes have to stay real: the
 // action maps them with instanceof, and a copied class would pass a test the
 // production module would fail.
 vi.mock('@/lib/run/service', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/lib/run/service')>()),
   startRun,
   submitAnswer,
+  resumeRun,
 }))
 
 const user = { id: 'user-1', name: 'Ada Lovelace', image: null }
@@ -100,6 +108,16 @@ const answer = {
   summary: { attemptId, score: 5, errors: 0, total: 5, passed: true },
 }
 
+const resumed = {
+  status: 'playing' as const,
+  attemptId,
+  question: run.question,
+  total: 5,
+  timePerQuestionSec: 30,
+  answered: 0,
+  history: [],
+}
+
 const submitInput = {
   attemptId,
   questionId,
@@ -115,6 +133,7 @@ beforeEach(() => {
   getQuizBySlug.mockResolvedValue(quiz)
   startRun.mockResolvedValue(run)
   submitAnswer.mockResolvedValue(answer)
+  resumeRun.mockResolvedValue(resumed)
 })
 
 describe('startRunAction', () => {
@@ -290,6 +309,101 @@ describe('submitAnswerAction', () => {
     submitAnswer.mockRejectedValue(new Error('the database is down'))
 
     await expect(submitAnswerAction(submitInput)).rejects.toThrow('the database is down')
+  })
+})
+
+describe('resumeRunAction', () => {
+  const resumeInput = { slug: quiz.slug, attemptId }
+
+  it('derives the player from the session, ignoring any client-supplied id', async () => {
+    const hostile = { ...resumeInput, userId: 'victim', guestId: 'victim', player: { kind: 'x' } }
+
+    const result = await resumeRunAction(hostile as never)
+
+    expect(result).toEqual({ ok: true, run: resumed })
+    // Exact, not objectContaining: the attempt id says which run, never who is
+    // playing it, and a spread of the payload would let it say both.
+    expect(resumeRun).toHaveBeenCalledWith({
+      quizId: quiz.id,
+      attemptId,
+      player: { kind: 'user', userId: user.id },
+    })
+  })
+
+  it('keys the limit on its own resume: prefix, apart from the run-start budget', async () => {
+    await resumeRunAction(resumeInput)
+
+    expect(checkRateLimit).toHaveBeenCalledWith(
+      `resume:user:${user.id}`,
+      RESUME_LIMIT,
+      RESUME_WINDOW_SEC,
+    )
+  })
+
+  it('keys the limit on the guest cookie for a signed-out caller', async () => {
+    getCurrentUser.mockResolvedValue(null)
+
+    await resumeRunAction(resumeInput)
+
+    expect(checkRateLimit).toHaveBeenCalledWith(
+      'resume:guest:guest-1',
+      RESUME_LIMIT,
+      RESUME_WINDOW_SEC,
+    )
+  })
+
+  it('returns rateLimited without reaching the service when the limiter refuses', async () => {
+    checkRateLimit.mockResolvedValue(false)
+
+    const result = await resumeRunAction(resumeInput)
+
+    expect(result).toEqual({ ok: false, error: 'rateLimited' })
+    expect(resumeRun).not.toHaveBeenCalled()
+  })
+
+  it('refuses a malformed attemptId as gone before anything else runs', async () => {
+    const result = await resumeRunAction({ slug: quiz.slug, attemptId: "' or 1=1 --" })
+
+    expect(result).toEqual({ ok: false, error: 'gone' })
+    // A malformed uuid would reach Postgres as a query error and come back as
+    // an opaque 500, so the guard has to stop it ahead of the service.
+    expect(resumeRun).not.toHaveBeenCalled()
+  })
+
+  it('reports an unknown slug as gone without reaching the service', async () => {
+    getQuizBySlug.mockResolvedValue(null)
+
+    const result = await resumeRunAction({ slug: 'gone', attemptId })
+
+    expect(result).toEqual({ ok: false, error: 'gone' })
+    expect(resumeRun).not.toHaveBeenCalled()
+  })
+
+  it('hands the service the looked-up quiz id, not the slug', async () => {
+    await resumeRunAction(resumeInput)
+
+    // The run is scoped to the quiz whose page asked for it. A slug in the
+    // quizId slot would match no attempt and read as gone for every resume.
+    expect(resumeRun).toHaveBeenCalledWith(expect.objectContaining({ quizId: quiz.id }))
+    expect(resumeRun).not.toHaveBeenCalledWith(expect.objectContaining({ quizId: quiz.slug }))
+  })
+
+  // One code for every refusal: "not yours" said out loud would tell a crafted
+  // caller something about an attempt that is not theirs.
+  it.each([
+    ['AttemptNotFoundError', new AttemptNotFoundError('x')],
+    ['NotYourAttemptError', new NotYourAttemptError('x')],
+    ['QuizNotFoundError', new QuizNotFoundError('x')],
+  ])('maps %s to { ok: false, error: gone }', async (_name, error) => {
+    resumeRun.mockRejectedValue(error)
+
+    await expect(resumeRunAction(resumeInput)).resolves.toEqual({ ok: false, error: 'gone' })
+  })
+
+  it('lets an unexpected failure through instead of reporting it as a missing run', async () => {
+    resumeRun.mockRejectedValue(new Error('the database is down'))
+
+    await expect(resumeRunAction(resumeInput)).rejects.toThrow('the database is down')
   })
 })
 

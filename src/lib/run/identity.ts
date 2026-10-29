@@ -3,7 +3,7 @@ import type { NodePgQueryResultHKT } from 'drizzle-orm/node-postgres'
 import type { PgDatabase } from 'drizzle-orm/pg-core'
 import { type Db, db } from '@/db/client'
 import { attempts } from '@/db/schema'
-import { getOrCreateGuestId } from '@/lib/guest'
+import { getOrCreateGuestId, readGuestId } from '@/lib/guest'
 import { getCurrentUser } from '@/lib/session'
 import type { Player } from './service'
 
@@ -32,10 +32,32 @@ export async function resolvePlayer(nickname?: string): Promise<Player> {
   }
 }
 
+// The read-only twin of resolvePlayer, for a render. It mints nothing: Next
+// throws when a cookie is written while rendering, which is the whole reason
+// readGuestId exists, so a visitor who has no guest cookie yet is nobody here
+// and gets `null` rather than a fresh identity.
+export async function readPlayer(): Promise<Player | null> {
+  const user = await getCurrentUser()
+  if (user) return { kind: 'user', userId: user.id }
+
+  const guestId = await readGuestId()
+  if (!guestId) return null
+
+  // Empty rather than invented: only resolvePlayer mints a nickname, and the
+  // lookups this player is handed to read ownership and never a name.
+  return { kind: 'guest', guestId, nickname: '' }
+}
+
 // The prefix keeps run starts out of the way of the upload limit, which shares
 // the rate limit table's primary key.
 export function runLimitKey(player: Player): string {
   return player.kind === 'user' ? `run:user:${player.userId}` : `run:guest:${player.guestId}`
+}
+
+// Its own prefix for the same reason: sharing the run-start key would let
+// picking a run back up burn the budget for starting one.
+export function resumeLimitKey(player: Player): string {
+  return player.kind === 'user' ? `resume:user:${player.userId}` : `resume:guest:${player.guestId}`
 }
 
 // Reading a finished run's comparison reveals the opponent's score, so the

@@ -1,19 +1,26 @@
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { TIMER_GRACE_MS } from '@/lib/run/engine'
-import type { AnswerResult, PublicQuestion, RunStart, RunSummary } from '@/lib/run/service'
+import type {
+  AnswerResult,
+  PublicQuestion,
+  RunHistoryEntry,
+  RunStart,
+  RunSummary,
+} from '@/lib/run/service'
 import { renderWithMessages } from '@/test/intl'
 import { ADVANCE_LOCK_MS, RunPlayer } from './run-player'
 
-const { submitAnswerAction, fetchChallengeComparisonAction } = vi.hoisted(() => ({
+const { submitAnswerAction, resumeRunAction, fetchChallengeComparisonAction } = vi.hoisted(() => ({
   submitAnswerAction: vi.fn(),
+  resumeRunAction: vi.fn(),
   fetchChallengeComparisonAction: vi.fn(),
 }))
 
 // A factory mock, so the real module — and the pg Pool it builds at import
 // time through @/lib/run/service — never loads in jsdom. The action has its
 // own tests against the service.
-vi.mock('@/app/(app)/q/[slug]/actions', () => ({ submitAnswerAction }))
+vi.mock('@/app/(app)/q/[slug]/actions', () => ({ submitAnswerAction, resumeRunAction }))
 
 // Imported by the player for the challenge reveal, and reached by the same pg
 // Pool if it were allowed to load for real.
@@ -67,6 +74,21 @@ const summary: RunSummary = {
   passed: true,
 }
 
+// One question already graded and correct, as the server hands it back.
+const priorStroke: RunHistoryEntry = {
+  question: single,
+  selectedOptionIds: ['o1'],
+  result: {
+    correct: true,
+    timedOut: false,
+    correctOptionIds: ['o1'],
+    explanation: null,
+    theoryUrl: null,
+    next: null,
+    summary: null,
+  },
+}
+
 function runOf(question: PublicQuestion, overrides: Partial<RunStart> = {}): RunStart {
   return { attemptId: 'attempt-1', question, total: 2, timePerQuestionSec: null, ...overrides }
 }
@@ -112,6 +134,7 @@ function rowOf(text: string) {
 beforeEach(() => {
   vi.clearAllMocks()
   submitAnswerAction.mockResolvedValue({ ok: true, result: resultOf() })
+  resumeRunAction.mockResolvedValue({ ok: false, error: 'gone' })
   fetchChallengeComparisonAction.mockResolvedValue({
     ok: true,
     comparison: {
@@ -373,7 +396,7 @@ describe('run player', () => {
     expect(submitAnswerAction.mock.calls[1][0]).toEqual(submitAnswerAction.mock.calls[0][0])
   })
 
-  it('offers a way out instead of a retry when the answer already landed', async () => {
+  it('offers to resume instead of a retry when the answer already landed', async () => {
     submitAnswerAction.mockResolvedValue({ ok: false, error: 'duplicate' })
     renderRun(single)
 
@@ -383,10 +406,61 @@ describe('run player', () => {
     expect(alert).toHaveTextContent('This question was already answered')
     // Retrying a duplicate only produces another duplicate.
     expect(within(alert).queryByRole('button', { name: 'Try again' })).not.toBeInTheDocument()
-    expect(within(alert).getByRole('link', { name: 'Start a new run' })).toHaveAttribute(
-      'href',
-      '/q/road-signs/run',
+    // The answer landed, so the run is alive: the way out is to pick it up, not
+    // to abandon it for a new one.
+    expect(within(alert).getByRole('button', { name: 'Resume' })).toBeEnabled()
+    expect(within(alert).queryByRole('link', { name: 'Start a new run' })).not.toBeInTheDocument()
+  })
+
+  it('opens a resumed run where the server left it', () => {
+    renderWithMessages(
+      <RunPlayer
+        run={runOf(second)}
+        quizSlug="road-signs"
+        resumed={{ answered: 1, history: [priorStroke] }}
+      />,
     )
+
+    expect(screen.getByRole('heading', { name: second.prompt })).toBeVisible()
+    // Position and prior stroke together: without the history the tally would
+    // read 0 correct, and without the offset it would read question 1.
+    expect(screen.getByText('Question 2 of 2')).toBeInTheDocument()
+    expect(screen.getByText('1 correct, 0 wrong')).toBeInTheDocument()
+  })
+
+  it('carries on where the server has the run after resuming from a duplicate', async () => {
+    submitAnswerAction.mockResolvedValue({ ok: false, error: 'duplicate' })
+    resumeRunAction.mockResolvedValue({
+      ok: true,
+      run: {
+        status: 'playing',
+        attemptId: 'attempt-1',
+        question: second,
+        total: 2,
+        timePerQuestionSec: null,
+        answered: 1,
+        history: [priorStroke],
+      },
+    })
+    renderRun(single)
+
+    // Still on the first question, nothing yet counted.
+    expect(screen.getByText('Question 1 of 2')).toBeInTheDocument()
+    expect(screen.getByText('0 correct, 0 wrong')).toBeInTheDocument()
+
+    await userEvent.click(option('Warning'))
+    await userEvent.click(
+      within(await screen.findByRole('alert')).getByRole('button', { name: 'Resume' }),
+    )
+
+    expect(await screen.findByRole('heading', { name: second.prompt })).toBeVisible()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(screen.getByText('Question 2 of 2')).toBeInTheDocument()
+    expect(screen.getByText('1 correct, 0 wrong')).toBeInTheDocument()
+    expect(resumeRunAction).toHaveBeenCalledTimes(1)
+    expect(resumeRunAction).toHaveBeenCalledWith({ slug: 'road-signs', attemptId: 'attempt-1' })
+    // Answerable once the advance lock the resume sets has lifted on its own.
+    await optionAfterAdvance('Red')
   })
 
   it('auto-submits whatever is selected when the clock runs out', async () => {

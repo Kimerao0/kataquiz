@@ -62,12 +62,18 @@
     "nicknameHint": "Optional, and only used on challenges you share.",
     "begin": "Begin",
     "starting": "Starting…",
+    "startOver": "Start over",
+    "resume": "Resume",
+    "resuming": "Resuming…",
+    "resumeBody": "You left a run unfinished — {answered} of {total} answered.",
     "startErrorTitle": "The run could not be started",
     "startAgain": "Start a new run",
     "startErrors": {
       "notFound": "That quiz is no longer available.",
       "empty": "That quiz has no questions to play yet.",
       "rateLimited": "You have started a lot of runs recently. Try again in a little while.",
+      "resumeGone": "That run is no longer available. Start a new one.",
+      "resumeLimited": "You have resumed runs a lot recently. Try again in a little while.",
       "unexpected": "The server did not answer. Check your connection and try again."
     },
     "progress": "Question {position} of {total}",
@@ -93,7 +99,7 @@
     "seeResult": "See your result",
     "submitErrorTitle": "Your answer did not reach the server",
     "submitErrors": {
-      "duplicate": "This question was already answered, so the run cannot be resumed here.",
+      "duplicate": "This question was already answered. Pick the run up where the server has it.",
       "notYours": "This run belongs to someone else. Start one of your own.",
       "notFound": "This run is no longer available."
     },
