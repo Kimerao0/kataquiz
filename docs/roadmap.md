@@ -123,12 +123,6 @@ Closed items: `docs/roadmap-archive-2026-10.md`.
 
 ## Tooling — each of these has already cost a wasted cycle
 
-- [ ] KQ33: `pnpm shots` photographs a 404 silently
-  Next renders not-found at the requested path, so the pathname assertion stays quiet. A stale slug produced a convincing picture of the wrong page. Needs the `Network` domain response status.
-  _`scripts/shots.mts`_
-- [ ] KQ34: `pnpm shots` cannot reach an interactive state
-  It loads a URL and stops, so no feedback panel, summary or selected state. The driver this once pointed at lived in a session scratchpad and is gone; KQ08 needed another one and it cost a cycle to rebuild. Whatever is folded in has to survive three things, each of which silently produced a dead or wrong photograph: the start panel's nickname `label[for]` is on screen before the run mounts, so an unscoped option click lands there and waits forever — scope option lookups to `.drill-main`; a click sooner than `ADVANCE_LOCK_MS` after Next is deliberately swallowed, so the driver must be slower than the lock; and seeded slugs carry a generated suffix, so a guessed slug 404s at the requested path (KQ33) and plays a page that is not there.
-  _`scripts/shots.mts`_
 - [ ] KQ35: The dev server silently serves stale CSS
   `globals.css` edits repeatedly failed to reach the bundle; a whole screenshot round was a picture of CSS that was never applied. Verify design work against `pnpm build`, not `pnpm dev`.
 - [ ] KQ36: No CI job runs `pnpm build`

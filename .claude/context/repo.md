@@ -20,15 +20,26 @@ Vitest runs two projects: `node` for `src/lib/**` and `src/db/**` against a real
 **The test suite cannot see a page.** jsdom computes no layout, which is how this project shipped
 Milestone 1 with 326 green tests and a UI nobody had looked at.
 
-`pnpm shots <path> [label]` drives headless Chrome at 375 / 768 / 1440 / 1920 / 2560 in both colour
-schemes and writes PNGs to `shots/`. **Open the files** — reading the filenames is not looking at
-the page. It is deliberately not a gate and must not be added to `pnpm check` or a hook.
+`pnpm shots <path> [label] [--play answer|summary] [--allow-noindex]` drives headless Chrome at
+375 / 768 / 1440 / 1920 / 2560 in both colour schemes and writes PNGs to `shots/`. **Open the
+files** — reading the filenames is not looking at the page. It is deliberately not a gate and must
+not be added to `pnpm check` or a hook.
 
-Three traps it has already sprung, each costing a cycle:
+`--play summary` plays a whole run first, which is the only way to photograph the summary; it does
+not exist until every question has been answered. `--play answer` stops on the feedback panel. A
+seeded slug carries a generated suffix, so take it from the catalog rather than typing it.
 
-- It points at `localhost`, never `127.0.0.1`: Next only hydrates on the origin it was started for,
+Two traps it used to spring are now caught for you, and both throw rather than returning a
+photograph:
+
+- A not-found page is refused. The response status is no help here — a dead slug answers HTTP 200
+  with not-found content, which this repo accepted deliberately — so it keys off the `noindex`
+  robots meta Next adds.
+- A scenario that never arrives throws with the page's own text, so a rate-limited start is never
+  filed as evidence of a screen.
+
+Two remain, and neither is the tool's to fix:
+
+- **The dev server serves stale CSS (KQ35): verify design work against `pnpm build`.**
+- It points at `localhost`, never `127.0.0.1`. Next only hydrates on the origin it was started for,
   and a `127.0.0.1` shot is a convincing picture of a page where React never attached.
-- It photographs a 404 silently (KQ33), because Next renders not-found at the requested path.
-- The dev server serves stale CSS (KQ35): verify design work against `pnpm build`.
-
-It cannot reach an interactive state (KQ34). A working driver exists in the session scratchpad.

@@ -19,3 +19,19 @@ must still resolve.
     That is KQ09 and was a deliberate choice, not an oversight.
   - `imageUrl` is now rendered in two places; re-validating it at render is still KQ15, which names
     both call sites.
+
+- [x] KQ33: `pnpm shots` photographed a 404 silently
+  Closed by `8fa9038`. The roadmap prescribed the `Network` domain response status and that fix
+  would not have worked: a dead slug answers **HTTP 200** with not-found content, because
+  `notFound()` is thrown inside a Suspense boundary after streaming starts — the limitation this
+  repo had already accepted. Verified against the running app before the fix was written. What does
+  distinguish it is the `noindex` robots meta Next adds, and that is what the tool refuses on.
+  `--allow-noindex` is the escape hatch.
+  _`scripts/shots.mts`_
+
+- [x] KQ34: `pnpm shots` could not reach an interactive state
+  Closed by `8fa9038`. `--play answer` and `--play summary` drive a real run before the shot, so the
+  feedback panel and the summary can be photographed. The three traps that cost a cycle each are
+  defended in the script and named in its comments: the start panel's nickname `label[for]`, the
+  advance lock, and a scenario that fails rather than photographing a rate-limit error.
+  _`scripts/shots.mts`_
