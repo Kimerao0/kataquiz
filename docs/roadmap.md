@@ -59,9 +59,6 @@ Closed items: `docs/roadmap-archive-2026-10.md`.
 - [ ] KQ14: `<html lang>` is always `en`
   Quizzes carry their own `language`, so a screen reader mispronounces every non-English quiz.
   _`src/app/layout.tsx`_
-- [ ] KQ39: `TheoryLink` trusts its caller, and it is the one that matters
-  KQ15 put `imageUrl`'s guard inside the component so a third caller cannot forget it. `theoryUrl` still has the opposite shape: `TheoryLink` takes `url: string` and renders `href={url}`, while `httpUrlOrNull` runs at each of the two call sites. A `javascript:` URL in an `<a href>` **does** execute, unlike in an `<img src>`, so the weaker arrangement is on the more dangerous column. Move the check inside, the way KQ15 did.
-  _`src/components/run/feedback-parts.tsx:40`, guarded at `feedback-panel.tsx:23` and `run-review.tsx:47`_
 - [ ] KQ16: `startRun` has a narrow mirror of the stranded-run bug
   If the first sampled question is deleted between the bank read and the load, it throws `EmptyQuizError` even though others survived. Fails honestly rather than stranding, so it is low priority.
   _`src/lib/run/service.ts:98`_

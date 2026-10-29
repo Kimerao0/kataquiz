@@ -8,6 +8,30 @@ must still resolve.
 
 ## Closed
 
+- [x] KQ39: `TheoryLink` trusts its caller, and it is the one that matters
+  Closed by `20d493e`. `TheoryLink` takes `string | null` and runs `httpUrlOrNull` itself, so both
+  call sites dropped their local and their conditional rather than the guard being duplicated. With
+  KQ15 this closes the class and not just two instances: review swept `src/` and found `TheoryLink`
+  is the only anchor carrying an author-supplied URL, `QuestionImage` the only `<img src>`, and no
+  `dangerouslySetInnerHTML`, `window.open`, `location.href` or `<iframe>` anywhere.
+  _`src/components/run/feedback-parts.tsx:44-47`_
+
+  Recorded:
+  - Behaviour is unchanged. The pre-existing 494 tests staying green across the move is the
+    evidence; the component returns null before any wrapper, so both screens emit the same host
+    nodes and there was nothing to photograph.
+  - The module had no tests of its own anywhere — only indirect ones through the panel and the
+    review. It has them now, and one closed a real hole: `verdictFor` returns the mark as well as
+    the word, and swapping `CheckIcon` for `XIcon` rendered a cross beside "Correct" with the whole
+    suite green. The icon is `aria-hidden` wherever it renders, correctly — the word already
+    carries the meaning — and that is precisely what puts it beyond every text and role query.
+    Identity against the imported component is the only assertion available.
+  - The two sibling guards now have different prop contracts: `TheoryLink` takes `string | null`
+    with no call-site conditional, `QuestionImage` takes `string` with one. Both check internally,
+    so the class is closed either way. Anyone tempted to mirror one onto the other should note
+    `question-card.tsx:112` uses `key={question.imageUrl}` to reset the broken state per image, and
+    that key goes away with the conditional.
+
 - [x] KQ15: Re-validate `imageUrl` at render
   Closed by `13346b6`. `QuestionImage` runs its `src` through `httpUrlOrNull` and renders nothing
   when the scheme is not http(s), covering both call sites at once because the guard lives inside
