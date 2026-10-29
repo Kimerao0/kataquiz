@@ -1,6 +1,8 @@
 # Repo context — Kataquiz
 
 tracker: docs/roadmap.md
+lenses: .claude/context/lenses.md — the defect shapes this repo has produced, read first by
+`core-workflow:code-reviewer` and `core-workflow:test-auditor`.
 
 Ids are `KQnn`, matching the shape `parse-tracker.py` can read (`[A-Z]{1,3}\d{1,2}`, no
 separator). A hyphenated `KQ-001` is invisible to it — that cost a round here.
@@ -18,7 +20,14 @@ This repo commits to trunk on `main` and has no pull-request path.
 `pnpm build` is NOT in it (KQ36).
 
 Vitest runs two projects: `node` for `src/lib/**` and `src/db/**` against a real Postgres, and
-`jsdom` for `.tsx`. Postgres comes from `compose.yaml` (`pnpm db:up`).
+`jsdom` for `.tsx`. Postgres comes from `compose.yaml` (`pnpm db:up`), published on **55432** — the
+mono checkout's dev stack owns 5432 and the two used to evict each other.
+
+**A stopped database does not say so.** With the container down, `vitest run` prints `No test files
+found` and a `TypeError: code.charCodeAt is not a function` from Vite's module runner — nothing
+names Postgres, and it looks like a broken config or a bad glob. Measured 2026-10-29, it cost ten
+minutes. `npx vitest run --project jsdom` passing while `--project node` fails this way is the tell;
+`docker ps` is the check.
 
 ## Looking at the UI
 
