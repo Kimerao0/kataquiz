@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { httpUrlOrNull } from './safe-url'
 
 /**
  * A snippet the question is about, which is not a sentence and must not be set
@@ -29,8 +30,14 @@ export function QuestionCode({ code, language }: { code: string; language: strin
 // would need every host allow-listed. A fixed max height keeps a slow or
 // oversized file from pushing the options off the screen, and a broken one
 // disappears instead of leaving a torn frame. Nothing here gates answering.
+// The scheme is checked here too: upload validation already restricts the
+// column, so this is a second line rather than the only one, and the Milestone 2
+// editor is a second way into the same column. theoryUrl runs the same check,
+// but at its call sites rather than inside the component that renders it.
 export function QuestionImage({ src }: { src: string }) {
   const [broken, setBroken] = useState(false)
+  const safe = httpUrlOrNull(src)
+  if (!safe) return null
   if (broken) return null
 
   return (
@@ -38,7 +45,7 @@ export function QuestionImage({ src }: { src: string }) {
     // an image could render at all, and the host set is whatever authors type.
     // biome-ignore lint/performance/noImgElement: author-supplied remote URL
     <img
-      src={src}
+      src={safe}
       // Empty on purpose: the prompt carries the meaning, and an author-written
       // alt does not exist in the schema.
       alt=""
