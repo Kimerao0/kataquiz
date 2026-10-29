@@ -8,6 +8,22 @@ must still resolve.
 
 ## Closed
 
+- [x] KQ15: Re-validate `imageUrl` at render
+  Closed by `13346b6`. `QuestionImage` runs its `src` through `httpUrlOrNull` and renders nothing
+  when the scheme is not http(s), covering both call sites at once because the guard lives inside
+  the component rather than beside each caller.
+  _`src/components/run/question-media.tsx:38-40`_
+
+  Recorded:
+  - Not an XSS fix, and the comment says so. A `javascript:` URL in an `<img src>` never executed;
+    the work is every other non-http(s) scheme and ending the disagreement between two
+    author-supplied URL columns.
+  - Review proved the silent-drop path is currently unreachable: zod's accept set is a strict
+    subset of `httpUrlOrNull`'s, because zod also demands a leading `http(s)://` that `new URL`
+    does not. Nothing that passes upload today can vanish at render. The guard is for KQ04's
+    editor, which will be a second way into the column — and KQ04 now says to validate there too.
+  - It left `theoryUrl` with the weaker arrangement on the more dangerous column. That is KQ39.
+
 - [x] KQ10: Make "Play again" one click
   Closed by `05b6179`. The summary starts the next run in place: no page load, no Begin click, and
   the nickname is carried both in memory across a replay and across a page load by

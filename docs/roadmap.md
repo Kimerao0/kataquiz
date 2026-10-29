@@ -28,7 +28,7 @@ Closed items: `docs/roadmap-archive-2026-10.md`.
 ## Milestone 2 — the planned next slice
 
 - [ ] KQ04: In-app quiz editor
-  Decided for v1, deferred to M2. The zod schema is the contract; the editor is a UI that produces the same JSON.
+  Decided for v1, deferred to M2. The zod schema is the contract; the editor is a UI that produces the same JSON. It must validate `imageUrl` and `theoryUrl` with that same `httpUrl` schema at the point the author can still fix them: KQ15 made the player drop a bad image URL silently, which is right for a stranger mid-quiz but useless as feedback to whoever typed it.
   _`src/lib/quiz-schema/`_
 - [ ] KQ05: Per-question error rate for authors
   The one stat that makes a quiz better: which questions everyone gets wrong. Every answer is already stored.
@@ -59,9 +59,9 @@ Closed items: `docs/roadmap-archive-2026-10.md`.
 - [ ] KQ14: `<html lang>` is always `en`
   Quizzes carry their own `language`, so a screen reader mispronounces every non-English quiz.
   _`src/app/layout.tsx`_
-- [ ] KQ15: Re-validate `imageUrl` at render
-  `theoryUrl` is guarded at render against a `javascript:` scheme; `imageUrl` is not. The asymmetry reads as an oversight and the M2 editor is a second way into the column. KQ08 gave the column a second render site, so the guard now has two call sites to cover; `httpUrlOrNull` already exists next door to both.
-  _`src/components/run/question-media.tsx`, used by `question-card.tsx` and `run-review.tsx`_
+- [ ] KQ39: `TheoryLink` trusts its caller, and it is the one that matters
+  KQ15 put `imageUrl`'s guard inside the component so a third caller cannot forget it. `theoryUrl` still has the opposite shape: `TheoryLink` takes `url: string` and renders `href={url}`, while `httpUrlOrNull` runs at each of the two call sites. A `javascript:` URL in an `<a href>` **does** execute, unlike in an `<img src>`, so the weaker arrangement is on the more dangerous column. Move the check inside, the way KQ15 did.
+  _`src/components/run/feedback-parts.tsx:40`, guarded at `feedback-panel.tsx:23` and `run-review.tsx:47`_
 - [ ] KQ16: `startRun` has a narrow mirror of the stranded-run bug
   If the first sampled question is deleted between the bank read and the load, it throws `EmptyQuizError` even though others survived. Fails honestly rather than stranding, so it is low priority.
   _`src/lib/run/service.ts:98`_
