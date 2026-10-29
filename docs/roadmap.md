@@ -21,6 +21,9 @@ Closed items: `docs/roadmap-archive-2026-10.md`.
 - [ ] KQ03: Prune `rate_limits`
   The table has no TTL and no cleanup job, so it grows without bound. One scheduled `DELETE` before launch.
   _`src/lib/rate-limit.ts`_
+- [ ] KQ38: `attempts` has no index
+  Declared with no table callback, so there is no index on it at all, while two reads on the run page's render path filter it by `quiz_id` + the owner column and sort by `started_at` — `findResumableRun` and `lastNicknameFor`, now issued together. KQ10 also raised the start limit to 120/hour, so the table grows four times faster than when both reads were written. One composite index on `(quiz_id, guest_id, started_at)` serves both; it needs a migration. Not measured — nothing is deployed and the dev database is too small for `EXPLAIN` to prove anything, so this is a pre-launch item and not a bug.
+  _`src/db/schema.ts:157`, `src/lib/run/service.ts`_
 
 ## Milestone 2 — the planned next slice
 
@@ -42,8 +45,6 @@ Closed items: `docs/roadmap-archive-2026-10.md`.
 - [ ] KQ37: Resume a challenge run after a refresh
   KQ09 gave the quiz's run page a resume offer, but `RunPlayer` is mounted from two places and the other one got nothing, so refreshing a challenge at question 20 still orphans it. `findResumableRun` excludes challenge runs on purpose — resumed from the plain quiz page they would lose their head-to-head framing — but `/c/[attemptId]` _is_ that framing, and `resumeRun` already has no challenge filter. What is missing is a challenge-scoped lookup and an offer on the invite panel.
   _`src/components/run/challenge-invite-panel.tsx:74`, `src/lib/run/service.ts`_
-- [ ] KQ10: Make "Play again" one click
-  It currently costs a page load plus a Begin click, and a guest retypes their nickname. For someone doing hundreds of reps in a sitting, that is the loop's main friction.
 - [ ] KQ11: Tell the challenger's sender what happened
   The person who shared a link never learns whether anyone played it. The growth loop has no return path.
 
@@ -77,8 +78,8 @@ Closed items: `docs/roadmap-archive-2026-10.md`.
 ## Accessibility and interaction
 
 - [ ] KQ20: Focus falls to `<body>` after Next
-  A keyboard player must Tab back into the options on every single question. The worst remaining friction for keyboard-first use.
-  _`src/components/run/run-player.tsx`_
+  A keyboard player must Tab back into the options on every single question. The worst remaining friction for keyboard-first use. KQ10 added a second instance of the same shape: Play again disables itself while the run starts, which blurs it, so a keyboard player whose replay fails has to Tab back to reach both the alert and the retry.
+  _`src/components/run/run-player.tsx`, `src/components/run/run-summary.tsx` (the Play again button)_
 - [ ] KQ21: Mid-run exits are unguarded
   The back link, the header and the quiz-title link all discard a run in progress with no confirmation, and there is no explicit Quit.
   _`src/components/run/`_

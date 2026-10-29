@@ -8,6 +8,25 @@ must still resolve.
 
 ## Closed
 
+- [x] KQ10: Make "Play again" one click
+  Closed by `05b6179`. The summary starts the next run in place: no page load, no Begin click, and
+  the nickname is carried both in memory across a replay and across a page load by
+  `lastNicknameFor`, which seeds the field so it shows what it will send.
+  _`src/components/run/run-summary.tsx`, `src/components/run/run-start-panel.tsx`, `src/lib/run/service.ts`_
+
+  Recorded, because each of these is a decision and not an oversight:
+  - `/c/[attemptId]` keeps its link. Leaving a challenge for an ordinary run is a real navigation,
+    and replaying it in place would leave the player on a `/c/` URL playing something else.
+  - `RUN_START_LIMIT` went 30 → 120 an hour, which also raises the ceiling for challenge starts.
+    The key is per guest cookie and a fresh cookie is free, so the number was never much of an
+    abuse control; what actually bounds the table is KQ38 and a pruning story that does not exist.
+  - The `key` on `RunPlayer` is load-bearing and has a test that goes red without it.
+  - Two things are deliberately uncovered. The `replaying` guard in the summary cannot be reached
+    from the DOM, because React drops clicks on a disabled button; it stays as defence and says so
+    in a comment. And the `page.tsx` → panel `initialNickname` wiring has no test — verified by
+    mutation, all 483 stay green — because this repo has no server-component page tests at all.
+    Introducing the first one is its own decision, not a thing to smuggle into KQ10.
+
 - [x] KQ09: Resume a run after a refresh
   Closed by `a4635c0`. A run left unfinished is offered back on the quiz's run page — "you left a
   run unfinished, N of M answered" — and resuming serves the question the server is waiting for
