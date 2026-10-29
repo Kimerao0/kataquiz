@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <title>Kataquiz</title>
+  <!--
+    The header's hanko, at favicon size. The geometry is .seal in globals.css
+    with 1em read as 28px: a square tilted -4deg, a frame inset inside it, and
+    the glyph centred. The tilt is the part that survives being 16px wide,
+    which is why it is here rather than being straightened out.
+
+    The frame and the glyph are heavier than .seal's 0.035em and 0.56em on
+    purpose. A favicon is painted at about 16px and the seal's own proportions
+    dissolve at that size: measured, a faithful copy downsamples to a blur.
+
+    The colours are the `ai` / `on-ai` token pair, written as literals because
+    a favicon is rendered outside the document and never sees the stylesheet.
+    Light is indigo on white; dark swaps to the lifted indigo on paper, the
+    same way the tokens do. (Token names are written without their leading
+    dashes on purpose: a double hyphen cannot appear inside an XML comment,
+    and an SVG that carries one fails to parse and renders as nothing.)
+  -->
+  <style>
+    .ground { fill: #27418c }
+    .mark { fill: #ffffff }
+    .frame { stroke: #ffffff }
+    @media (prefers-color-scheme: dark) {
+      .ground { fill: #7b93d6 }
+      .mark { fill: #14171a }
+      .frame { stroke: #14171a }
+    }
+  </style>
+  <!-- Tilted about the centre, like the seal. 28px square inside a 32px box:
+       the rotated bounding box is ~29.9px, so nothing clips at any size. -->
+  <g transform="rotate(-4 16 16)">
+    <rect class="ground" x="2" y="2" width="28" height="28" rx="1.12" />
+    <rect
+      class="frame"
+      x="4.52"
+      y="4.52"
+      width="22.96"
+      height="22.96"
+      rx="0.6"
+      fill="none"
+      stroke-width="1.4"
+      opacity="0.78"
+    />
+    <text
+      class="mark"
+      x="16"
+      y="16"
+      font-family="Literata, Georgia, 'Times New Roman', serif"
+      font-size="17.4"
+      font-weight="800"
+      text-anchor="middle"
+      dominant-baseline="central"
+    >K</text>
+  </g>
+</svg>
