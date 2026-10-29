@@ -8,8 +8,26 @@ must still resolve.
 
 ## Closed
 
+- [x] KQ09: Resume a run after a refresh
+  Closed by `a4635c0`. A run left unfinished is offered back on the quiz's run page — "you left a
+  run unfinished, N of M answered" — and resuming serves the question the server is waiting for
+  together with the history it has already graded, so the tally keeps its strokes and the KQ08
+  review still lists the whole run rather than only what came after the refresh. A `duplicate`
+  answer after a flaky network now offers that same resume instead of a dead end.
+  _`src/lib/run/service.ts` (`findResumableRun`, `resumeRun`), `src/components/run/run-start-panel.tsx`_
+
+  Recorded, because each of these is a decision and not an oversight:
+  - No schema change, and no staleness cutoff: an unfinished attempt is offered back however old it
+    is. Starting over leaves the old one unfinished, which is already what happens to every run
+    somebody walks away from.
+  - Resuming hands the player a fresh clock on the current question. Accepted on a manual pass.
+  - Challenge runs are excluded from the offer. The other mount point is KQ37.
+  - Two defects came out of review and were fixed before the commit: Begin and Resume could both be
+    in flight at once, and the zero-answer filter ran after `LIMIT 1`, so an abandoned Start over
+    hid the run that still held the work. Both now have tests that fail without the fix.
+
 - [x] KQ08: Review your missed questions on the summary
-  Closed by `b10118a`. Every question of the run is listed under the score — missed ones open,
+  Closed by `2577453`. Every question of the run is listed under the score — missed ones open,
   correct ones collapsed — with the correct answer, the player's own picks struck where they were
   wrong, the explanation, the question's snippet or image, and the theory link.
   _`src/components/run/run-review.tsx`, rendered from `run-summary.tsx:81`_
@@ -21,7 +39,7 @@ must still resolve.
     both call sites.
 
 - [x] KQ33: `pnpm shots` photographed a 404 silently
-  Closed by `8fa9038`. The roadmap prescribed the `Network` domain response status and that fix
+  Closed by `e07e76a`. The roadmap prescribed the `Network` domain response status and that fix
   would not have worked: a dead slug answers **HTTP 200** with not-found content, because
   `notFound()` is thrown inside a Suspense boundary after streaming starts — the limitation this
   repo had already accepted. Verified against the running app before the fix was written. What does
@@ -30,7 +48,7 @@ must still resolve.
   _`scripts/shots.mts`_
 
 - [x] KQ34: `pnpm shots` could not reach an interactive state
-  Closed by `8fa9038`. `--play answer` and `--play summary` drive a real run before the shot, so the
+  Closed by `e07e76a`. `--play answer` and `--play summary` drive a real run before the shot, so the
   feedback panel and the summary can be photographed. The three traps that cost a cycle each are
   defended in the script and named in its comments: the start panel's nickname `label[for]`, the
   advance lock, and a scenario that fails rather than photographing a rate-limit error.

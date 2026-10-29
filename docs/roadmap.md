@@ -39,8 +39,9 @@ Closed items: `docs/roadmap-archive-2026-10.md`.
 
 ## The biggest gap between the product and its own pitch
 
-- [ ] KQ09: Resume a run after a refresh
-  Run state is client-only; a refresh orphans the attempt and loses 30 questions of work. The `duplicate` error after a flaky network is a dead end rather than "continue from where the server is".
+- [ ] KQ37: Resume a challenge run after a refresh
+  KQ09 gave the quiz's run page a resume offer, but `RunPlayer` is mounted from two places and the other one got nothing, so refreshing a challenge at question 20 still orphans it. `findResumableRun` excludes challenge runs on purpose — resumed from the plain quiz page they would lose their head-to-head framing — but `/c/[attemptId]` _is_ that framing, and `resumeRun` already has no challenge filter. What is missing is a challenge-scoped lookup and an offer on the invite panel.
+  _`src/components/run/challenge-invite-panel.tsx:74`, `src/lib/run/service.ts`_
 - [ ] KQ10: Make "Play again" one click
   It currently costs a page load plus a Begin click, and a guest retypes their nickname. For someone doing hundreds of reps in a sitting, that is the loop's main friction.
 - [ ] KQ11: Tell the challenger's sender what happened

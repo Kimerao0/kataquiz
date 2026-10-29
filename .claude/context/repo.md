@@ -5,6 +5,11 @@ tracker: docs/roadmap.md
 Ids are `KQnn`, matching the shape `parse-tracker.py` can read (`[A-Z]{1,3}\d{1,2}`, no
 separator). A hyphenated `KQ-001` is invisible to it — that cost a round here.
 
+`parse-tracker.py`'s `next_free_id` reads the live file only, so once items are archived it hands
+back an id that is already taken: on 2026-10-29 it offered `KQ36`, which had been archived that
+morning. Take the next id from `grep -ho 'KQ[0-9]\+' docs/roadmap.md docs/roadmap-archive-*.md`,
+never from the parser.
+
 This repo commits to trunk on `main` and has no pull-request path.
 
 ## Gates
