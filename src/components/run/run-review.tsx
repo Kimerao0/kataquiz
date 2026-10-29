@@ -6,7 +6,6 @@ import { cn } from '@/lib/utils'
 import { Explanation, TheoryLink, verdictFor } from './feedback-parts'
 import { QuestionCode, QuestionImage } from './question-media'
 import { QuizText } from './quiz-text'
-import { httpUrlOrNull } from './safe-url'
 
 /**
  * One graded question, kept by the run as it is played. The summary the server
@@ -44,7 +43,6 @@ function ReviewEntry({ item, position }: { item: Reviewed; position: number }) {
   const t = useTranslations('run')
 
   const verdict = verdictFor(item.result)
-  const safeTheoryUrl = httpUrlOrNull(item.result.theoryUrl)
   const correctOptions = optionsWithIds(item.question.options, item.result.correctOptionIds)
   const pickedOptions = optionsWithIds(item.question.options, item.selectedOptionIds)
   // Restating the same option under two labels says nothing on a question that
@@ -106,7 +104,7 @@ function ReviewEntry({ item, position }: { item: Reviewed; position: number }) {
 
         {item.result.explanation && <Explanation value={item.result.explanation} />}
 
-        {safeTheoryUrl && <TheoryLink url={safeTheoryUrl} />}
+        <TheoryLink url={item.result.theoryUrl} />
       </div>
     </details>
   )

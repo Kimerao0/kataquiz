@@ -6,7 +6,6 @@ import { Button } from '@/components/ui/button'
 import type { AnswerResult } from '@/lib/run/service'
 import { cn } from '@/lib/utils'
 import { Explanation, TheoryLink, verdictFor } from './feedback-parts'
-import { httpUrlOrNull } from './safe-url'
 
 type FeedbackPanelProps = {
   result: AnswerResult
@@ -20,7 +19,6 @@ type FeedbackPanelProps = {
 export function FeedbackPanel({ result, showKeys, onNext }: FeedbackPanelProps) {
   const t = useTranslations('run')
   const nextRef = useRef<HTMLButtonElement>(null)
-  const safeTheoryUrl = httpUrlOrNull(result.theoryUrl)
 
   // The panel appears below the options the player has just left, so keyboard
   // focus moves to the one control that continues the run.
@@ -52,7 +50,7 @@ export function FeedbackPanel({ result, showKeys, onNext }: FeedbackPanelProps) 
           above; restating it here only says the same thing twice. */}
       {result.explanation && <Explanation value={result.explanation} />}
 
-      {safeTheoryUrl && <TheoryLink url={safeTheoryUrl} />}
+      <TheoryLink url={result.theoryUrl} />
 
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
         <Button

@@ -4,6 +4,7 @@ import { CheckIcon, TimerOffIcon, XIcon } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import type { AnswerResult } from '@/lib/run/service'
 import { QuizText } from './quiz-text'
+import { httpUrlOrNull } from './safe-url'
 
 /**
  * What a graded answer looks like, in the panel during the run and in the
@@ -34,15 +35,20 @@ export function Explanation({ value }: { value: string }) {
 }
 
 // External and author-supplied, so a plain anchor rather than the internal
-// Link, and no opener handed to the destination. The url is already validated:
-// each caller runs `httpUrlOrNull` where it decides whether to render this, so
-// the guard stays visible next to the content it is guarding.
-export function TheoryLink({ url }: { url: string }) {
+// Link, and no opener handed to the destination. The scheme is checked here
+// rather than by each caller: a caller that forgets would put an unvalidated
+// URL into an <a href>, the one place a `javascript:` URL actually executes
+// (unlike <img src>, where QuestionImage carries the same guard). Upload
+// validation already restricts the column and no live path reaches this, so it
+// is a second line; the Milestone 2 editor is the way in it is there for.
+export function TheoryLink({ url }: { url: string | null }) {
   const t = useTranslations('run')
+  const safe = httpUrlOrNull(url)
+  if (!safe) return null
 
   return (
     <a
-      href={url}
+      href={safe}
       target="_blank"
       rel="noreferrer noopener"
       className="w-fit text-ink-quiet text-meta underline underline-offset-4 hover:text-ink"

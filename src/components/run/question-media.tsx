@@ -32,8 +32,8 @@ export function QuestionCode({ code, language }: { code: string; language: strin
 // disappears instead of leaving a torn frame. Nothing here gates answering.
 // The scheme is checked here too: upload validation already restricts the
 // column, so this is a second line rather than the only one, and the Milestone 2
-// editor is a second way into the same column. theoryUrl runs the same check,
-// but at its call sites rather than inside the component that renders it.
+// editor is a second way into the same column. TheoryLink carries the same
+// check for a stronger reason: an <a href> is where a javascript: URL runs.
 export function QuestionImage({ src }: { src: string }) {
   const [broken, setBroken] = useState(false)
   const safe = httpUrlOrNull(src)
