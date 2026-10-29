@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import type { RunSummary as RunSummaryData } from '@/lib/run/service'
 import { cn } from '@/lib/utils'
+import { type Reviewed, RunReview } from './run-review'
 
 const COPIED_FEEDBACK_MS = 2000
 
@@ -25,9 +26,11 @@ type RunSummaryProps = {
   summary: RunSummaryData
   quizSlug: string
   comparison?: ComparisonState
+  /** Every question of the run as it was graded, in the order it was played. */
+  reviewed: Reviewed[]
 }
 
-export function RunSummary({ summary, quizSlug, comparison }: RunSummaryProps) {
+export function RunSummary({ summary, quizSlug, comparison, reviewed }: RunSummaryProps) {
   const t = useTranslations('run')
   // The challenger's own attempt, never the one they were challenged on: the
   // loop only continues if beating a challenge produces a new link to pass on.
@@ -72,6 +75,10 @@ export function RunSummary({ summary, quizSlug, comparison }: RunSummaryProps) {
           <Comparison state={comparison} />
         </div>
       )}
+
+      {/* Guarded rather than always rendered: a heading standing over an empty
+          list would be the whole of what the review says. */}
+      {reviewed.length > 0 && <RunReview items={reviewed} />}
 
       <ChallengeLink url={challengeUrl} />
 

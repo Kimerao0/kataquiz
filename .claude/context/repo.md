@@ -28,7 +28,7 @@ Three traps it has already sprung, each costing a cycle:
 
 - It points at `localhost`, never `127.0.0.1`: Next only hydrates on the origin it was started for,
   and a `127.0.0.1` shot is a convincing picture of a page where React never attached.
-- It photographs a 404 silently (KQ35), because Next renders not-found at the requested path.
-- The dev server serves stale CSS (KQ37 note): verify design work against `pnpm build`.
+- It photographs a 404 silently (KQ33), because Next renders not-found at the requested path.
+- The dev server serves stale CSS (KQ35): verify design work against `pnpm build`.
 
 It cannot reach an interactive state (KQ34). A working driver exists in the session scratchpad.

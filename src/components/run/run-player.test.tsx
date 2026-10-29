@@ -599,4 +599,103 @@ describe('run player', () => {
       )
     })
   })
+
+  // The summary only carries a score, so the review is the player's own record
+  // of the run, and the tally is read from the same record.
+  describe('the record of the run', () => {
+    const third: PublicQuestion = {
+      id: 'q4',
+      type: 'single',
+      prompt: 'Which side do you overtake on?',
+      imageUrl: null,
+      code: null,
+      codeLanguage: null,
+      options: [
+        { id: 'r1', text: 'Left' },
+        { id: 'r2', text: 'Right' },
+      ],
+    }
+
+    it('lists a wrongly answered question in the review on the summary', async () => {
+      submitAnswerAction
+        .mockResolvedValueOnce({
+          ok: true,
+          result: resultOf({
+            correct: false,
+            correctOptionIds: ['o2'],
+            explanation: 'A red triangle warns, it does not forbid.',
+          }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          result: resultOf({
+            correctOptionIds: ['p1'],
+            next: null,
+            summary: { ...summary, score: 1, errors: 1, passed: false },
+          }),
+        })
+      renderRun(single)
+
+      await userEvent.click(option('Warning'))
+      await userEvent.click(await screen.findByRole('button', { name: 'Next question' }))
+      await userEvent.click(await optionAfterAdvance('Red'))
+      await userEvent.click(await screen.findByRole('button', { name: 'See your result' }))
+
+      const review = screen.getByRole('heading', { name: 'Your run' }).closest('section')
+      if (!review) throw new Error('no review section')
+      // Both questions are there, and the first carries what the feedback panel
+      // showed during the run: its verdict, the pick the player made, and the
+      // explanation that is otherwise gone once the run moves on.
+      const [firstEntry, secondEntry] = within(review).getAllByRole('listitem')
+      expect(within(firstEntry).getByText(single.prompt)).toBeInTheDocument()
+      expect(within(firstEntry).getByText('Wrong')).toBeInTheDocument()
+      expect(
+        within(firstEntry).getByText('A red triangle warns, it does not forbid.'),
+      ).toBeVisible()
+      expect(
+        within(within(firstEntry).getByText('Your answer').parentElement as HTMLElement).getByText(
+          'Warning',
+        ),
+      ).toBeInTheDocument()
+      expect(within(secondEntry).getByText(second.prompt)).toBeInTheDocument()
+      expect(within(secondEntry).getByText('Correct')).toBeInTheDocument()
+    })
+
+    it('marks correct and wrong answers in the tally as the run progresses', async () => {
+      // Wrong, then right, then right: two correct against one wrong, so a
+      // tally that swapped the two, or counted every answer as one kind, or
+      // lagged a question behind, would each read differently at some step.
+      submitAnswerAction
+        .mockResolvedValueOnce({
+          ok: true,
+          result: resultOf({ correct: false, correctOptionIds: ['o2'] }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          result: resultOf({ correctOptionIds: ['p1'], next: third }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          result: resultOf({
+            correctOptionIds: ['r1'],
+            next: null,
+            summary: { ...summary, total: 3, score: 2, errors: 1, passed: false },
+          }),
+        })
+      renderRun(single, { total: 3 })
+
+      expect(screen.getByText('0 correct, 0 wrong')).toBeInTheDocument()
+
+      await userEvent.click(option('Warning'))
+      expect(await screen.findByText('0 correct, 1 wrong')).toBeInTheDocument()
+
+      await userEvent.click(screen.getByRole('button', { name: 'Next question' }))
+      await userEvent.click(await optionAfterAdvance('Red'))
+      expect(await screen.findByText('1 correct, 1 wrong')).toBeInTheDocument()
+
+      await userEvent.click(screen.getByRole('button', { name: 'Next question' }))
+      await userEvent.click(await optionAfterAdvance('Left'))
+      expect(await screen.findByText('2 correct, 1 wrong')).toBeInTheDocument()
+    })
+  })
 })

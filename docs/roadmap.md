@@ -59,8 +59,8 @@ Created 2026-10-28 from the Milestone 1 close-out, two code reviews, a UX flow r
   Quizzes carry their own `language`, so a screen reader mispronounces every non-English quiz.
   _`src/app/layout.tsx`_
 - [ ] KQ15: Re-validate `imageUrl` at render
-  `theoryUrl` is guarded at render against a `javascript:` scheme; `imageUrl` is not. The asymmetry reads as an oversight and the M2 editor is a second way into the column.
-  _`src/components/run/question-card.tsx`_
+  `theoryUrl` is guarded at render against a `javascript:` scheme; `imageUrl` is not. The asymmetry reads as an oversight and the M2 editor is a second way into the column. KQ08 gave the column a second render site, so the guard now has two call sites to cover; `httpUrlOrNull` already exists next door to both.
+  _`src/components/run/question-media.tsx`, used by `question-card.tsx` and `run-review.tsx`_
 - [ ] KQ16: `startRun` has a narrow mirror of the stranded-run bug
   If the first sampled question is deleted between the bank read and the load, it throws `EmptyQuizError` even though others survived. Fails honestly rather than stranding, so it is low priority.
   _`src/lib/run/service.ts:98`_
@@ -116,7 +116,8 @@ Created 2026-10-28 from the Milestone 1 close-out, two code reviews, a UX flow r
   The "Select all that apply" line costs ~33px. The only lever is `.drill-main` padding.
   _`src/app/globals.css`_
 - [ ] KQ31: The header seal is easy to miss at 28px
-  | `src/components/site-header.tsx`
+  Rendered at `size="1.75rem"` beside the wordmark, the hanko reads as a small coloured square and its glyph is lost. It is the only brand mark most pages carry.
+  _`src/components/site-header.tsx:58`_
 - [ ] KQ32: "Browse" is a compass icon below 640px
   Has an accessible name, but a compass for "browse quizzes" is a guess. Short text labels would fit.
   _`src/components/site-header.tsx`_
@@ -127,7 +128,7 @@ Created 2026-10-28 from the Milestone 1 close-out, two code reviews, a UX flow r
   Next renders not-found at the requested path, so the pathname assertion stays quiet. A stale slug produced a convincing picture of the wrong page. Needs the `Network` domain response status.
   _`scripts/shots.mts`_
 - [ ] KQ34: `pnpm shots` cannot reach an interactive state
-  It loads a URL and stops, so no feedback panel, summary or selected state. A working driver exists at `scratchpad/runshot.mjs` and should be folded in.
+  It loads a URL and stops, so no feedback panel, summary or selected state. The driver this once pointed at lived in a session scratchpad and is gone; KQ08 needed another one and it cost a cycle to rebuild. Whatever is folded in has to survive three things, each of which silently produced a dead or wrong photograph: the start panel's nickname `label[for]` is on screen before the run mounts, so an unscoped option click lands there and waits forever — scope option lookups to `.drill-main`; a click sooner than `ADVANCE_LOCK_MS` after Next is deliberately swallowed, so the driver must be slower than the lock; and seeded slugs carry a generated suffix, so a guessed slug 404s at the requested path (KQ33) and plays a page that is not there.
   _`scripts/shots.mts`_
 - [ ] KQ35: The dev server silently serves stale CSS
   `globals.css` edits repeatedly failed to reach the bundle; a whole screenshot round was a picture of CSS that was never applied. Verify design work against `pnpm build`, not `pnpm dev`.

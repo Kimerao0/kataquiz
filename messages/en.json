@@ -102,6 +102,8 @@
     "failed": "Not passed",
     "score": "{score} of {total} correct",
     "errorCount": "{errors, plural, =0 {no mistakes} =1 {# mistake} other {# mistakes}}",
+    "reviewTitle": "Your run",
+    "reviewQuestion": "Question {position}",
     "shareTitle": "Challenge a friend",
     "shareBody": "They play the same questions in the same order, and see your score only once they finish.",
     "shareLabel": "Challenge link",

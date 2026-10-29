@@ -1,12 +1,12 @@
 'use client'
 
-import { CheckIcon, TimerOffIcon, XIcon } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { useEffect, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import type { AnswerResult } from '@/lib/run/service'
 import { cn } from '@/lib/utils'
-import { QuizText } from './quiz-text'
+import { Explanation, TheoryLink, verdictFor } from './feedback-parts'
+import { httpUrlOrNull } from './safe-url'
 
 type FeedbackPanelProps = {
   result: AnswerResult
@@ -17,20 +17,6 @@ type FeedbackPanelProps = {
 
 // Deliberately untimed. The clock stopped the instant the answer was submitted,
 // and reading this is the part of the run that teaches anything.
-// Quiz content is uploaded by strangers. Upload validation already restricts
-// theoryUrl to http(s), so this is a second line rather than the only one —
-// but the Milestone 2 editor will be a second way into the same column, and a
-// javascript: href here would run in the player's session.
-function httpUrlOrNull(value: string | null): string | null {
-  if (!value) return null
-  try {
-    const url = new URL(value)
-    return url.protocol === 'http:' || url.protocol === 'https:' ? url.toString() : null
-  } catch {
-    return null
-  }
-}
-
 export function FeedbackPanel({ result, showKeys, onNext }: FeedbackPanelProps) {
   const t = useTranslations('run')
   const nextRef = useRef<HTMLButtonElement>(null)
@@ -42,13 +28,7 @@ export function FeedbackPanel({ result, showKeys, onNext }: FeedbackPanelProps) 
     nextRef.current?.focus()
   }, [])
 
-  // Three verdicts, not two: running out of time is wrong, but saying only
-  // "wrong" hides why.
-  const verdict = result.timedOut
-    ? { Icon: TimerOffIcon, title: t('feedbackTimedOut'), tone: 'text-suo' }
-    : result.correct
-      ? { Icon: CheckIcon, title: t('feedbackCorrect'), tone: 'text-ai' }
-      : { Icon: XIcon, title: t('feedbackWrong'), tone: 'text-suo' }
+  const verdict = verdictFor(result)
 
   return (
     <section aria-live="polite" className="flex flex-col gap-5 border-rule border-t pt-6">
@@ -63,33 +43,16 @@ export function FeedbackPanel({ result, showKeys, onNext }: FeedbackPanelProps) 
         )}
       >
         <verdict.Icon aria-hidden="true" className="size-4 xl:size-5" />
-        {verdict.title}
+        {t(verdict.key)}
       </h3>
 
       {result.timedOut && <p className="text-ink-quiet text-meta">{t('feedbackTimedOutBody')}</p>}
 
       {/* Which option was right is marked on the option itself, directly
           above; restating it here only says the same thing twice. */}
-      {result.explanation && (
-        // The one thing on this screen that is genuinely read, so it keeps a
-        // reading measure where the question and the options drop theirs.
-        <p className="max-w-measure whitespace-pre-line font-reading text-prose [overflow-wrap:anywhere] [word-break:normal]">
-          <QuizText value={result.explanation} />
-        </p>
-      )}
+      {result.explanation && <Explanation value={result.explanation} />}
 
-      {safeTheoryUrl && (
-        // External and author-supplied, so a plain anchor rather than the
-        // internal Link, and no opener handed to the destination.
-        <a
-          href={safeTheoryUrl}
-          target="_blank"
-          rel="noreferrer noopener"
-          className="w-fit text-ink-quiet text-meta underline underline-offset-4 hover:text-ink"
-        >
-          {t('theoryLink')}
-        </a>
-      )}
+      {safeTheoryUrl && <TheoryLink url={safeTheoryUrl} />}
 
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
         <Button

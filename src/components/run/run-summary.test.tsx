@@ -22,7 +22,7 @@ const theirs: RunSummaryData = {
 
 function renderSummary(comparison?: ComparisonState) {
   return renderWithMessages(
-    <RunSummary summary={mine} quizSlug="road-signs" comparison={comparison} />,
+    <RunSummary summary={mine} quizSlug="road-signs" comparison={comparison} reviewed={[]} />,
   )
 }
 

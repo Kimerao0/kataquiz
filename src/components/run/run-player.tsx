@@ -11,6 +11,7 @@ import type { AnswerResult, PublicQuestion, RunStart, RunSummary } from '@/lib/r
 import { FeedbackPanel } from './feedback-panel'
 import { QuestionCard } from './question-card'
 import { QuestionTimer } from './question-timer'
+import type { Reviewed } from './run-review'
 import { type ComparisonState, RunSummary as RunSummaryPanel } from './run-summary'
 import { RunTally, type TallyOutcome } from './run-tally'
 
@@ -72,9 +73,11 @@ export function RunPlayer({ run, quizSlug, challenge }: RunPlayerProps) {
   const [pending, setPending] = useState(false)
   const [failure, setFailure] = useState<Failure | null>(null)
   const [startedAt, setStartedAt] = useState(() => Date.now())
-  // One entry per question the server has already graded, in order. It is the
-  // tally, and nothing else reads it: the score still comes from the summary.
-  const [outcomes, setOutcomes] = useState<TallyOutcome[]>([])
+  // One entry per question the server has already graded, in order. It feeds
+  // both the tally and the review on the summary screen, which is why the
+  // whole answer is kept and not only its verdict; the score still comes from
+  // the summary.
+  const [reviewed, setReviewed] = useState<Reviewed[]>([])
   // Undefined for an ordinary run, which is what keeps the summary identical
   // to the one it renders today.
   const [comparison, setComparison] = useState<ComparisonState | undefined>(undefined)
@@ -128,7 +131,10 @@ export function RunPlayer({ run, quizSlug, challenge }: RunPlayerProps) {
         setFeedback(outcome.result)
         // Appended here rather than on advancing, so the mark for the question
         // in hand fills in the moment the verdict does.
-        setOutcomes((current) => [...current, outcome.result.correct ? 'correct' : 'wrong'])
+        setReviewed((current) => [
+          ...current,
+          { question, selectedOptionIds: attempt.optionIds, result: outcome.result },
+        ])
         // Started here and not when the summary is opened: the run is finished
         // as of this answer, which is the first moment the server will part
         // with the opponent's score, and the player is still reading the last
@@ -272,11 +278,23 @@ export function RunPlayer({ run, quizSlug, challenge }: RunPlayerProps) {
   }, [summary])
 
   if (summary !== null) {
-    return <RunSummaryPanel summary={summary} quizSlug={quizSlug} comparison={comparison} />
+    return (
+      <RunSummaryPanel
+        summary={summary}
+        quizSlug={quizSlug}
+        comparison={comparison}
+        reviewed={reviewed}
+      />
+    )
   }
 
   const answered = feedback !== null
   const correctOptionIds = feedback?.correctOptionIds ?? null
+  // Derived rather than tracked alongside: a second array kept in step by hand
+  // is a second place for the run to disagree with itself.
+  const outcomes: TallyOutcome[] = reviewed.map((entry) =>
+    entry.result.correct ? 'correct' : 'wrong',
+  )
 
   return (
     <div className="drill">
