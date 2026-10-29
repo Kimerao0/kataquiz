@@ -7,6 +7,7 @@ commits and reviews cite them. **Closing an item requires evidence**: a commit s
 showing the fixed state. **Dropping one requires a recorded reason**, or the next audit raises it again.
 
 Created 2026-10-28 from the Milestone 1 close-out, two code reviews, a UX flow review and a design pass.
+Closed items: `docs/roadmap-archive-2026-10.md`.
 
 ---
 
@@ -38,8 +39,6 @@ Created 2026-10-28 from the Milestone 1 close-out, two code reviews, a UX flow r
 
 ## The biggest gap between the product and its own pitch
 
-- [ ] KQ08: Review your missed questions on the summary
-  The premise is "look up only what you got wrong". Today the explanation and theory link vanish the moment you press Next, and the summary shows a score and nothing else. Named by the UX review as the largest gap.
 - [ ] KQ09: Resume a run after a refresh
   Run state is client-only; a refresh orphans the attempt and loses 30 questions of work. The `duplicate` error after a flaky network is a dead end rather than "continue from where the server is".
 - [ ] KQ10: Make "Play again" one click
