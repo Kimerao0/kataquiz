@@ -131,10 +131,10 @@ pnpm db:migrate              # applies the migrations in ./drizzle
 pnpm dev                     # http://localhost:3000
 ```
 
-The container from `compose.yaml` uses user, password and database `kataquiz` on port 5432, so in `.env.local` set:
+The container from `compose.yaml` uses user, password and database `kataquiz` on port 55432, so in `.env.local` set:
 
 ```bash
-DATABASE_URL=postgres://kataquiz:kataquiz@localhost:5432/kataquiz
+DATABASE_URL=postgres://kataquiz:kataquiz@localhost:55432/kataquiz
 ```
 
 `pnpm db:seed` imports the quizzes in `seeds/`, so a fresh database opens with something to play instead of an empty catalog. It is idempotent: a quiz it has already imported is skipped, so running it twice leaves exactly one copy of each. Those files double as worked examples of the file format.

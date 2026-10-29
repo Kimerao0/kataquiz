@@ -8,7 +8,7 @@ Requires Node 24, pnpm 11 and Docker.
 
 ```bash
 pnpm install
-cp .env.example .env.local   # set DATABASE_URL=postgres://kataquiz:kataquiz@localhost:5432/kataquiz
+cp .env.example .env.local   # set DATABASE_URL=postgres://kataquiz:kataquiz@localhost:55432/kataquiz
 pnpm db:up
 pnpm db:migrate
 pnpm dev

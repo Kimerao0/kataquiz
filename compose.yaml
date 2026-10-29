@@ -13,8 +13,11 @@ services:
       POSTGRES_USER: kataquiz
       POSTGRES_PASSWORD: kataquiz
       POSTGRES_DB: kataquiz
+    # Published on 55432, not the default 5432: the mono checkout's own
+    # dev stack binds 5432 for a container called `postgres`, and whichever
+    # came second lost. Inside the container it is still 5432.
     ports:
-      - "5432:5432"
+      - "55432:5432"
     volumes:
       - kataquiz-pgdata:/var/lib/postgresql/data
       - ./scripts/init-test-db.sql:/docker-entrypoint-initdb.d/init-test-db.sql:ro
