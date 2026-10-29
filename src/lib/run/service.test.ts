@@ -7,6 +7,7 @@ import {
   DuplicateAnswerError,
   EmptyQuizError,
   findResumableRun,
+  lastNicknameFor,
   NotYourAttemptError,
   type Player,
   type PublicQuestion,
@@ -951,6 +952,127 @@ describe('findResumableRun', () => {
       // A Start over the player walked away from immediately must not hide the
       // run that still has their work in it.
       expect(found?.attemptId).toBe(played.attemptId)
+    })
+  })
+})
+
+describe('lastNicknameFor', () => {
+  it('gives a guest back the nickname they last used', async () => {
+    await withTestDb(async (tx) => {
+      const seed = await seedQuiz(tx, { questionCount: 2 })
+      const guest: Player = { kind: 'guest', guestId: crypto.randomUUID(), nickname: 'Fast Fox' }
+      await startRun({ quizId: seed.quizId, player: guest, executor: tx })
+
+      const found = await lastNicknameFor({ quizId: seed.quizId, player: guest, executor: tx })
+
+      expect(found).toBe('Fast Fox')
+    })
+  })
+
+  it('takes the most recent one when the guest has renamed themselves', async () => {
+    await withTestDb(async (tx) => {
+      const seed = await seedQuiz(tx, { questionCount: 2 })
+      const guestId = crypto.randomUUID()
+      const asOld: Player = { kind: 'guest', guestId, nickname: 'Old Owl' }
+      const asNew: Player = { kind: 'guest', guestId, nickname: 'New Newt' }
+      const first = await startRun({ quizId: seed.quizId, player: asOld, executor: tx })
+      const second = await startRun({ quizId: seed.quizId, player: asNew, executor: tx })
+      // started_at defaults to now(), which Postgres fixes at the start of the
+      // transaction: inside this harness both rows carry the same instant and
+      // "latest" would be a tie. So the times are written explicitly, and the
+      // attempt inserted first is made the later one, so insertion order cannot
+      // produce the right answer by accident.
+      await tx
+        .update(attempts)
+        .set({ startedAt: new Date('2026-01-02T00:00:00Z') })
+        .where(eq(attempts.id, first.attemptId))
+      await tx
+        .update(attempts)
+        .set({ startedAt: new Date('2026-01-01T00:00:00Z') })
+        .where(eq(attempts.id, second.attemptId))
+
+      const found = await lastNicknameFor({ quizId: seed.quizId, player: asNew, executor: tx })
+
+      // The name they typed last is the one they want back, not the first one.
+      expect(found).toBe('Old Owl')
+    })
+  })
+
+  it('returns null for a guest who has played nothing on this quiz', async () => {
+    await withTestDb(async (tx) => {
+      const seed = await seedQuiz(tx, { questionCount: 2 })
+      const guest: Player = { kind: 'guest', guestId: crypto.randomUUID(), nickname: 'Fast Fox' }
+
+      const found = await lastNicknameFor({ quizId: seed.quizId, player: guest, executor: tx })
+
+      expect(found).toBeNull()
+    })
+  })
+
+  it('returns null for a signed-in player', async () => {
+    await withTestDb(async (tx) => {
+      const seed = await seedQuiz(tx, { questionCount: 2 })
+      await startRun({ quizId: seed.quizId, player: seed.player, executor: tx })
+      // The attempt row exists and carries the column, so only the player's kind
+      // can be what makes this null.
+      const [stored] = await tx.select().from(attempts).where(eq(attempts.quizId, seed.quizId))
+      await tx.update(attempts).set({ nickname: 'Leaked' }).where(eq(attempts.id, stored.id))
+
+      const found = await lastNicknameFor({
+        quizId: seed.quizId,
+        player: seed.player,
+        executor: tx,
+      })
+
+      // A signed-in player already has a name; carrying one into the field would
+      // be inventing it.
+      expect(found).toBeNull()
+    })
+  })
+
+  it('returns null rather than an empty string when the guest never named themselves', async () => {
+    await withTestDb(async (tx) => {
+      const seed = await seedQuiz(tx, { questionCount: 2 })
+      const guest: Player = { kind: 'guest', guestId: crypto.randomUUID(), nickname: '' }
+      await startRun({ quizId: seed.quizId, player: guest, executor: tx })
+
+      const found = await lastNicknameFor({ quizId: seed.quizId, player: guest, executor: tx })
+
+      // The value seeds a text input: '' and "no nickname" must look the same to
+      // the caller, or an empty default is told apart from no default.
+      expect(found).toBeNull()
+    })
+  })
+
+  it("ignores another guest's nickname", async () => {
+    await withTestDb(async (tx) => {
+      const seed = await seedQuiz(tx, { questionCount: 2 })
+      const fox: Player = { kind: 'guest', guestId: crypto.randomUUID(), nickname: 'Fast Fox' }
+      const owl: Player = { kind: 'guest', guestId: crypto.randomUUID(), nickname: 'Wise Owl' }
+      await startRun({ quizId: seed.quizId, player: fox, executor: tx })
+      await startRun({ quizId: seed.quizId, player: owl, executor: tx })
+
+      const foxFound = await lastNicknameFor({ quizId: seed.quizId, player: fox, executor: tx })
+      const owlFound = await lastNicknameFor({ quizId: seed.quizId, player: owl, executor: tx })
+
+      // Drop the owner predicate and one of these is handed a stranger's name.
+      expect(foxFound).toBe('Fast Fox')
+      expect(owlFound).toBe('Wise Owl')
+    })
+  })
+
+  it('is scoped to the quiz', async () => {
+    await withTestDb(async (tx) => {
+      const quizA = await seedQuiz(tx, { questionCount: 2 })
+      const quizB = await seedQuiz(tx, { questionCount: 2 })
+      const guest: Player = { kind: 'guest', guestId: crypto.randomUUID(), nickname: 'Fast Fox' }
+      await startRun({ quizId: quizA.quizId, player: guest, executor: tx })
+
+      const found = await lastNicknameFor({ quizId: quizB.quizId, player: guest, executor: tx })
+
+      // What name to carry between quizzes is a wider question than this
+      // function answers.
+      expect(found).toBeNull()
     })
   })
 })

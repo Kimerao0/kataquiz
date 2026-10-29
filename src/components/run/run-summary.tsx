@@ -4,6 +4,7 @@ import { CheckIcon, XIcon } from 'lucide-react'
 import Link from 'next/link'
 import { useTranslations } from 'next-intl'
 import { useEffect, useRef, useState } from 'react'
+import type { StartRunResult } from '@/app/(app)/q/[slug]/actions'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -22,15 +23,32 @@ export type ComparisonState =
   | { status: 'failed'; retry: () => void }
   | { status: 'ready'; opponentName: string; mine: RunSummaryData; theirs: RunSummaryData }
 
+// Imported as a type and only as a type: the actions module builds a pg Pool
+// the moment it is loaded, and this component also renders in jsdom.
+export type ReplayError = Extract<StartRunResult, { ok: false }>['error'] | 'unexpected'
+
 type RunSummaryProps = {
   summary: RunSummaryData
   quizSlug: string
   comparison?: ComparisonState
   /** Every question of the run as it was graded, in the order it was played. */
   reviewed: Reviewed[]
+  /**
+   * Set where a new run can be started in place, which turns Play again from a
+   * page load into a click. Resolving `null` means the run started. Left unset
+   * on /c/[attemptId], where leaving for an ordinary run really is a
+   * navigation.
+   */
+  onPlayAgain?: () => Promise<ReplayError | null>
 }
 
-export function RunSummary({ summary, quizSlug, comparison, reviewed }: RunSummaryProps) {
+export function RunSummary({
+  summary,
+  quizSlug,
+  comparison,
+  reviewed,
+  onPlayAgain,
+}: RunSummaryProps) {
   const t = useTranslations('run')
   // The challenger's own attempt, never the one they were challenged on: the
   // loop only continues if beating a challenge produces a new link to pass on.
@@ -82,13 +100,74 @@ export function RunSummary({ summary, quizSlug, comparison, reviewed }: RunSumma
 
       <ChallengeLink url={challengeUrl} />
 
+      <Actions quizSlug={quizSlug} onPlayAgain={onPlayAgain} />
+    </section>
+  )
+}
+
+function Actions({
+  quizSlug,
+  onPlayAgain,
+}: {
+  quizSlug: string
+  onPlayAgain?: () => Promise<ReplayError | null>
+}) {
+  const t = useTranslations('run')
+  const [replaying, setReplaying] = useState(false)
+  const [failed, setFailed] = useState<ReplayError | null>(null)
+
+  async function replay() {
+    // The `replaying` half sits behind the disabled button and no test can
+    // reach it: React drops a click on a disabled control, so a mutation that
+    // deletes it survives the suite. It stays because `disabled` is styling
+    // that happens to block, and a second attempt is a second attempt row.
+    if (onPlayAgain === undefined || replaying) return
+
+    setReplaying(true)
+    setFailed(null)
+    const error = await onPlayAgain()
+    // Left replaying on success: this summary is about to be replaced by the
+    // new run, and flicking the label back to idle first would be a lie.
+    if (error === null) return
+
+    setFailed(error)
+    setReplaying(false)
+  }
+
+  return (
+    <div className="flex flex-col gap-3">
+      {failed !== null && (
+        <Alert variant="destructive">
+          <AlertTitle>{t('startErrorTitle')}</AlertTitle>
+          {/* The retry is the button below, which is enabled again. */}
+          <AlertDescription>{t(`startErrors.${failed}`)}</AlertDescription>
+        </Alert>
+      )}
       <div className="flex flex-col gap-3 sm:flex-row">
-        <Link
-          href={`/q/${quizSlug}/run`}
-          className={buttonVariants({ size: 'lg', className: 'h-11 rounded-md text-base sm:px-8' })}
-        >
-          {t('playAgain')}
-        </Link>
+        {/* A link where the only way to another run is a page load, a button
+            where the caller can start one here. Same sizing either way, so the
+            row does not move between the two. */}
+        {onPlayAgain === undefined ? (
+          <Link
+            href={`/q/${quizSlug}/run`}
+            className={buttonVariants({
+              size: 'lg',
+              className: 'h-11 rounded-md text-base sm:px-8',
+            })}
+          >
+            {t('playAgain')}
+          </Link>
+        ) : (
+          <Button
+            type="button"
+            size="lg"
+            disabled={replaying}
+            onClick={() => replay()}
+            className="h-11 rounded-md text-base sm:px-8"
+          >
+            {replaying ? t('starting') : t('playAgain')}
+          </Button>
+        )}
         <Link
           href={`/q/${quizSlug}`}
           className={buttonVariants({
@@ -100,7 +179,7 @@ export function RunSummary({ summary, quizSlug, comparison, reviewed }: RunSumma
           {t('backToQuiz')}
         </Link>
       </div>
-    </section>
+    </div>
   )
 }
 

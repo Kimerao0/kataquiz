@@ -22,7 +22,11 @@ import { FeedbackPanel } from './feedback-panel'
 import { QuestionCard } from './question-card'
 import { QuestionTimer } from './question-timer'
 import type { Reviewed } from './run-review'
-import { type ComparisonState, RunSummary as RunSummaryPanel } from './run-summary'
+import {
+  type ComparisonState,
+  type ReplayError,
+  RunSummary as RunSummaryPanel,
+} from './run-summary'
 import { RunTally, type TallyOutcome } from './run-tally'
 
 type SubmitErrorCode = Extract<SubmitResult, { ok: false }>['error']
@@ -64,6 +68,8 @@ type RunPlayerProps = {
    * only what came after it.
    */
   resumed?: { answered: number; history: Reviewed[] }
+  /** Handed straight to the summary, where Play again sits. */
+  onPlayAgain?: () => Promise<ReplayError | null>
 }
 
 /** '1'–'9' to a zero-based option index. Zero is skipped: it misfires. */
@@ -83,7 +89,7 @@ function isButton(target: EventTarget | null): boolean {
   return target instanceof HTMLElement && target.closest('button, a[href]') !== null
 }
 
-export function RunPlayer({ run, quizSlug, challenge, resumed }: RunPlayerProps) {
+export function RunPlayer({ run, quizSlug, challenge, resumed, onPlayAgain }: RunPlayerProps) {
   const t = useTranslations('run')
   const tCommon = useTranslations('common')
 
@@ -351,6 +357,7 @@ export function RunPlayer({ run, quizSlug, challenge, resumed }: RunPlayerProps)
         quizSlug={quizSlug}
         comparison={comparison}
         reviewed={reviewed}
+        onPlayAgain={onPlayAgain}
       />
     )
   }

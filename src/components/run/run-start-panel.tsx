@@ -2,7 +2,7 @@
 
 import { useTranslations } from 'next-intl'
 import { type FormEvent, useState } from 'react'
-import { resumeRunAction, type StartRunResult, startRunAction } from '@/app/(app)/q/[slug]/actions'
+import { resumeRunAction, startRunAction } from '@/app/(app)/q/[slug]/actions'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -10,13 +10,9 @@ import { Label } from '@/components/ui/label'
 import type { ResumableRun, RunResume, RunStart, RunSummary } from '@/lib/run/service'
 import { RunPlayer } from './run-player'
 import type { Reviewed } from './run-review'
-import { RunSummary as RunSummaryPanel } from './run-summary'
+import { type ReplayError, RunSummary as RunSummaryPanel } from './run-summary'
 
-type StartErrorCode =
-  | Extract<StartRunResult, { ok: false }>['error']
-  | 'unexpected'
-  | 'resumeGone'
-  | 'resumeLimited'
+type StartErrorCode = ReplayError | 'resumeGone' | 'resumeLimited'
 
 // One state for all three ways this panel ends, so a resume and a fresh start
 // can never be on screen at once or disagree about which run is being played.
@@ -31,6 +27,11 @@ type RunStartPanelProps = {
   timePerQuestionSec: number | null
   /** Signed-out players name themselves; a signed-in one already has a name. */
   askNickname: boolean
+  /**
+   * The name this guest last played this quiz under, so somebody drilling it
+   * does not retype it on every run. Null when there is none to carry.
+   */
+  initialNickname: string | null
   /** An unfinished run on this quiz, which the player is offered back. */
   resumable: ResumableRun | null
 }
@@ -63,6 +64,7 @@ export function RunStartPanel({
   maxErrors,
   timePerQuestionSec,
   askNickname,
+  initialNickname,
   resumable,
 }: RunStartPanelProps) {
   const t = useTranslations('run')
@@ -71,37 +73,56 @@ export function RunStartPanel({
   const [started, setStarted] = useState<Started | null>(null)
   const [starting, setStarting] = useState(false)
   const [error, setError] = useState<StartErrorCode | null>(null)
-  const [nickname, setNickname] = useState('')
+  // Seeded from the prop rather than read from it: once the field is on screen
+  // what the player types is the name, carried name or not.
+  const [nickname, setNickname] = useState(initialNickname ?? '')
   // Seeded from the prop rather than read from it, so a resume the server
   // refuses can take the offer off the screen.
   const [offer, setOffer] = useState(resumable)
   const [resuming, setResuming] = useState(false)
 
-  // Each handler guards on both flags and both buttons are disabled by both:
-  // that cross-guard is what keeps a single run on screen. With only one
-  // request ever in flight there is no second response left to land on a panel
-  // that has already handed the run to <RunPlayer> — which React reconciles
-  // rather than remounts, so a late reply would swap the attempt while the
-  // question, the position and the review stayed on the other one.
-  async function begin(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-    if (starting || resuming) return
-
+  // The one way a run is started, reached from the form below and from Play
+  // again on the summary of a finished one. It never touches `error`: that
+  // alert renders only in the form branch, which is off screen while a run is,
+  // so a code written there for a replay would be invisible. Each caller says
+  // what to do with the failure it is handed.
+  async function startFresh(): Promise<ReplayError | null> {
     setStarting(true)
-    setError(null)
+
+    let failure: ReplayError
     try {
       const result = await startRunAction({ slug, nickname: askNickname ? nickname : undefined })
       if (result.ok) {
         // Left mounted and starting stays true: the panel is about to be
         // replaced by the run, so the button must not flicker back to idle.
         setStarted({ kind: 'playing', run: result.run })
-        return
+        return null
       }
-      setError(result.error)
+      failure = result.error
     } catch {
-      setError('unexpected')
+      failure = 'unexpected'
     }
     setStarting(false)
+    return failure
+  }
+
+  // Each handler guards on both flags and both buttons are disabled by both:
+  // that cross-guard is what keeps a single run on screen. With only one
+  // request ever in flight there is no second response left to land on a panel
+  // that has already handed the run to <RunPlayer>, replacing the attempt the
+  // player is in the middle of with another one it never asked for.
+  //
+  // The guard cannot move down into startFresh: both flags are deliberately
+  // left true once a run has taken this panel's place, so a replay that
+  // re-checked them would be refused for ever. A second replay is kept out by
+  // the summary's own in-flight flag, and by then this form is gone.
+  async function begin(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (starting || resuming) return
+
+    setError(null)
+    const failure = await startFresh()
+    if (failure !== null) setError(failure)
   }
 
   async function resume() {
@@ -134,11 +155,33 @@ export function RunStartPanel({
   }
 
   if (started?.kind === 'playing') {
-    return <RunPlayer run={started.run} quizSlug={slug} resumed={started.resumed} />
+    return (
+      // The key is load-bearing. A replay puts a <RunPlayer> of the same type
+      // in the same position, which React reconciles rather than remounts, so
+      // without it the new run would land inside the previous one's question,
+      // position and review. Keyed on the attempt it is a new component
+      // instead, initialised through the very path a first start takes, with
+      // no reset function to keep in step. Same reconciliation hazard that
+      // produced the Begin/Resume blocker in KQ09.
+      <RunPlayer
+        key={started.run.attemptId}
+        run={started.run}
+        quizSlug={slug}
+        resumed={started.resumed}
+        onPlayAgain={startFresh}
+      />
+    )
   }
 
   if (started?.kind === 'finished') {
-    return <RunSummaryPanel summary={started.summary} quizSlug={slug} reviewed={started.history} />
+    return (
+      <RunSummaryPanel
+        summary={started.summary}
+        quizSlug={slug}
+        reviewed={started.history}
+        onPlayAgain={startFresh}
+      />
+    )
   }
 
   const settings =

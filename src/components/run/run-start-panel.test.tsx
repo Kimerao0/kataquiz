@@ -1,6 +1,6 @@
 import { fireEvent, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import type { PublicQuestion, RunStart } from '@/lib/run/service'
+import type { AnswerResult, PublicQuestion, RunStart, RunSummary } from '@/lib/run/service'
 import { renderWithMessages } from '@/test/intl'
 import { RunStartPanel } from './run-start-panel'
 
@@ -53,6 +53,7 @@ function renderPanel(overrides: Partial<Parameters<typeof RunStartPanel>[0]> = {
       maxErrors={2}
       timePerQuestionSec={null}
       askNickname={false}
+      initialNickname={null}
       resumable={null}
       {...overrides}
     />,
@@ -247,5 +248,133 @@ describe('run start panel', () => {
     expect(startRunAction).toHaveBeenCalledWith({ slug: 'road-signs', nickname: undefined })
     expect(resumeRunAction).not.toHaveBeenCalled()
     expect(screen.getByText('Question 1 of 10')).toBeInTheDocument()
+  })
+
+  it('pre-fills the nickname field with the carried name', () => {
+    renderPanel({ askNickname: true, initialNickname: 'Fast Fox' })
+
+    expect(screen.getByRole('textbox', { name: 'Nickname' })).toHaveValue('Fast Fox')
+  })
+
+  it('leaves the nickname field empty when there is no name to carry', () => {
+    renderPanel({ askNickname: true, initialNickname: null })
+
+    expect(screen.getByRole('textbox', { name: 'Nickname' })).toHaveValue('')
+  })
+})
+
+describe('run start panel replay', () => {
+  const finishedRun = {
+    ok: true,
+    run: {
+      status: 'finished',
+      attemptId: 'attempt-old',
+      summary: { attemptId: 'attempt-old', score: 7, errors: 3, total: 10, passed: true },
+      answered: 10,
+      history: [],
+    },
+  }
+
+  const nextQuestion: PublicQuestion = {
+    ...question,
+    id: 'q-new',
+    prompt: 'What colour is a stop sign?',
+  }
+
+  // Reaches the summary the cheap way: a resume of a run finished elsewhere.
+  async function openFinishedSummary(overrides: Parameters<typeof renderPanel>[0] = {}) {
+    resumeRunAction.mockResolvedValue(finishedRun)
+    renderPanel({ resumable, ...overrides })
+    await userEvent.click(screen.getByRole('button', { name: 'Resume' }))
+    return screen.findByRole('button', { name: 'Play again' })
+  }
+
+  // Defends the point of the pre-fill: a replay that sent an empty name would
+  // put the same guest on the board under a different one.
+  it('sends the carried nickname when the player plays again', async () => {
+    await openFinishedSummary({ askNickname: true, initialNickname: 'Fast Fox' })
+
+    await userEvent.click(screen.getByRole('button', { name: 'Play again' }))
+
+    expect(startRunAction).toHaveBeenCalledTimes(1)
+    expect(startRunAction).toHaveBeenCalledWith({ slug: 'road-signs', nickname: 'Fast Fox' })
+  })
+
+  // Defends the replay being wired at all: the summary must hand the new run
+  // to the panel, which must put its first question on screen.
+  it('shows the first question of the new run after Play again on a summary', async () => {
+    startRunAction.mockResolvedValue({
+      ok: true,
+      run: {
+        attemptId: 'attempt-new',
+        question: nextQuestion,
+        total: 10,
+        timePerQuestionSec: null,
+      },
+    })
+    await openFinishedSummary()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Play again' }))
+
+    expect(await screen.findByRole('heading', { name: nextQuestion.prompt })).toBeVisible()
+    expect(screen.getByText('Question 1 of 10')).toBeInTheDocument()
+    expect(screen.queryByText('7 of 10 correct · 3 mistakes')).not.toBeInTheDocument()
+  })
+
+  // Defends the key on <RunPlayer>, the KQ09-class hazard. A replay puts a
+  // player of the same type in the same position, which React reconciles
+  // rather than remounts. Without the key the player keeps its own `summary`
+  // state, so the summary never goes away; and it would keep its position and
+  // tally too. Driven through a real player, because only a player that has
+  // reached its own summary has state to leak.
+  it('remounts the player on a replay instead of reconciling it', async () => {
+    const lastSummary: RunSummary = {
+      attemptId: 'attempt-old',
+      score: 1,
+      errors: 0,
+      total: 1,
+      passed: true,
+    }
+    const finalResult: AnswerResult = {
+      correct: true,
+      timedOut: false,
+      correctOptionIds: ['o1'],
+      explanation: null,
+      theoryUrl: null,
+      next: null,
+      summary: lastSummary,
+    }
+    resumeRunAction.mockResolvedValue({
+      ok: true,
+      run: {
+        status: 'playing',
+        attemptId: 'attempt-old',
+        question,
+        total: 1,
+        timePerQuestionSec: null,
+        answered: 0,
+        history: [],
+      },
+    })
+    submitAnswerAction.mockResolvedValue({ ok: true, result: finalResult })
+    startRunAction.mockResolvedValue({
+      ok: true,
+      run: { attemptId: 'attempt-new', question: nextQuestion, total: 1, timePerQuestionSec: null },
+    })
+    renderPanel({ resumable })
+
+    await userEvent.click(screen.getByRole('button', { name: 'Resume' }))
+    await userEvent.click(await screen.findByRole('radio', { name: 'Warning' }))
+    await userEvent.click(await screen.findByRole('button', { name: 'See your result' }))
+    // The player is now on its own summary, with a graded answer behind it.
+    expect(screen.getByText('1 of 1 correct · no mistakes')).toBeVisible()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Play again' }))
+
+    expect(await screen.findByRole('heading', { name: nextQuestion.prompt })).toBeVisible()
+    expect(screen.queryByText('1 of 1 correct · no mistakes')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Play again' })).not.toBeInTheDocument()
+    expect(screen.getByText('Question 1 of 1')).toBeInTheDocument()
+    expect(screen.getByText('0 correct, 0 wrong')).toBeInTheDocument()
   })
 })

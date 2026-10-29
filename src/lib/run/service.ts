@@ -295,6 +295,34 @@ export async function findResumableRun(params: {
   return { attemptId: row.attemptId, answered: row.answered, total: row.questionIds.length }
 }
 
+// The name a guest last played this quiz under, so a replay does not make them
+// type it again. Scoped to one quiz because that is the case KQ10 names — the
+// same quiz, drilled over and over — and what name to carry between quizzes is
+// a different and wider question. Challenge attempts are not excluded: a
+// nickname is a nickname wherever it was used.
+export async function lastNicknameFor(params: {
+  quizId: string
+  player: Player
+  executor?: Executor
+}): Promise<string | null> {
+  const { quizId, player, executor = db } = params
+  // A signed-in player already has a name, and never typed one here to carry.
+  if (player.kind === 'user') return null
+
+  const [row] = await executor
+    .select({ nickname: attempts.nickname })
+    .from(attempts)
+    .where(and(eq(attempts.quizId, quizId), ownedBy(player)))
+    .orderBy(desc(attempts.startedAt))
+    .limit(1)
+
+  // A guest who played anonymously stored an empty nickname, and pre-filling
+  // the field with that is the same as pre-filling nothing.
+  if (!row || row.nickname === '') return null
+
+  return row.nickname
+}
+
 // Everything the browser needs to carry on where it left off: the question the
 // server is waiting for, and the questions already graded so the tally and the
 // review are not empty for the half of the run that was played before.

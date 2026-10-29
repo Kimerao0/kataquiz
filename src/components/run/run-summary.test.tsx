@@ -1,8 +1,8 @@
-import { screen, within } from '@testing-library/react'
+import { act, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { RunSummary as RunSummaryData } from '@/lib/run/service'
 import { renderWithMessages } from '@/test/intl'
-import { type ComparisonState, RunSummary } from './run-summary'
+import { type ComparisonState, type ReplayError, RunSummary } from './run-summary'
 
 const mine: RunSummaryData = {
   attemptId: 'attempt-2',
@@ -136,5 +136,118 @@ describe('run summary with a comparison', () => {
     await userEvent.click(within(alert).getByRole('button', { name: 'Try again' }))
 
     expect(retry).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('run summary play again', () => {
+  function renderReplay(onPlayAgain?: () => Promise<ReplayError | null>) {
+    return renderWithMessages(
+      <RunSummary summary={mine} quizSlug="road-signs" reviewed={[]} onPlayAgain={onPlayAgain} />,
+    )
+  }
+
+  // A promise the test settles by hand, to look at the screen while the
+  // replay is still in flight.
+  function deferred() {
+    let settle: (value: ReplayError | null) => void = () => {}
+    const promise = new Promise<ReplayError | null>((resolve) => {
+      settle = resolve
+    })
+    return { promise, settle }
+  }
+
+  // Defends /c/[attemptId], which passes no callback: leaving for an ordinary
+  // run there is a real navigation, and a button would do nothing.
+  it('is a link to a new run when there is no callback', () => {
+    renderReplay()
+
+    expect(screen.getByRole('link', { name: 'Play again' })).toHaveAttribute(
+      'href',
+      '/q/road-signs/run',
+    )
+    expect(screen.queryByRole('button', { name: 'Play again' })).not.toBeInTheDocument()
+  })
+
+  // Defends the swap to an in-place replay: a link left behind would reload
+  // the page and throw away the state the callback exists to keep.
+  it('is a button that calls back once, and no longer a link, when there is a callback', async () => {
+    const onPlayAgain = vi.fn().mockResolvedValue(null)
+    renderReplay(onPlayAgain)
+
+    expect(screen.queryByRole('link', { name: 'Play again' })).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Play again' }))
+
+    expect(onPlayAgain).toHaveBeenCalledTimes(1)
+  })
+
+  // Defends the feedback while the request travels: without it the player
+  // sees nothing happen and clicks again.
+  it('says Starting and is disabled while the replay is in flight', async () => {
+    const pending = deferred()
+    renderReplay(() => pending.promise)
+
+    await userEvent.click(screen.getByRole('button', { name: 'Play again' }))
+
+    expect(screen.getByRole('button', { name: 'Starting…' })).toBeDisabled()
+    expect(screen.queryByRole('button', { name: 'Play again' })).not.toBeInTheDocument()
+  })
+
+  // Defends against two attempts from an impatient player: the summary's own
+  // in-flight flag (and the disabled attribute it drives) is all that stands
+  // between a double click and two runs.
+  it('calls back once on a double click', async () => {
+    const pending = deferred()
+    const onPlayAgain = vi.fn(() => pending.promise)
+    renderReplay(onPlayAgain)
+
+    await userEvent.dblClick(screen.getByRole('button', { name: 'Play again' }))
+
+    expect(onPlayAgain).toHaveBeenCalledTimes(1)
+  })
+
+  // Two codes, not one: a hardcoded message would pass with either alone, and
+  // only reading the code passes with both.
+  it.each([
+    ['rateLimited', 'You have started a lot of runs recently. Try again in a little while.'],
+    ['notFound', 'That quiz is no longer available.'],
+  ] as const)('shows the %s message and lets the player retry', async (code, message) => {
+    const pending = deferred()
+    renderReplay(() => pending.promise)
+
+    await userEvent.click(screen.getByRole('button', { name: 'Play again' }))
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    await act(async () => pending.settle(code))
+
+    expect(screen.getByRole('alert')).toHaveTextContent(message)
+    // Enabled and back to its idle label, so the failure is not a dead end.
+    expect(screen.getByRole('button', { name: 'Play again' })).toBeEnabled()
+  })
+
+  // Defends the retry: the failure must clear and the callback must be
+  // reachable a second time, not only look enabled.
+  it('calls back again on a retry after a failure, and clears the message', async () => {
+    const onPlayAgain = vi.fn<() => Promise<ReplayError | null>>()
+    onPlayAgain.mockResolvedValueOnce('rateLimited').mockResolvedValueOnce(null)
+    renderReplay(onPlayAgain)
+
+    await userEvent.click(screen.getByRole('button', { name: 'Play again' }))
+    expect(await screen.findByRole('alert')).toBeVisible()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Play again' }))
+
+    expect(onPlayAgain).toHaveBeenCalledTimes(2)
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it.each([
+    ['without a callback', undefined],
+    ['with a callback', () => Promise.resolve(null)],
+  ] as const)('links back to the quiz %s', (_, onPlayAgain) => {
+    renderReplay(onPlayAgain)
+
+    expect(screen.getByRole('link', { name: 'Back to the quiz' })).toHaveAttribute(
+      'href',
+      '/q/road-signs',
+    )
   })
 })

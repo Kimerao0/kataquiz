@@ -4,7 +4,13 @@ import type { PgDatabase } from 'drizzle-orm/pg-core'
 import { type Db, db } from '@/db/client'
 import { rateLimits } from '@/db/schema'
 
-export const RUN_START_LIMIT = 30
+// Starting a run is limited for the row it writes: one `attempts` row per
+// start, so a loop over the action is database growth. The ceiling has to clear
+// a drilling session, which is what KQ10 turned into one click — 120 an hour is
+// a fresh run every thirty seconds sustained for a full hour, past what a
+// person reps through and still nowhere near unbounded. Challenge starts share
+// this budget: they take the same key.
+export const RUN_START_LIMIT = 120
 export const RUN_START_WINDOW_SEC = 3600
 
 // Uploads are limited for the rows they write, not the request they cost: one

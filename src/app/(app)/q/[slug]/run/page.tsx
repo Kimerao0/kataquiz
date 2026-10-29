@@ -7,7 +7,7 @@ import { cache, Suspense } from 'react'
 import { RunStartPanel } from '@/components/run/run-start-panel'
 import { getQuizBySlug } from '@/lib/quizzes/search'
 import { readPlayer } from '@/lib/run/identity'
-import { findResumableRun } from '@/lib/run/service'
+import { findResumableRun, lastNicknameFor } from '@/lib/run/service'
 
 type QuizParams = Promise<{ slug: string }>
 
@@ -54,9 +54,18 @@ async function RunSetup({ params }: { params: QuizParams }) {
   // Read-only, because this is a render: a visitor with no guest cookie yet has
   // played nothing, so there is nothing to look up and no cookie to mint. Who
   // is playing is settled again inside startRunAction; here it decides only
-  // whether to ask for a nickname and whether there is a run to pick back up.
+  // whether to ask for a nickname, what name to put in the field, and whether
+  // there is a run to pick back up.
   const player = await readPlayer()
-  const resumable = player ? await findResumableRun({ quizId: quiz.id, player }) : null
+  // Two independent reads about the same player, so they go together: in
+  // series this screen would wait out two round trips of latency instead of
+  // one.
+  const [resumable, initialNickname] = player
+    ? await Promise.all([
+        findResumableRun({ quizId: quiz.id, player }),
+        lastNicknameFor({ quizId: quiz.id, player }),
+      ])
+    : [null, null]
 
   return (
     <>
@@ -84,6 +93,7 @@ async function RunSetup({ params }: { params: QuizParams }) {
         maxErrors={quiz.maxErrors}
         timePerQuestionSec={quiz.timePerQuestionSec}
         askNickname={player?.kind !== 'user'}
+        initialNickname={initialNickname}
         resumable={resumable}
       />
     </>
