@@ -23,6 +23,7 @@ Self-hosting today means: build it with Node, point `DATABASE_URL` at your Postg
 | `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` | No       | Enables GitHub sign-in.                                                                                                                                      |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | No       | Enables Google sign-in.                                                                                                                                      |
 | `NEXT_PUBLIC_BETTER_AUTH_URL`              | No       | Read by the browser auth client. Left unset, the client uses the current origin, which is correct for a single-host deployment. It is inlined at build time. |
+| `OPERATOR_USER_IDS`                        | No       | Comma-separated user ids (the `user.id` column) of accounts that may see every quiz's per-question stats. Left unset, only each quiz's author can.           |
 
 Generate the secret:
 

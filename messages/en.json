@@ -61,6 +61,17 @@
     "untimed": "No limit",
     "settingsLabel": "Run settings"
   },
+  "stats": {
+    "link": "Stats",
+    "title": "Stats: {title}",
+    "back": "Back to the quiz",
+    "totalAnswers": "{count, plural, =0 {No answers yet} =1 {# answer across the quiz} other {# answers across the quiz}}",
+    "listLabel": "Questions, most often wrong first",
+    "answers": "{count, plural, =1 {# answer} other {# answers}}",
+    "percentWrong": "{percent}% wrong",
+    "notEnoughData": "Not enough data yet",
+    "topWrongPick": "Most picked wrong answer: {text} ({count})"
+  },
   "run": {
     "title": "Ready to drill",
     "nicknameLabel": "Nickname",

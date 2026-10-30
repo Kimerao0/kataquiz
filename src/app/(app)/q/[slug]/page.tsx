@@ -9,8 +9,9 @@ import { TierRibbon } from '@/components/tier-ribbon'
 import { buttonVariants } from '@/components/ui/button'
 import { getBestTiers } from '@/lib/quizzes/progress'
 import { getQuizBySlug } from '@/lib/quizzes/search'
+import { canSeeStats } from '@/lib/quizzes/stats'
 import type { Tier } from '@/lib/run/engine'
-import { getCurrentUser } from '@/lib/session'
+import { getCurrentUser, type SessionUser } from '@/lib/session'
 
 type QuizParams = Promise<{ slug: string }>
 
@@ -49,8 +50,10 @@ async function QuizDetail({ params }: { params: QuizParams }) {
   if (!quiz) notFound()
 
   const t = await getTranslations('quiz')
-  const tier = await viewerTier(quiz.id)
+  const viewer = await getCurrentUser()
+  const tier = await viewerTier(viewer, quiz.id)
   const tCatalog = await getTranslations('catalog')
+  const tStats = await getTranslations('stats')
   // A quiz outlives its author's account, so the byline has to stand in for one.
   const authorName = quiz.authorName ?? tCatalog('deletedAuthor')
   // What a run will actually serve, not what the author asked for: a quiz with
@@ -77,7 +80,19 @@ async function QuizDetail({ params }: { params: QuizParams }) {
       title={quiz.title}
       userTitle
       lead={null}
-      tools={<p className="text-ink-quiet text-meta">{t('author', { name: authorName })}</p>}
+      tools={
+        <div className="flex flex-wrap items-baseline gap-x-5 gap-y-1 text-ink-quiet text-meta">
+          <p>{t('author', { name: authorName })}</p>
+          {canSeeStats(viewer, quiz) && (
+            <Link
+              href={`/q/${quiz.slug}/stats`}
+              className="underline underline-offset-4 hover:text-ink"
+            >
+              {tStats('link')}
+            </Link>
+          )}
+        </div>
+      }
     >
       <div className="flex max-w-measure flex-col gap-8 pt-4">
         {quiz.description && <p className="font-reading text-prose">{quiz.description}</p>}
@@ -126,8 +141,7 @@ async function QuizDetail({ params }: { params: QuizParams }) {
 }
 
 // Only a signed-in player has a best run to show; a visitor costs no query.
-async function viewerTier(quizId: string): Promise<Tier | undefined> {
-  const viewer = await getCurrentUser()
+async function viewerTier(viewer: SessionUser | null, quizId: string): Promise<Tier | undefined> {
   if (!viewer) return undefined
   const tiers = await getBestTiers(viewer.id, [quizId])
   return tiers.get(quizId)

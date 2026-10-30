@@ -13,6 +13,7 @@ const quiz: QuizSummary = {
   questionsPerRun: 10,
   maxErrors: 3,
   timePerQuestionSec: null,
+  authorId: 'user-ada',
   authorName: 'Ada Lovelace',
   createdAt: new Date('2026-01-01T00:00:00Z'),
 }

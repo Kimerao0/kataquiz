@@ -22,6 +22,7 @@ export type QuizSummary = {
   questionsPerRun: number
   maxErrors: number
   timePerQuestionSec: number | null
+  authorId: string | null
   // Null once the author deletes their account: the quiz survives, the link does
   // not. Every read below therefore joins `user` on the left.
   authorName: string | null
@@ -43,6 +44,7 @@ const summaryFields = {
   questionsPerRun: quizzes.questionsPerRun,
   maxErrors: quizzes.maxErrors,
   timePerQuestionSec: quizzes.timePerQuestionSec,
+  authorId: quizzes.authorId,
   authorName: user.name,
   createdAt: quizzes.createdAt,
 }

@@ -79,6 +79,7 @@ const quiz = {
   questionsPerRun: 5,
   maxErrors: 1,
   timePerQuestionSec: 30,
+  authorId: 'user-ada',
   authorName: 'Ada Lovelace',
   createdAt: new Date(),
 }
