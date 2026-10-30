@@ -8,6 +8,14 @@ must still resolve.
 
 ## Closed
 
+- [x] KQ40: Mark a quiz the player has already passed
+  Closed by `dc72c13`, live on production the same day. Signed-in players see a gold / silver /
+  bronze ribbon for their best finished run, on the catalog row and the quiz page ("Your best:").
+  Gold is 100% correct, silver passed with at least 90% of answered questions correct, bronze passed.
+  One query per catalog page (`getBestTiers`). Runs are judged against the quiz's current
+  `maxErrors`, because `attempts` does not record the limit a run was played under; revisit when
+  KQ04 lets an author change it. Tests were mutation-checked: a last-wins merge and a swapped tier
+  colour each turn them red.
 - [x] KQ39: `TheoryLink` trusts its caller, and it is the one that matters
   Closed by `20d493e`. `TheoryLink` takes `string | null` and runs `httpUrlOrNull` itself, so both
   call sites dropped their local and their conditional rather than the guard being duplicated. With
