@@ -5,8 +5,12 @@ import { useTranslations } from 'next-intl'
 import { getTranslations } from 'next-intl/server'
 import { cache, Suspense } from 'react'
 import { PageFrame } from '@/components/page-frame'
+import { TierRibbon } from '@/components/tier-ribbon'
 import { buttonVariants } from '@/components/ui/button'
+import { getBestTiers } from '@/lib/quizzes/progress'
 import { getQuizBySlug } from '@/lib/quizzes/search'
+import type { Tier } from '@/lib/run/engine'
+import { getCurrentUser } from '@/lib/session'
 
 type QuizParams = Promise<{ slug: string }>
 
@@ -45,6 +49,7 @@ async function QuizDetail({ params }: { params: QuizParams }) {
   if (!quiz) notFound()
 
   const t = await getTranslations('quiz')
+  const tier = await viewerTier(quiz.id)
   const tCatalog = await getTranslations('catalog')
   // A quiz outlives its author's account, so the byline has to stand in for one.
   const authorName = quiz.authorName ?? tCatalog('deletedAuthor')
@@ -89,6 +94,12 @@ async function QuizDetail({ params }: { params: QuizParams }) {
           </ul>
         )}
 
+        {tier && (
+          <p className="text-meta">
+            <TierRibbon tier={tier} variant="full" />
+          </p>
+        )}
+
         <section aria-label={t('settingsLabel')} className="flex flex-col gap-8">
           <dl className="divide-y divide-rule border-rule border-y">
             {settings.map(({ label, value }) => (
@@ -112,4 +123,12 @@ async function QuizDetail({ params }: { params: QuizParams }) {
       </div>
     </PageFrame>
   )
+}
+
+// Only a signed-in player has a best run to show; a visitor costs no query.
+async function viewerTier(quizId: string): Promise<Tier | undefined> {
+  const viewer = await getCurrentUser()
+  if (!viewer) return undefined
+  const tiers = await getBestTiers(viewer.id, [quizId])
+  return tiers.get(quizId)
 }

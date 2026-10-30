@@ -1,12 +1,22 @@
 import Link from 'next/link'
 import { useTranslations } from 'next-intl'
+import { TierRibbon } from '@/components/tier-ribbon'
 import type { QuizSummary } from '@/lib/quizzes/search'
+import type { Tier } from '@/lib/run/engine'
 
 // One quiz in the catalog. The title carries the weight and is the only
 // link: its ::after stretches over the row, so the whole row is the target
 // without nesting anything interactive inside it. The description reads;
 // tags and the count are metadata and recede into the UI face.
-export function QuizRow({ quiz, activeTag }: { quiz: QuizSummary; activeTag?: string }) {
+export function QuizRow({
+  quiz,
+  activeTag,
+  tier,
+}: {
+  quiz: QuizSummary
+  activeTag?: string
+  tier?: Tier
+}) {
   const t = useTranslations('common')
 
   return (
@@ -33,8 +43,9 @@ export function QuizRow({ quiz, activeTag }: { quiz: QuizSummary; activeTag?: st
           ))}
         </ul>
       )}
-      <p className="text-ink-quiet text-meta sm:col-start-2 sm:row-start-1 sm:self-center">
-        {t('questionCount', { count: quiz.questionCount })}
+      <p className="flex flex-wrap items-center gap-x-4 gap-y-1 text-ink-quiet text-meta sm:col-start-2 sm:row-start-1 sm:self-center">
+        <span>{t('questionCount', { count: quiz.questionCount })}</span>
+        {tier && <TierRibbon tier={tier} />}
       </p>
     </article>
   )

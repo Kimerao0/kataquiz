@@ -21,6 +21,9 @@
   --color-suo: var(--suo);
   --color-rule: var(--rule);
   --color-surface: var(--surface);
+  --color-tier-gold: var(--tier-gold);
+  --color-tier-silver: var(--tier-silver);
+  --color-tier-bronze: var(--tier-bronze);
 
   /* Type scale for the sizes that carry the design. */
   /* The question is the screen, not a paragraph on it, so it keeps growing
@@ -109,6 +112,11 @@
   --rule: #d3d8d5;
   --surface: #ffffff;
   --on-ai: var(--surface);
+  /* Best-run ribbons. Only the mark is tinted, so these clear 3:1 against
+     paper as graphics; the label beside them keeps its text colour. */
+  --tier-gold: #9a7300;
+  --tier-silver: #747d86;
+  --tier-bronze: #a0582a;
   --page-width: 80rem;
   --spine: 2px;
   /* The 正 tally is the one picture this product is remembered by, and it is
@@ -165,6 +173,9 @@
   --rule: #2a2f35;
   --surface: #1b1f24;
   --on-ai: var(--paper);
+  --tier-gold: #d4a72c;
+  --tier-silver: #a9b1b9;
+  --tier-bronze: #cd8550;
 }
 
 @layer base {

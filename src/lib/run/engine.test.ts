@@ -1,10 +1,12 @@
 import {
+  bestTier,
   gradeAnswer,
   hasPassed,
   isTimedOut,
   sampleQuestionIds,
   seededOrder,
   TIMER_GRACE_MS,
+  tierFor,
 } from './engine'
 
 function mulberry32(seed: number): () => number {
@@ -199,5 +201,49 @@ describe('hasPassed', () => {
 
   it('passes with zero errors when maxErrors is 0', () => {
     expect(hasPassed(0, 0)).toBe(true)
+  })
+})
+
+describe('tierFor', () => {
+  it('gives gold to a run with no mistakes', () => {
+    expect(tierFor(10, 0, 3)).toBe('gold')
+  })
+
+  it('gives silver at exactly 90% accuracy', () => {
+    expect(tierFor(9, 1, 3)).toBe('silver')
+  })
+
+  it('gives bronze to a pass just under 90% accuracy', () => {
+    expect(tierFor(8, 1, 3)).toBe('bronze')
+  })
+
+  it('gives bronze at exactly maxErrors, which still passes', () => {
+    expect(tierFor(7, 3, 3)).toBe('bronze')
+  })
+
+  it('gives nothing at maxErrors + 1', () => {
+    expect(tierFor(6, 4, 3)).toBeNull()
+  })
+
+  it('gives nothing to a failed run even at 90% accuracy', () => {
+    expect(tierFor(36, 4, 3)).toBeNull()
+  })
+
+  it('gives nothing to a run with no answers', () => {
+    expect(tierFor(0, 0, 3)).toBeNull()
+  })
+
+  it('gives gold to a flawless run when maxErrors is 0', () => {
+    expect(tierFor(5, 0, 0)).toBe('gold')
+  })
+})
+
+describe('bestTier', () => {
+  it('picks the highest tier', () => {
+    expect(bestTier(['bronze', null, 'gold', 'silver'])).toBe('gold')
+  })
+
+  it('returns null when no run reached a tier', () => {
+    expect(bestTier([null, null])).toBeNull()
   })
 })

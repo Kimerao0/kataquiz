@@ -18,7 +18,13 @@
     "error": "Something went wrong.",
     "retry": "Try again",
     "cancel": "Cancel",
-    "questionCount": "{count, plural, =1 {# question} other {# questions}}"
+    "questionCount": "{count, plural, =1 {# question} other {# questions}}",
+    "tiers": {
+      "gold": "Gold",
+      "silver": "Silver",
+      "bronze": "Bronze",
+      "yourBest": "Your best: {tier}"
+    }
   },
   "catalog": {
     "title": "Browse quizzes",

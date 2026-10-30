@@ -64,3 +64,30 @@ export function isTimedOut(elapsedMs: number, limitSec: number | null): boolean 
 export function hasPassed(errors: number, maxErrors: number): boolean {
   return errors <= maxErrors
 }
+
+export type Tier = 'gold' | 'silver' | 'bronze'
+
+const SILVER_ACCURACY = 0.9
+
+// Ascending, so a tier's index is its rank.
+const TIER_RANK: Tier[] = ['bronze', 'silver', 'gold']
+
+// Accuracy is over the questions actually answered, not the run's planned
+// length: a question deleted mid-run must not count against the player.
+export function tierFor(score: number, errors: number, maxErrors: number): Tier | null {
+  const answered = score + errors
+  if (answered === 0) return null
+  if (!hasPassed(errors, maxErrors)) return null
+  if (errors === 0) return 'gold'
+  if (score / answered >= SILVER_ACCURACY) return 'silver'
+  return 'bronze'
+}
+
+export function bestTier(tiers: (Tier | null)[]): Tier | null {
+  let best: Tier | null = null
+  for (const tier of tiers) {
+    if (tier === null) continue
+    if (best === null || TIER_RANK.indexOf(tier) > TIER_RANK.indexOf(best)) best = tier
+  }
+  return best
+}

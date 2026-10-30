@@ -7,7 +7,10 @@ import { QuizRow } from '@/components/quiz-row'
 import { Seal } from '@/components/seal'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { getBestTiers } from '@/lib/quizzes/progress'
 import { listPopularTags, PAGE_SIZE, searchQuizzes } from '@/lib/quizzes/search'
+import type { Tier } from '@/lib/run/engine'
+import { getCurrentUser } from '@/lib/session'
 
 type CatalogSearchParams = Promise<{ [key: string]: string | string[] | undefined }>
 
@@ -101,6 +104,7 @@ async function Results({ searchParams }: { searchParams: CatalogSearchParams }) 
   const { q, tag, page } = await readQuery(searchParams)
   const t = await getTranslations('catalog')
   const { items, total } = await searchQuizzes({ q, tag, page })
+  const tiers = await viewerTiers(items.map((quiz) => quiz.id))
   const lastPage = Math.max(Math.ceil(total / PAGE_SIZE), 1)
 
   return (
@@ -113,7 +117,7 @@ async function Results({ searchParams }: { searchParams: CatalogSearchParams }) 
           <ul className="divide-y divide-rule border-rule border-y">
             {items.map((quiz) => (
               <li key={quiz.id}>
-                <QuizRow quiz={quiz} activeTag={tag} />
+                <QuizRow quiz={quiz} activeTag={tag} tier={tiers.get(quiz.id)} />
               </li>
             ))}
           </ul>
@@ -123,6 +127,14 @@ async function Results({ searchParams }: { searchParams: CatalogSearchParams }) 
       <Pagination q={q} tag={tag} page={page} lastPage={lastPage} />
     </div>
   )
+}
+
+// Ribbons are a signed-in player's own record; a visitor gets none and costs
+// no query.
+async function viewerTiers(quizIds: string[]): Promise<Map<string, Tier>> {
+  const viewer = await getCurrentUser()
+  if (!viewer) return new Map()
+  return getBestTiers(viewer.id, quizIds)
 }
 
 function Pagination({
