@@ -251,6 +251,11 @@ export function RunPlayer({ run, quizSlug, challenge, resumed, onPlayAgain }: Ru
     // question the player has not read. The timeout path below deliberately
     // skips it — the clock is not input.
     if (advanceLock) return
+    // Recorded here, not left to the input: a tap on an option's text commits
+    // from the label and locks the row before the browser forwards the click,
+    // so the input's own change never fires and the chosen row would show
+    // nothing — not while in flight, and not as "your answer" afterwards.
+    setSelected(optionIds)
     void submit({ optionIds, elapsedMs: Date.now() - startedAt })
   }
 

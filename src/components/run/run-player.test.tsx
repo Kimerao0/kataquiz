@@ -187,6 +187,37 @@ describe('run player', () => {
     })
   })
 
+  it('rings the tapped option, by its text, while its answer is in flight', async () => {
+    // Never settles: the moment under test is the gap before the verdict.
+    submitAnswerAction.mockReturnValue(new Promise(() => {}))
+    renderRun(single)
+
+    // The text, not the radio: a tap on the words commits from the label's own
+    // handler and locks the row before the click reaches the input, so the
+    // input's change handler never runs.
+    await userEvent.click(screen.getByText('Warning'))
+
+    const tapped = option('Warning').closest('label')
+    expect(tapped).toHaveClass('ring-ai')
+    expect(tapped).not.toHaveClass('opacity-60')
+    expect(option('Prohibition').closest('label')).toHaveClass('opacity-60')
+  })
+
+  it('lands a verdict tapped by text: the right row pops, the wrong pick shakes', async () => {
+    submitAnswerAction.mockResolvedValue({
+      ok: true,
+      result: resultOf({ correct: false, correctOptionIds: ['o1'] }),
+    })
+    renderRun(single)
+
+    await userEvent.click(screen.getByText('Prohibition'))
+
+    // By pattern: once graded, each row's name also carries its verdict.
+    const row = (name: RegExp) => screen.getByRole('radio', { name }).closest('label')
+    await waitFor(() => expect(row(/Prohibition/)).toHaveClass('animate-verdict-shake'))
+    expect(row(/Warning/)).toHaveClass('animate-verdict-pop')
+  })
+
   it('does not submit a multi question until Confirm is pressed', async () => {
     renderRun(multi)
 

@@ -257,9 +257,8 @@ function OptionRow({
   const t = useTranslations('run')
   const marker = answered ? rowMarker(selected, isCorrect) : null
   const struck = answered && selected && !isCorrect
-  // The control is disabled the instant the row is tapped, and the primitive
-  // dims a disabled control: the one row the player just chose would read as
-  // the one that went away. Full strength on the chosen row only.
+  // The row the player just chose, while its verdict is on the way: the one
+  // row that has to stand out, at the moment every row is locked.
   const chosenWhilePending = pending && selected
 
   return (
@@ -316,7 +315,6 @@ function OptionRow({
               // The dot would show through the digit sitting on top of it.
               (keyHint !== null || marker !== null) &&
                 '[&_[data-slot=radio-group-indicator]]:hidden',
-              chosenWhilePending && 'disabled:opacity-100',
               marker?.controlClass,
             )}
           />
@@ -330,7 +328,6 @@ function OptionRow({
               // Square, and deliberately so: see the radio above.
               'size-full rounded-sm',
               (keyHint !== null || marker !== null) && '[&_[data-slot=checkbox-indicator]]:hidden',
-              chosenWhilePending && 'disabled:opacity-100',
               marker?.controlClass,
             )}
           />
