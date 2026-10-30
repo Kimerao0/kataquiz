@@ -46,6 +46,8 @@ pnpm start
 
 `pnpm db:seed` then imports the quizzes in `seeds/`, so a fresh instance has something to play rather than an empty catalog. It is idempotent, it reads `DATABASE_URL` the same way, and it needs dev dependencies installed. The quizzes it imports are attributed to a built-in seed account at `seed.invalid`, a reserved domain that cannot receive mail, so they never look like one of your users' uploads.
 
+`pnpm release` runs both in that order, which makes it the one command to hook into a host's build or release step. The hosted instance runs it from its Vercel build command on production builds only, with `DATABASE_URL` pointed at Neon's unpooled connection for the duration; that wiring lives in the Vercel project settings, not in this repo. A failed migration or an invalid seed file fails the build, so the previous deployment keeps serving. Editing a seed that is already imported does not update it, since the import skips by title.
+
 ## OAuth apps
 
 Sign-in is GitHub and Google OAuth only; there is no email or password login. Without at least one provider configured the app runs but nobody can sign in. Replace `{BETTER_AUTH_URL}` with the value you set.

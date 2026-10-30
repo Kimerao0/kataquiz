@@ -1,0 +1,195 @@
+version: 1
+title: "TypeScript: The basics"
+description: Type annotations, interfaces, unions and the everyday features you meet on day one.
+language: en
+tags: [typescript, programming, beginner]
+run:
+  questionsPerRun: 10
+  maxErrors: 3
+  timePerQuestionSec: 45
+questions:
+  - type: single
+    prompt: What does the TypeScript compiler produce from a `.ts` file?
+    explanation: "TypeScript compiles to plain JavaScript. The types are checked at compile time and then erased, so none of them exist at runtime."
+    theoryUrl: https://www.typescriptlang.org/docs/handbook/typescript-from-scratch.html
+    options:
+      - { text: Machine code, correct: false }
+      - { text: JavaScript, correct: true }
+      - { text: WebAssembly, correct: false }
+      - { text: A `.d.ts` file only, correct: false }
+  - type: boolean
+    prompt: TypeScript types are checked at runtime by the browser.
+    answer: false
+    explanation: "Types are erased during compilation. The browser only ever sees JavaScript, so nothing checks a type at runtime unless you write that check yourself."
+  - type: single
+    prompt: "What type does TypeScript infer for `count`?"
+    code: |
+      let count = 5
+    codeLanguage: typescript
+    explanation: "A `let` initialised with a number is inferred as `number`. With `const` it would be the literal type `5`, because a `const` can never change."
+    theoryUrl: https://www.typescriptlang.org/docs/handbook/type-inference.html
+    options:
+      - { text: "`5`", correct: false }
+      - { text: "`any`", correct: false }
+      - { text: "`number`", correct: true }
+      - { text: "`int`", correct: false }
+  - type: single
+    prompt: How do you annotate a variable as a string?
+    explanation: "A type annotation goes after the name, separated by a colon."
+    options:
+      - { text: "`let name: string`", correct: true }
+      - { text: "`let string name`", correct: false }
+      - { text: "`let name as string`", correct: false }
+      - { text: "`let name<string>`", correct: false }
+  - type: multi
+    prompt: Which of these are primitive types in TypeScript?
+    explanation: "`string`, `boolean` and `number` are primitives. `Array` and `Date` are object types."
+    options:
+      - { text: "`string`", correct: true }
+      - { text: "`Array`", correct: false }
+      - { text: "`boolean`", correct: true }
+      - { text: "`Date`", correct: false }
+      - { text: "`number`", correct: true }
+  - type: single
+    prompt: Which is a valid way to type an array of numbers?
+    explanation: "`number[]` and `Array<number>` mean exactly the same thing. `number[]` is the more common style."
+    theoryUrl: https://www.typescriptlang.org/docs/handbook/2/everyday-types.html#arrays
+    options:
+      - { text: "`[number]`", correct: false }
+      - { text: "`array<number>`", correct: false }
+      - { text: "`number[]`", correct: true }
+      - { text: "`numbers`", correct: false }
+  - type: single
+    prompt: "What does the `?` mean on `age` here?"
+    code: |
+      interface User {
+        name: string
+        age?: number
+      }
+    codeLanguage: typescript
+    explanation: "`?` marks a property as optional. An object can omit `age`, and reading it gives `number | undefined`."
+    theoryUrl: https://www.typescriptlang.org/docs/handbook/2/objects.html#optional-properties
+    options:
+      - { text: "`age` can be `null`", correct: false }
+      - { text: "`age` is optional", correct: true }
+      - { text: "`age` is readonly", correct: false }
+      - { text: "`age` is private", correct: false }
+  - type: single
+    prompt: "What does the type `string | number` mean?"
+    explanation: "The `|` builds a union type: the value can be any one of the listed types."
+    theoryUrl: https://www.typescriptlang.org/docs/handbook/2/everyday-types.html#union-types
+    options:
+      - { text: A value that is both a string and a number, correct: false }
+      - { text: A string that contains a number, correct: false }
+      - { text: A value that is either a string or a number, correct: true }
+      - { text: A syntax error, correct: false }
+  - type: single
+    prompt: What is the return type of a function that returns nothing?
+    code: |
+      function log(message: string) {
+        console.log(message)
+      }
+    codeLanguage: typescript
+    explanation: "A function with no `return` value is typed as returning `void`."
+    options:
+      - { text: "`null`", correct: false }
+      - { text: "`never`", correct: false }
+      - { text: "`undefined[]`", correct: false }
+      - { text: "`void`", correct: true }
+  - type: boolean
+    prompt: "A variable typed as `any` turns off type checking for that variable."
+    answer: true
+    explanation: "`any` opts out of the type checker: you can assign anything to it and call anything on it. That is why `unknown` is usually the safer choice."
+  - type: single
+    prompt: "Which keyword declares a type alias?"
+    explanation: "`type` gives a name to any type, for example `type ID = string | number`."
+    theoryUrl: https://www.typescriptlang.org/docs/handbook/2/everyday-types.html#type-aliases
+    options:
+      - { text: "`alias`", correct: false }
+      - { text: "`type`", correct: true }
+      - { text: "`typedef`", correct: false }
+      - { text: "`define`", correct: false }
+  - type: single
+    prompt: "Which value can be assigned to `direction`?"
+    code: |
+      let direction: 'left' | 'right'
+    codeLanguage: typescript
+    explanation: "This is a union of string literal types, so only the exact strings `'left'` or `'right'` are allowed."
+    options:
+      - { text: "`'up'`", correct: false }
+      - { text: "`'Left'`", correct: false }
+      - { text: "`'right'`", correct: true }
+      - { text: "Any string", correct: false }
+  - type: boolean
+    prompt: "This code compiles without errors."
+    code: |
+      let total: number = 10
+      total = 'ten'
+    codeLanguage: typescript
+    answer: false
+    explanation: "`total` is typed as `number`, so assigning the string `'ten'` is a compile error: Type 'string' is not assignable to type 'number'."
+  - type: single
+    prompt: "What does `readonly` do on a property?"
+    code: |
+      interface Point {
+        readonly x: number
+      }
+    codeLanguage: typescript
+    explanation: "A `readonly` property can be set when the object is created but not reassigned afterwards. It is a compile-time check only."
+    options:
+      - { text: It hides the property from `console.log`, correct: false }
+      - { text: It prevents reassigning the property after creation, correct: true }
+      - { text: It freezes the object at runtime, correct: false }
+      - { text: It makes the property optional, correct: false }
+  - type: single
+    prompt: How do you type a function parameter that takes a number and returns a string?
+    explanation: "A function type is written like an arrow function: parameters in parentheses, then `=>` and the return type."
+    theoryUrl: https://www.typescriptlang.org/docs/handbook/2/functions.html
+    options:
+      - { text: "`(n: number) => string`", correct: true }
+      - { text: "`function(number): string`", correct: false }
+      - { text: "`number -> string`", correct: false }
+      - { text: "`Function<number, string>`", correct: false }
+  - type: multi
+    prompt: "Which of these can describe the shape of an object?"
+    explanation: "Both `interface` and `type` can describe an object's shape. `enum` defines a set of named constants, and `namespace` groups code."
+    theoryUrl: https://www.typescriptlang.org/docs/handbook/2/everyday-types.html#differences-between-type-aliases-and-interfaces
+    options:
+      - { text: "`interface`", correct: true }
+      - { text: "`enum`", correct: false }
+      - { text: "`type`", correct: true }
+      - { text: "`namespace`", correct: false }
+  - type: single
+    prompt: "What is the file extension for a TypeScript file containing JSX?"
+    explanation: "React components written in TypeScript use `.tsx`. Plain TypeScript uses `.ts`."
+    options:
+      - { text: "`.jsx`", correct: false }
+      - { text: "`.ts`", correct: false }
+      - { text: "`.tsj`", correct: false }
+      - { text: "`.tsx`", correct: true }
+  - type: single
+    prompt: "What is the type of `pair`?"
+    code: |
+      const pair: [string, number] = ['age', 30]
+    codeLanguage: typescript
+    explanation: "`[string, number]` is a tuple: an array with a fixed length where each position has its own type."
+    theoryUrl: https://www.typescriptlang.org/docs/handbook/2/objects.html#tuple-types
+    options:
+      - { text: An array of strings or numbers of any length, correct: false }
+      - { text: A tuple with a string first and a number second, correct: true }
+      - { text: An object with two keys, correct: false }
+      - { text: A union type, correct: false }
+  - type: boolean
+    prompt: "An `interface` can extend another `interface` with `extends`."
+    answer: true
+    explanation: "`interface Admin extends User { ... }` copies every member of `User` into `Admin` and adds its own."
+    theoryUrl: https://www.typescriptlang.org/docs/handbook/2/objects.html#extending-types
+  - type: single
+    prompt: "Which file configures the TypeScript compiler for a project?"
+    explanation: "`tsconfig.json` holds the compiler options and tells `tsc` which files belong to the project."
+    theoryUrl: https://www.typescriptlang.org/docs/handbook/tsconfig-json.html
+    options:
+      - { text: "`package.json`", correct: false }
+      - { text: "`tsconfig.json`", correct: true }
+      - { text: "`typescript.config.js`", correct: false }
+      - { text: "`.tsrc`", correct: false }
