@@ -123,6 +123,7 @@ export function QuestionCard({
               {...row}
               answered={answered}
               locked={locked}
+              pending={submitting}
               control={{
                 kind: 'checkbox',
                 onCheckedChange: (checked: boolean) => {
@@ -151,6 +152,7 @@ export function QuestionCard({
               {...row}
               answered={answered}
               locked={locked}
+              pending={submitting}
               control={{ kind: 'radio' }}
               // A click — pointer or Space on the focused radio — is the commit.
               onActivate={() => onCommit([row.id])}
@@ -202,6 +204,8 @@ type OptionRowProps = {
   isCorrect: boolean
   answered: boolean
   locked: boolean
+  /** An answer is in flight: the gap between the tap and the verdict. */
+  pending: boolean
   control: OptionControl
   onActivate: (() => void) | undefined
 }
@@ -246,12 +250,17 @@ function OptionRow({
   isCorrect,
   answered,
   locked,
+  pending,
   control,
   onActivate,
 }: OptionRowProps) {
   const t = useTranslations('run')
   const marker = answered ? rowMarker(selected, isCorrect) : null
   const struck = answered && selected && !isCorrect
+  // The control is disabled the instant the row is tapped, and the primitive
+  // dims a disabled control: the one row the player just chose would read as
+  // the one that went away. Full strength on the chosen row only.
+  const chosenWhilePending = pending && selected
 
   return (
     // The click handler rides on the label rather than on the control: a
@@ -271,8 +280,25 @@ function OptionRow({
         // tightens where the face is large, the way the question's does.
         'flex w-full items-start gap-4 py-4 font-normal text-option leading-relaxed',
         'xl:gap-5 xl:py-5 xl:leading-snug 2xl:py-6',
-        locked ? 'cursor-default' : 'cursor-pointer hover:bg-surface',
+        // The press state below replaces the browser's grey tap flash, which
+        // would otherwise paint over it on every touch. Scale is a property of
+        // its own in Tailwind v4, not a transform, so it is named as one here.
+        'transition-[scale,background-color,opacity] duration-100 ease-out [-webkit-tap-highlight-color:transparent]',
+        // On a phone the finger covers the control, so the row itself has to
+        // answer the touch: a step past the selected tint, so the press reads
+        // even on a row that is already chosen, and a give under the finger
+        // for anyone who has not asked for less motion.
+        locked
+          ? 'cursor-default'
+          : 'cursor-pointer hover:bg-surface active:bg-ai/15 motion-safe:active:scale-[0.98]',
         !answered && selected && 'bg-accent',
+        // While the answer is in flight the 10% tint is too faint to hold the
+        // choice on its own, so the chosen row is outlined in the indigo the
+        // control already wears and the rest step back.
+        chosenWhilePending && 'ring-2 ring-ai ring-inset',
+        pending && !selected && 'opacity-60',
+        answered && isCorrect && 'animate-verdict-pop motion-reduce:animate-none',
+        struck && 'animate-verdict-shake motion-reduce:animate-none',
       )}
     >
       <span className="relative mt-[0.15em] inline-flex size-7 shrink-0 xl:size-8 2xl:size-9">
@@ -290,6 +316,7 @@ function OptionRow({
               // The dot would show through the digit sitting on top of it.
               (keyHint !== null || marker !== null) &&
                 '[&_[data-slot=radio-group-indicator]]:hidden',
+              chosenWhilePending && 'disabled:opacity-100',
               marker?.controlClass,
             )}
           />
@@ -303,6 +330,7 @@ function OptionRow({
               // Square, and deliberately so: see the radio above.
               'size-full rounded-sm',
               (keyHint !== null || marker !== null) && '[&_[data-slot=checkbox-indicator]]:hidden',
+              chosenWhilePending && 'disabled:opacity-100',
               marker?.controlClass,
             )}
           />
