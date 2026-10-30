@@ -1,0 +1,183 @@
+version: 1
+title: "AWS Cloud Practitioner 19: Cloud management"
+description: Multi-account governance and infrastructure as code with Organizations, Control Tower, CloudFormation, CDK, Service Catalog, Trusted Advisor, the Well-Architected Tool and License Manager.
+language: en
+tags: [aws, cloud-practitioner, governance, iac]
+run:
+  questionsPerRun: 10
+  maxErrors: 3
+  timePerQuestionSec: 45
+questions:
+  - type: single
+    prompt: "A company runs dozens of AWS accounts and wants to create, group and govern them centrally with a single bill. Which service does this?"
+    explanation: "AWS Organizations lets you create accounts, group them into OUs, apply policies and use one payment method for all accounts."
+    theoryUrl: https://docs.aws.amazon.com/organizations/latest/userguide/orgs_introduction.html
+    options:
+      - { text: "AWS Organizations", correct: true }
+      - { text: "AWS Service Catalog", correct: false }
+      - { text: "AWS License Manager", correct: false }
+      - { text: "AWS Trusted Advisor", correct: false }
+  - type: single
+    prompt: "What is a key benefit of consolidated billing in AWS Organizations?"
+    explanation: "Usage across all accounts is combined, so you get one bill and can share volume pricing, Reserved Instance and Savings Plans discounts. It costs nothing extra."
+    theoryUrl: https://docs.aws.amazon.com/awsaccountbilling/latest/aboutv2/consolidated-billing.html
+    options:
+      - { text: "Each account automatically gets its own separate discount tier", correct: false }
+      - { text: "Member accounts can no longer see their own usage", correct: false }
+      - { text: "It adds a monthly fee in exchange for lower rates", correct: false }
+      - { text: "Combined usage across accounts can unlock shared volume discounts", correct: true }
+  - type: single
+    prompt: "What does a service control policy (SCP) do?"
+    explanation: "An SCP sets the maximum permissions available to IAM users and roles in member accounts. It never grants permissions by itself, so identity or resource policies are still needed."
+    theoryUrl: https://docs.aws.amazon.com/organizations/latest/userguide/orgs_manage_policies_scps.html
+    options:
+      - { text: "It grants IAM users in member accounts access to AWS services", correct: false }
+      - {
+          text: "It defines a permission guardrail, the maximum permissions for member accounts",
+          correct: true,
+        }
+      - { text: "It restricts the management account's users and roles", correct: false }
+      - { text: "It replaces IAM policies in every account", correct: false }
+  - type: single
+    prompt: "In AWS Control Tower, which feature standardizes provisioning of new accounts with pre-approved configurations?"
+    explanation: "Account Factory is a configurable account template that automates account provisioning. Controls (guardrails) and the dashboard are separate Control Tower features."
+    theoryUrl: https://docs.aws.amazon.com/controltower/latest/userguide/what-is-control-tower.html
+    options:
+      - { text: "The dashboard", correct: false }
+      - { text: "Preventive controls", correct: false }
+      - { text: "Consolidated billing", correct: false }
+      - { text: "Account Factory", correct: true }
+  - type: single
+    prompt: "A company wants the easiest way to set up a secure, multi-account AWS environment based on best practices (a landing zone). Which service orchestrates this?"
+    explanation: "AWS Control Tower orchestrates Organizations, Service Catalog and IAM Identity Center to build a landing zone, and applies controls to prevent drift."
+    theoryUrl: https://docs.aws.amazon.com/controltower/latest/userguide/what-is-control-tower.html
+    options:
+      - { text: "AWS Control Tower", correct: true }
+      - { text: "AWS CloudFormation alone", correct: false }
+      - { text: "AWS Trusted Advisor", correct: false }
+      - { text: "AWS Compute Optimizer", correct: false }
+  - type: single
+    prompt: "In AWS CloudFormation, what do you create to describe all the resources you want, which CloudFormation then provisions as a single unit called a stack?"
+    explanation: "A template describes your resources and their properties. Creating a stack from it provisions them, and deleting the stack deletes those resources."
+    theoryUrl: https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/Welcome.html
+    options:
+      - { text: "A launch template", correct: false }
+      - { text: "A service control policy", correct: false }
+      - { text: "A CloudFormation template", correct: true }
+      - { text: "A Trusted Advisor check", correct: false }
+  - type: single
+    prompt: "Your developers want to define infrastructure using TypeScript or Python instead of writing template files by hand. Which tool helps?"
+    explanation: "The AWS CDK lets you define cloud infrastructure in general-purpose languages and deploys it through CloudFormation."
+    theoryUrl: https://docs.aws.amazon.com/cdk/v2/guide/home.html
+    options:
+      - { text: "AWS Service Catalog", correct: false }
+      - { text: "AWS Cloud Development Kit (AWS CDK)", correct: true }
+      - { text: "AWS License Manager", correct: false }
+      - { text: "AWS Well-Architected Tool", correct: false }
+  - type: single
+    prompt: "An administrator wants to give teams a curated catalog of pre-approved IT products they can launch themselves, within set constraints. Which service fits?"
+    explanation: "AWS Service Catalog lets organizations manage catalogs of approved IT services, so end users deploy only what is approved."
+    theoryUrl: https://docs.aws.amazon.com/servicecatalog/latest/adminguide/introduction.html
+    options:
+      - { text: "AWS Trusted Advisor", correct: false }
+      - { text: "AWS Control Tower dashboard", correct: false }
+      - { text: "AWS Compute Optimizer", correct: false }
+      - { text: "AWS Service Catalog", correct: true }
+  - type: single
+    prompt: "Which service inspects your AWS environment and recommends ways to save money, improve performance and availability, and close security gaps?"
+    explanation: "AWS Trusted Advisor draws on AWS best practices to make recommendations across categories such as cost optimization, security and fault tolerance."
+    theoryUrl: https://docs.aws.amazon.com/awssupport/latest/user/trusted-advisor.html
+    options:
+      - { text: "AWS Trusted Advisor", correct: true }
+      - { text: "AWS License Manager", correct: false }
+      - { text: "AWS CDK", correct: false }
+      - { text: "AWS Organizations", correct: false }
+  - type: single
+    prompt: "Which tool lets you review a workload against the AWS Well-Architected Framework by answering questions for each pillar?"
+    explanation: "The AWS Well-Architected Tool is available in the console at no charge and helps you review workloads against best practices for each pillar."
+    theoryUrl: https://docs.aws.amazon.com/whitepapers/latest/overview-aws-cloud-adoption-framework/welcome.html
+    options:
+      - { text: "AWS Trusted Advisor", correct: false }
+      - { text: "AWS Well-Architected Tool", correct: true }
+      - { text: "AWS Service Catalog", correct: false }
+      - { text: "AWS CloudFormation", correct: false }
+  - type: single
+    prompt: "A company wants to track usage of Microsoft and Oracle software licenses across accounts and enforce limits to avoid compliance problems. Which service helps?"
+    explanation: "AWS License Manager tracks licenses based on vCPUs, cores, sockets or machines, and supports rule-based limits plus bring-your-own-license use."
+    theoryUrl: https://docs.aws.amazon.com/license-manager/latest/userguide/license-manager.html
+    options:
+      - { text: "AWS Service Catalog", correct: false }
+      - { text: "AWS Control Tower", correct: false }
+      - { text: "AWS License Manager", correct: true }
+      - { text: "AWS Compute Optimizer", correct: false }
+  - type: single
+    prompt: "In AWS Organizations, what is an organizational unit (OU) used for?"
+    explanation: "An OU groups accounts so you can apply the same controls, and policies are inherited from parent OUs. OUs can be nested."
+    theoryUrl: https://docs.aws.amazon.com/organizations/latest/userguide/orgs_getting-started_concepts.html
+    options:
+      - { text: "Grouping accounts so the same policies can be applied to them", correct: true }
+      - { text: "Storing the organization's consolidated invoice", correct: false }
+      - { text: "Running the Account Factory", correct: false }
+      - { text: "Hosting EC2 instances for the whole organization", correct: false }
+  - type: multi
+    prompt: "Which of these are AWS Trusted Advisor check categories?"
+    explanation: "Trusted Advisor groups checks into cost optimization, performance, security, fault tolerance, service limits and operational excellence. Data residency and user adoption are not categories."
+    theoryUrl: https://docs.aws.amazon.com/awssupport/latest/user/trusted-advisor-check-reference.html
+    options:
+      - { text: "Cost optimization", correct: true }
+      - { text: "Data residency", correct: false }
+      - { text: "Fault tolerance", correct: true }
+      - { text: "User adoption", correct: false }
+      - { text: "Service limits", correct: true }
+  - type: multi
+    prompt: "Which of these are pillars of the AWS Well-Architected Framework?"
+    explanation: "The six pillars are operational excellence, security, reliability, performance efficiency, cost optimization and sustainability. Scalability and compliance are not separate pillars."
+    theoryUrl: https://docs.aws.amazon.com/wellarchitected/latest/framework/the-pillars-of-the-framework.html
+    options:
+      - { text: "Scalability", correct: false }
+      - { text: "Reliability", correct: true }
+      - { text: "Sustainability", correct: true }
+      - { text: "Compliance", correct: false }
+      - { text: "Operational excellence", correct: true }
+  - type: multi
+    prompt: "Which are benefits of provisioning infrastructure with AWS CloudFormation?"
+    explanation: "Templates let you replicate infrastructure in multiple Regions, track changes in version control, and delete a whole stack at once. You do not configure each resource by hand."
+    theoryUrl: https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/Welcome.html
+    options:
+      - {
+          text: "Reuse the same template to create consistent resources in multiple Regions",
+          correct: true,
+        }
+      - { text: "You must create and configure each resource manually first", correct: false }
+      - { text: "Templates can be tracked in version control to see what changed", correct: true }
+      - { text: "Deleting the stack removes the resources it created", correct: true }
+  - type: multi
+    prompt: "Which are features of AWS Control Tower?"
+    explanation: "Control Tower provides a landing zone, Account Factory and controls (guardrails). It does not track software licenses or recommend Reserved Instance purchases."
+    theoryUrl: https://docs.aws.amazon.com/controltower/latest/userguide/what-is-control-tower.html
+    options:
+      - { text: "Landing zone", correct: true }
+      - { text: "Software license tracking", correct: false }
+      - { text: "Controls (guardrails)", correct: true }
+      - { text: "Account Factory", correct: true }
+      - { text: "Reserved Instance purchase recommendations", correct: false }
+  - type: boolean
+    prompt: "Service control policies restrict the users and roles in the organization's management account."
+    answer: false
+    explanation: "SCPs affect only member accounts. They have no effect on users or roles in the management account, which is why AWS advises keeping workloads out of it."
+    theoryUrl: https://docs.aws.amazon.com/organizations/latest/userguide/orgs_manage_policies_scps.html
+  - type: boolean
+    prompt: "Consolidated billing in AWS Organizations is offered at no additional cost."
+    answer: true
+    explanation: "Consolidated billing gives one bill, combined usage and shared discounts, with no extra fee."
+    theoryUrl: https://docs.aws.amazon.com/awsaccountbilling/latest/aboutv2/consolidated-billing.html
+  - type: boolean
+    prompt: "The AWS CDK replaces CloudFormation, so CDK apps are deployed without CloudFormation."
+    answer: false
+    explanation: "The CDK defines infrastructure in code and deploys it through AWS CloudFormation. It is a layer on top of CloudFormation, not a replacement."
+    theoryUrl: https://docs.aws.amazon.com/cdk/v2/guide/home.html
+  - type: boolean
+    prompt: "An AWS Organizations OU can contain other OUs, which lets you build a hierarchy."
+    answer: true
+    explanation: "OUs can be nested, and child OUs inherit the policies of their parent OU."
+    theoryUrl: https://docs.aws.amazon.com/organizations/latest/userguide/orgs_getting-started_concepts.html

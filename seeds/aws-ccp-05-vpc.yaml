@@ -1,0 +1,192 @@
+version: 1
+title: "AWS Cloud Practitioner 05: Managing cloud networks with VPCs"
+description: Amazon VPC building blocks, public and private subnets, gateways, security groups versus network ACLs, peering, endpoints, Site-to-Site VPN and Direct Connect.
+language: en
+tags: [aws, cloud-practitioner, vpc, networking]
+run:
+  questionsPerRun: 10
+  maxErrors: 3
+  timePerQuestionSec: 45
+questions:
+  - type: single
+    prompt: "What is an Amazon VPC?"
+    explanation: "A VPC lets you launch AWS resources in a logically isolated virtual network that you define. It resembles a traditional network in your own data center."
+    theoryUrl: https://docs.aws.amazon.com/vpc/latest/userguide/what-is-amazon-vpc.html
+    options:
+      - { text: "A physical data center operated by AWS", correct: false }
+      - { text: "A logically isolated virtual network that you define in AWS", correct: true }
+      - { text: "A VPN client application", correct: false }
+      - { text: "A caching service for web content", correct: false }
+  - type: single
+    prompt: "In which scope must a single subnet reside?"
+    explanation: "A subnet is a range of IP addresses in your VPC and must reside in a single Availability Zone. A VPC can have subnets in several AZs of its Region."
+    theoryUrl: https://docs.aws.amazon.com/vpc/latest/userguide/what-is-amazon-vpc.html
+    options:
+      - { text: "Several Regions at once", correct: false }
+      - { text: "Two Availability Zones for redundancy", correct: false }
+      - { text: "An entire AWS account", correct: false }
+      - { text: "A single Availability Zone", correct: true }
+  - type: single
+    prompt: "What makes a subnet a public subnet?"
+    explanation: "A subnet is public when its route table has a route to an internet gateway. Without that route it is a private subnet."
+    theoryUrl: https://docs.aws.amazon.com/vpc/latest/userguide/VPC_Internet_Gateway.html
+    options:
+      - { text: "Its route table has a route to an internet gateway", correct: true }
+      - { text: "It contains a NAT gateway", correct: false }
+      - { text: "It has a network ACL that allows all traffic", correct: false }
+      - { text: "It is in the default VPC", correct: false }
+  - type: single
+    prompt: "An EC2 instance sits in a subnet whose route table sends 0.0.0.0/0 to an internet gateway attached to the VPC. What else does the instance need to communicate with the internet over IPv4?"
+    explanation: "The instance needs a public IPv4 address or an Elastic IP address. The internet gateway performs one-to-one NAT between that public address and the instance's private address."
+    theoryUrl: https://docs.aws.amazon.com/vpc/latest/userguide/VPC_Internet_Gateway.html
+    options:
+      - { text: "A VPN connection", correct: false }
+      - { text: "A second internet gateway", correct: false }
+      - { text: "A public IPv4 address or an Elastic IP address", correct: true }
+      - { text: "A VPC peering connection", correct: false }
+  - type: single
+    prompt: "What does a NAT gateway allow?"
+    explanation: "Instances in a private subnet can connect out to services outside the VPC through a NAT gateway, but external services can't initiate connections to those instances."
+    theoryUrl: https://docs.aws.amazon.com/vpc/latest/userguide/vpc-nat-gateway.html
+    options:
+      - { text: "Internet users to connect to instances in a private subnet", correct: false }
+      - {
+          text: "Instances in a private subnet to connect outbound without receiving unsolicited inbound connections",
+          correct: true,
+        }
+      - { text: "Two VPCs to share route tables", correct: false }
+      - { text: "On-premises servers to join a VPC", correct: false }
+  - type: single
+    prompt: "Where do you create a public NAT gateway, and what must it have?"
+    explanation: "A public NAT gateway is created in a public subnet and must have an Elastic IP address associated at creation. Its traffic then goes to the VPC's internet gateway."
+    theoryUrl: https://docs.aws.amazon.com/vpc/latest/userguide/vpc-nat-gateway.html
+    options:
+      - { text: "In a private subnet, with a security group only", correct: false }
+      - { text: "Outside any VPC, with a VPN tunnel", correct: false }
+      - { text: "In a private subnet, with a peering connection", correct: false }
+      - { text: "In a public subnet, with an Elastic IP address", correct: true }
+  - type: single
+    prompt: "Network ACLs are stateless. What does that mean for return traffic?"
+    explanation: "A network ACL doesn't remember previous traffic, so responses are not automatically allowed. You must explicitly allow return traffic, unlike with stateful security groups."
+    theoryUrl: https://docs.aws.amazon.com/vpc/latest/userguide/vpc-network-acls.html
+    options:
+      - { text: "Return traffic must be explicitly allowed by a rule", correct: true }
+      - { text: "Return traffic is always allowed automatically", correct: false }
+      - { text: "Return traffic is allowed only through a NAT gateway", correct: false }
+      - { text: "Return traffic is blocked for the whole subnet", correct: false }
+  - type: single
+    prompt: "At what level do security groups and network ACLs operate?"
+    explanation: "Security groups operate at the instance level (they apply to the resources they are associated with). Network ACLs operate at the subnet level."
+    theoryUrl: https://docs.aws.amazon.com/vpc/latest/userguide/infrastructure-security.html#VPC_Security_Comparison
+    options:
+      - { text: "Both operate at the subnet level", correct: false }
+      - {
+          text: "Security groups at the subnet level, network ACLs at the instance level",
+          correct: false,
+        }
+      - {
+          text: "Security groups at the instance level, network ACLs at the subnet level",
+          correct: true,
+        }
+      - { text: "Both operate at the VPC level", correct: false }
+  - type: single
+    prompt: "VPC A is peered with VPC B, and VPC A is also peered with VPC C. Can resources in VPC B reach VPC C through VPC A?"
+    explanation: "VPC peering doesn't support transitive peering. To route traffic between VPC B and VPC C, you must create a peering connection directly between them."
+    theoryUrl: https://docs.aws.amazon.com/vpc/latest/peering/vpc-peering-basics.html
+    options:
+      - { text: "Yes, peering connections are automatically transitive", correct: false }
+      - { text: "No, B and C need their own peering connection", correct: true }
+      - { text: "Yes, but only in the same Region", correct: false }
+      - { text: "Yes, if A has an internet gateway", correct: false }
+  - type: single
+    prompt: "What is the main purpose of a VPC endpoint?"
+    explanation: "A VPC endpoint lets you connect to AWS services privately, without using an internet gateway or NAT device. Traffic stays on the AWS network."
+    theoryUrl: https://docs.aws.amazon.com/vpc/latest/userguide/what-is-amazon-vpc.html
+    options:
+      - { text: "To expose your instances to the internet", correct: false }
+      - { text: "To connect two VPCs in different accounts", correct: false }
+      - { text: "To encrypt data at rest in S3", correct: false }
+      - {
+          text: "To connect to AWS services privately without an internet gateway or NAT device",
+          correct: true,
+        }
+  - type: single
+    prompt: "Which service gives you an encrypted IPsec connection between your on-premises network and your VPC?"
+    explanation: "AWS Site-to-Site VPN creates a VPN connection between your VPC and your own network. Each connection includes two encrypted VPN tunnels for high availability."
+    theoryUrl: https://docs.aws.amazon.com/vpn/latest/s2svpn/VPC_VPN.html
+    options:
+      - { text: "AWS Site-to-Site VPN", correct: true }
+      - { text: "VPC peering", correct: false }
+      - { text: "An internet gateway", correct: false }
+      - { text: "A NAT gateway", correct: false }
+  - type: single
+    prompt: "What is AWS Direct Connect?"
+    explanation: "Direct Connect links your network to an AWS Direct Connect location over a fiber-optic cable. You create virtual interfaces to AWS services or your VPC, bypassing internet service providers in the path."
+    theoryUrl: https://docs.aws.amazon.com/directconnect/latest/UserGuide/Welcome.html
+    options:
+      - { text: "A managed VPN client for laptops", correct: false }
+      - { text: "A CDN that caches content at edge locations", correct: false }
+      - {
+          text: "A dedicated network connection from your premises to AWS that bypasses internet service providers",
+          correct: true,
+        }
+      - { text: "A service that peers two VPCs", correct: false }
+  - type: multi
+    prompt: "Which statements about network ACLs are true?"
+    explanation: "NACLs work at the subnet level, support both allow and deny rules and evaluate rules in ascending number order until a match. They are stateless, and they stop at the first match instead of evaluating all rules."
+    theoryUrl: https://docs.aws.amazon.com/vpc/latest/userguide/vpc-network-acls.html
+    options:
+      - { text: "They operate at the subnet level", correct: true }
+      - { text: "They are stateful", correct: false }
+      - { text: "They support both allow and deny rules", correct: true }
+      - { text: "They evaluate all rules before deciding", correct: false }
+      - { text: "Rules are evaluated in order, starting with the lowest number", correct: true }
+  - type: multi
+    prompt: "Which of these can be the target of a route in a VPC route table?"
+    explanation: "A route targets something like an internet gateway, a NAT gateway, a VPC peering connection or a VPN connection. Security groups and AMIs are not routing targets."
+    theoryUrl: https://docs.aws.amazon.com/vpc/latest/userguide/VPC_Route_Tables.html
+    options:
+      - { text: "An internet gateway", correct: true }
+      - { text: "A security group", correct: false }
+      - { text: "A NAT gateway", correct: true }
+      - { text: "An AMI", correct: false }
+      - { text: "A VPC peering connection", correct: true }
+  - type: multi
+    prompt: "Which AWS services can you reach through a gateway VPC endpoint?"
+    explanation: "Gateway endpoints send traffic to Amazon S3 or Amazon DynamoDB only. Other services, such as SQS or Lambda, use interface endpoints."
+    theoryUrl: https://docs.aws.amazon.com/vpc/latest/privatelink/concepts.html
+    options:
+      - { text: "Amazon SQS", correct: false }
+      - { text: "Amazon S3", correct: true }
+      - { text: "AWS Lambda", correct: false }
+      - { text: "Amazon DynamoDB", correct: true }
+  - type: multi
+    prompt: "Which options provide private connectivity between an on-premises network and a VPC?"
+    explanation: "AWS Site-to-Site VPN and Direct Connect both connect remote networks to VPCs. VPC peering links two VPCs, a NAT gateway handles outbound translation, and a VPC endpoint reaches AWS services."
+    theoryUrl: https://docs.aws.amazon.com/vpc/latest/userguide/infrastructure-security.html
+    options:
+      - { text: "VPC peering", correct: false }
+      - { text: "AWS Site-to-Site VPN", correct: true }
+      - { text: "A NAT gateway", correct: false }
+      - { text: "AWS Direct Connect", correct: true }
+      - { text: "A VPC endpoint", correct: false }
+  - type: boolean
+    prompt: "Security groups are stateful: if an inbound request is allowed, the response is automatically allowed out regardless of outbound rules."
+    answer: true
+    explanation: "Stateful means the group tracks connections, so responses to allowed traffic flow back without a matching rule."
+    theoryUrl: https://docs.aws.amazon.com/vpc/latest/userguide/vpc-security-groups.html
+  - type: boolean
+    prompt: "You can create a VPC peering connection between two VPCs that have overlapping CIDR blocks."
+    answer: false
+    explanation: "VPC peering is not allowed between VPCs with matching or overlapping IPv4 or IPv6 CIDR blocks."
+    theoryUrl: https://docs.aws.amazon.com/vpc/latest/peering/vpc-peering-basics.html
+  - type: boolean
+    prompt: "Your AWS account includes a default VPC in each AWS Region, so you can launch EC2 instances right away."
+    answer: true
+    explanation: "A default VPC comes with a public subnet in each AZ, an internet gateway and DNS resolution settings, so you can start launching instances immediately."
+    theoryUrl: https://docs.aws.amazon.com/vpc/latest/userguide/default-vpc.html
+  - type: boolean
+    prompt: "A NAT gateway lets users on the internet initiate connections to instances in your private subnet."
+    answer: false
+    explanation: "Connections must always be initiated from within the VPC. External services can't initiate a connection to the instances behind a NAT gateway."
+    theoryUrl: https://docs.aws.amazon.com/vpc/latest/userguide/vpc-nat-gateway.html

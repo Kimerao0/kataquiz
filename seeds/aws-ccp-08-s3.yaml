@@ -1,0 +1,202 @@
+version: 1
+title: "AWS Cloud Practitioner 08: S3 (Simple Storage Service)"
+description: "Buckets and objects, storage classes, lifecycle rules, versioning, access control, replication and static website hosting in Amazon S3."
+language: en
+tags: [aws, cloud-practitioner, s3, storage]
+run:
+  questionsPerRun: 10
+  maxErrors: 3
+  timePerQuestionSec: 45
+questions:
+  - type: single
+    prompt: "Which type of storage is Amazon S3?"
+    explanation: "Amazon S3 is an object storage service. You store files and their metadata as objects inside buckets, and access them through an API or URLs."
+    theoryUrl: https://docs.aws.amazon.com/AmazonS3/latest/userguide/Welcome.html
+    options:
+      - { text: "Block storage", correct: false }
+      - { text: "Object storage", correct: true }
+      - { text: "Network file system storage", correct: false }
+      - { text: "In-memory storage", correct: false }
+  - type: single
+    prompt: "What uniquely identifies an object within an S3 bucket (when versioning is not enabled)?"
+    explanation: "Every object in a bucket has exactly one key (key name), which is its unique identifier within that bucket. With versioning on, the key plus the version ID identify it."
+    theoryUrl: https://docs.aws.amazon.com/AmazonS3/latest/userguide/Welcome.html
+    options:
+      - { text: "Its ETag", correct: false }
+      - { text: "Its storage class", correct: false }
+      - { text: "Its key", correct: true }
+      - { text: "Its Availability Zone", correct: false }
+  - type: single
+    prompt: "By default, what is the rule for the name of a general purpose S3 bucket?"
+    explanation: "General purpose bucket names live in a global namespace: each name must be unique across all AWS accounts in all Regions of the partition. The bucket itself still lives in the one Region you choose."
+    theoryUrl: https://docs.aws.amazon.com/AmazonS3/latest/userguide/UsingBucket.html
+    options:
+      - {
+          text: "It must be unique across all AWS accounts in all AWS Regions of the partition",
+          correct: true,
+        }
+      - { text: "It must be unique only within your AWS account", correct: false }
+      - {
+          text: "It must be unique only within the Region where the bucket is created",
+          correct: false,
+        }
+      - {
+          text: "It can be reused by any account as long as the Region is different",
+          correct: false,
+        }
+  - type: single
+    prompt: "You create an S3 bucket in the Europe (Ireland) Region and upload objects. What happens to those objects?"
+    explanation: "A bucket is created in the Region you specify, and its objects never leave that Region unless you explicitly transfer or replicate them elsewhere. This matters for data residency."
+    theoryUrl: https://docs.aws.amazon.com/AmazonS3/latest/userguide/UsingBucket.html
+    options:
+      - { text: "They are copied automatically to every AWS Region", correct: false }
+      - {
+          text: "They are stored in the Region closest to each user who accesses them",
+          correct: false,
+        }
+      - { text: "They are moved to US East (N. Virginia) after 30 days", correct: false }
+      - {
+          text: "They stay in that Region unless you explicitly transfer or replicate them",
+          correct: true,
+        }
+  - type: single
+    prompt: "What durability is S3 Standard designed for?"
+    explanation: "S3 Standard is designed for 99.999999999% (11 nines) of durability. Do not mix it up with availability, which is a lower figure."
+    theoryUrl: https://docs.aws.amazon.com/AmazonS3/latest/userguide/storage-class-intro.html
+    options:
+      - { text: "99.9%", correct: false }
+      - { text: "99.999999999%", correct: true }
+      - { text: "99.99%", correct: false }
+      - { text: "99.5%", correct: false }
+  - type: single
+    prompt: "Which S3 storage class is designed for data with unknown or changing access patterns, moving objects between access tiers automatically and with no retrieval fees?"
+    explanation: "S3 Intelligent-Tiering monitors access patterns and moves objects between tiers automatically. It charges a small monitoring and automation fee but has no retrieval fees."
+    theoryUrl: https://docs.aws.amazon.com/AmazonS3/latest/userguide/storage-class-intro.html
+    options:
+      - { text: "S3 Standard-IA", correct: false }
+      - { text: "S3 One Zone-IA", correct: false }
+      - { text: "S3 Intelligent-Tiering", correct: true }
+      - { text: "S3 Glacier Deep Archive", correct: false }
+  - type: single
+    prompt: "Which S3 storage class is the best fit for long-lived archive data that is accessed less than once a year, where retrieval can take hours?"
+    explanation: "S3 Glacier Deep Archive is the lowest-cost class for data that rarely needs to be accessed. Objects are archived and must be restored before use."
+    theoryUrl: https://docs.aws.amazon.com/AmazonS3/latest/userguide/storage-class-intro.html
+    options:
+      - { text: "S3 Glacier Deep Archive", correct: true }
+      - { text: "S3 Glacier Instant Retrieval", correct: false }
+      - { text: "S3 Standard-IA", correct: false }
+      - { text: "S3 Standard", correct: false }
+  - type: single
+    prompt: "A company stores secondary copies of data that it can easily re-create, accessed infrequently but needing millisecond access. It wants a cheaper class than Standard-IA and accepts losing the data if an Availability Zone is destroyed. Which class fits?"
+    explanation: "S3 One Zone-IA stores data in a single AZ, which makes it cheaper than Standard-IA but not resilient to the loss of that AZ. Use it for re-creatable data."
+    theoryUrl: https://docs.aws.amazon.com/AmazonS3/latest/userguide/storage-class-intro.html
+    options:
+      - { text: "S3 Standard-IA", correct: false }
+      - { text: "S3 Glacier Flexible Retrieval", correct: false }
+      - { text: "S3 Intelligent-Tiering", correct: false }
+      - { text: "S3 One Zone-IA", correct: true }
+  - type: single
+    prompt: "Which S3 class suits archive data that is rarely accessed, but must still be retrievable in milliseconds when needed?"
+    explanation: "S3 Glacier Instant Retrieval is for long-lived archive data accessed about once a quarter, with millisecond access. Flexible Retrieval and Deep Archive need a restore first."
+    theoryUrl: https://docs.aws.amazon.com/AmazonS3/latest/userguide/storage-class-intro.html
+    options:
+      - { text: "S3 Glacier Flexible Retrieval", correct: false }
+      - { text: "S3 Glacier Instant Retrieval", correct: true }
+      - { text: "S3 Glacier Deep Archive", correct: false }
+      - { text: "S3 Standard", correct: false }
+  - type: single
+    prompt: "You want objects to move automatically from S3 Standard to a cheaper class after 30 days and to be deleted after a year. Which feature do you use?"
+    explanation: "S3 Lifecycle rules define transition actions (move to another storage class) and expiration actions (delete expired objects) for a group of objects."
+    theoryUrl: https://docs.aws.amazon.com/AmazonS3/latest/userguide/object-lifecycle-mgmt.html
+    options:
+      - { text: "S3 Replication", correct: false }
+      - { text: "S3 Transfer Acceleration", correct: false }
+      - { text: "S3 Lifecycle rules", correct: true }
+      - { text: "S3 Block Public Access", correct: false }
+  - type: single
+    prompt: "In a bucket with S3 Versioning enabled, you delete an object without specifying a version. What happens?"
+    explanation: "S3 inserts a delete marker, which becomes the current version, instead of removing the object permanently. The earlier versions are kept and can be restored."
+    theoryUrl: https://docs.aws.amazon.com/AmazonS3/latest/userguide/Versioning.html
+    options:
+      - { text: "S3 inserts a delete marker, and the previous versions are kept", correct: true }
+      - { text: "S3 permanently deletes all versions of the object", correct: false }
+      - { text: "S3 moves the object to S3 Glacier Deep Archive", correct: false }
+      - { text: "The request fails because versioned objects cannot be deleted", correct: false }
+  - type: single
+    prompt: "Which S3 feature helps prevent buckets and objects from becoming public, even if someone attaches a permissive bucket policy or ACL?"
+    explanation: "S3 Block Public Access settings override bucket policies and ACLs to limit public access. They can be applied at account and bucket level, and are on by default for new buckets."
+    theoryUrl: https://docs.aws.amazon.com/AmazonS3/latest/userguide/access-control-block-public-access.html
+    options:
+      - { text: "S3 Versioning", correct: false }
+      - { text: "S3 Lifecycle", correct: false }
+      - { text: "S3 Transfer Acceleration", correct: false }
+      - { text: "S3 Block Public Access", correct: true }
+  - type: multi
+    prompt: "Which of these are Amazon S3 storage classes?"
+    explanation: "S3 Standard-IA, One Zone-IA and Glacier Deep Archive are S3 storage classes. st1 and gp3 are EBS volume types."
+    theoryUrl: https://docs.aws.amazon.com/AmazonS3/latest/userguide/storage-class-intro.html
+    options:
+      - { text: "S3 Standard-IA", correct: true }
+      - { text: "S3 One Zone-IA", correct: true }
+      - { text: "st1", correct: false }
+      - { text: "S3 Glacier Deep Archive", correct: true }
+      - { text: "gp3", correct: false }
+  - type: multi
+    prompt: "Which of these can you use to grant or control access to an S3 bucket and its objects?"
+    explanation: "Bucket policies (resource-based) and IAM policies (identity-based) control S3 access. Security groups and network ACLs apply to VPC resources, not to S3 buckets."
+    theoryUrl: https://docs.aws.amazon.com/AmazonS3/latest/userguide/Welcome.html
+    options:
+      - { text: "A security group attached to the bucket", correct: false }
+      - { text: "A bucket policy", correct: true }
+      - { text: "A network ACL attached to the bucket", correct: false }
+      - { text: "An IAM policy attached to a user or role", correct: true }
+  - type: multi
+    prompt: "Which statements about S3 replication are true?"
+    explanation: "Replication is asynchronous and can be Cross-Region (CRR) or Same-Region (SRR). Live replication copies only new and updated objects, so existing objects need S3 Batch Replication."
+    theoryUrl: https://docs.aws.amazon.com/AmazonS3/latest/userguide/replication.html
+    options:
+      - { text: "Replication copies objects asynchronously between buckets", correct: true }
+      - {
+          text: "Cross-Region Replication copies objects to a bucket in a different Region",
+          correct: true,
+        }
+      - {
+          text: "Live replication automatically copies all objects that existed before it was set up",
+          correct: false,
+        }
+      - {
+          text: "Same-Region Replication copies objects to a bucket in the same Region",
+          correct: true,
+        }
+  - type: multi
+    prompt: "Which statements about S3 Transfer Acceleration are true?"
+    explanation: "Transfer Acceleration is a bucket-level feature that speeds up long-distance transfers by routing data through CloudFront edge locations over an optimized network path. It does not move the bucket to another Region."
+    theoryUrl: https://docs.aws.amazon.com/AmazonS3/latest/userguide/transfer-acceleration.html
+    options:
+      - { text: "It is a bucket-level feature that you must enable on the bucket", correct: true }
+      - { text: "It uses the globally distributed CloudFront edge locations", correct: true }
+      - { text: "It moves the bucket to the Region closest to each uploader", correct: false }
+      - {
+          text: "It speeds up transfers over long distances between a client and the bucket",
+          correct: true,
+        }
+  - type: boolean
+    prompt: "S3 Standard-IA charges a retrieval fee when you read data from it."
+    answer: true
+    explanation: "Standard-IA and One Zone-IA give millisecond access but charge per-GB retrieval fees, so they suit data that you read rarely."
+    theoryUrl: https://docs.aws.amazon.com/AmazonS3/latest/userguide/storage-class-intro.html
+  - type: boolean
+    prompt: "After you enable S3 Versioning on a bucket, you can switch the bucket back to the unversioned state."
+    answer: false
+    explanation: "A versioning-enabled bucket can never return to the unversioned state. You can only suspend versioning, which stops new versions from accumulating."
+    theoryUrl: https://docs.aws.amazon.com/AmazonS3/latest/userguide/Versioning.html
+  - type: boolean
+    prompt: "An S3 static website endpoint serves your content over HTTPS by itself."
+    answer: false
+    explanation: "S3 static website endpoints support only HTTP. To serve the site over HTTPS, put Amazon CloudFront in front of the bucket."
+    theoryUrl: https://docs.aws.amazon.com/AmazonS3/latest/userguide/UsingBucket.html
+  - type: boolean
+    prompt: "All four S3 Block Public Access settings are turned on by default when you create a new general purpose bucket."
+    answer: true
+    explanation: "New buckets block public access by default. You must deliberately change the settings if you need public access, for example to host a static website."
+    theoryUrl: https://docs.aws.amazon.com/AmazonS3/latest/userguide/UsingBucket.html

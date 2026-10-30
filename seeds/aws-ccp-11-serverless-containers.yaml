@@ -1,0 +1,182 @@
+version: 1
+title: "AWS Cloud Practitioner 11: Serverless and containers"
+description: "Lambda, containers, ECS, EKS, Fargate, ECR and how to choose between them for the CLF-C02 exam."
+language: en
+tags: [aws, cloud-practitioner, serverless, containers]
+run:
+  questionsPerRun: 10
+  maxErrors: 3
+  timePerQuestionSec: 45
+questions:
+  - type: single
+    prompt: "What does it mean that AWS Lambda is a serverless compute service?"
+    explanation: "You run code without provisioning or managing servers. Lambda handles capacity, scaling and patching of the underlying infrastructure. Servers still exist, you just never manage them."
+    theoryUrl: https://docs.aws.amazon.com/lambda/latest/dg/welcome.html
+    options:
+      - { text: "You run code without provisioning or managing servers", correct: true }
+      - { text: "Your code runs without any physical hardware", correct: false }
+      - { text: "You must launch and patch EC2 instances to host your functions", correct: false }
+      - { text: "Your code can only run on your on-premises servers", correct: false }
+  - type: single
+    prompt: "How is AWS Lambda billed?"
+    explanation: "Lambda is pay-per-use: you pay per request plus the duration your code runs (GB-seconds). Nothing is charged while the function is not running."
+    theoryUrl: https://docs.aws.amazon.com/lambda/latest/dg/welcome.html
+    options:
+      - { text: "A fixed hourly fee per function, whether it runs or not", correct: false }
+      - { text: "An upfront annual commitment per function", correct: false }
+      - { text: "A monthly fee per provisioned EC2 instance behind the function", correct: false }
+      - { text: "Per request plus the execution time of your code", correct: true }
+  - type: single
+    prompt: "A scheduled job needs to run code for about 10 minutes at a time. What is the default maximum duration of a single standard Lambda function invocation?"
+    explanation: "A standard Lambda event function can run for up to 15 minutes per invocation by default. Longer jobs need another approach, such as containers on ECS or Fargate."
+    theoryUrl: https://docs.aws.amazon.com/lambda/latest/dg/welcome.html
+    options:
+      - { text: "1 minute", correct: false }
+      - { text: "5 minutes", correct: false }
+      - { text: "15 minutes", correct: true }
+      - { text: "24 hours", correct: false }
+  - type: single
+    prompt: "Which AWS service is a fully managed container orchestration service that deploys, manages and scales containerized applications?"
+    explanation: "Amazon ECS is AWS's own fully managed container orchestrator. EKS is the managed Kubernetes option, and ECR only stores images."
+    theoryUrl: https://docs.aws.amazon.com/AmazonECS/latest/developerguide/Welcome.html
+    options:
+      - { text: "Amazon ECR", correct: false }
+      - { text: "Amazon ECS", correct: true }
+      - { text: "AWS Lambda", correct: false }
+      - { text: "Amazon Lightsail", correct: false }
+  - type: single
+    prompt: "Your team already runs its applications on Kubernetes and wants AWS to manage the Kubernetes control plane. Which service fits?"
+    explanation: "Amazon EKS is the managed Kubernetes service. AWS manages the control plane, and EKS is certified Kubernetes-conformant so existing Kubernetes apps and tooling work without refactoring."
+    theoryUrl: https://docs.aws.amazon.com/eks/latest/userguide/what-is-eks.html
+    options:
+      - { text: "Amazon ECS", correct: false }
+      - { text: "AWS Elastic Beanstalk", correct: false }
+      - { text: "Amazon EKS", correct: true }
+      - { text: "AWS Lambda", correct: false }
+  - type: single
+    prompt: "What is AWS Fargate?"
+    explanation: "Fargate is a serverless compute engine for containers. You specify CPU and memory for your tasks and there are no servers or EC2 clusters to provision, patch or scale."
+    theoryUrl: https://docs.aws.amazon.com/AmazonECS/latest/developerguide/AWS_Fargate.html
+    options:
+      - { text: "A container image registry", correct: false }
+      - { text: "A managed Kubernetes control plane", correct: false }
+      - {
+          text: "A serverless compute engine for running containers without managing servers",
+          correct: true,
+        }
+      - { text: "A service that converts virtual machines into containers", correct: false }
+  - type: single
+    prompt: "Where do you store and manage your Docker container images on AWS?"
+    explanation: "Amazon ECR is a managed container image registry. ECS and EKS pull images from it to run your containers."
+    theoryUrl: https://docs.aws.amazon.com/AmazonECR/latest/userguide/what-is-ecr.html
+    options:
+      - { text: "Amazon ECR", correct: true }
+      - { text: "Amazon EBS", correct: false }
+      - { text: "AWS CodeCommit", correct: false }
+      - { text: "Amazon ECS", correct: false }
+  - type: single
+    prompt: "What does a container package together?"
+    explanation: "A container bundles the application code and its dependencies so it runs reliably from one computing environment to another. That portability is the main reason teams adopt containers."
+    theoryUrl: https://docs.aws.amazon.com/lightsail/latest/userguide/what-is-amazon-lightsail.html
+    options:
+      - { text: "A full guest operating system and a hypervisor", correct: false }
+      - { text: "Only the application's database", correct: false }
+      - { text: "The physical server and its network cables", correct: false }
+      - { text: "The application code and its dependencies", correct: true }
+  - type: single
+    prompt: "A user uploads an image to an S3 bucket and you want a small piece of code to run automatically to create a thumbnail, with no servers to manage. What should you use?"
+    explanation: "Lambda is event-driven: an S3 upload event can trigger a function directly. You pay only while the function runs."
+    theoryUrl: https://docs.aws.amazon.com/lambda/latest/dg/welcome.html
+    options:
+      - { text: "A long-running EC2 instance polling the bucket", correct: false }
+      - { text: "An AWS Lambda function triggered by the S3 event", correct: true }
+      - { text: "An Amazon EKS cluster", correct: false }
+      - { text: "Amazon ECR", correct: false }
+  - type: single
+    prompt: "You run containers on Amazon ECS and want to pick the instance types and manage the cluster capacity yourself. Which capacity option is that?"
+    explanation: "With ECS on EC2 instances you choose the instance type and number of instances and manage the capacity. Fargate removes that work."
+    theoryUrl: https://docs.aws.amazon.com/AmazonECS/latest/developerguide/Welcome.html
+    options:
+      - { text: "AWS Fargate", correct: false }
+      - { text: "ECS on Amazon EC2 instances", correct: true }
+      - { text: "AWS Lambda", correct: false }
+      - { text: "Amazon ECR Public", correct: false }
+  - type: single
+    prompt: "Which service runs your container workloads while you only specify CPU and memory per task, and never choose server types or decide when to scale a cluster?"
+    explanation: "Fargate removes the need to choose server types, decide when to scale clusters or optimize cluster packing. With ECS on EC2 you still own that."
+    theoryUrl: https://docs.aws.amazon.com/AmazonECS/latest/developerguide/AWS_Fargate.html
+    options:
+      - { text: "Amazon ECS on EC2 instances that you manage", correct: false }
+      - { text: "Amazon EC2 with Docker installed by hand", correct: false }
+      - { text: "Amazon ECS with the Fargate capacity option", correct: true }
+      - { text: "AWS Snowball Edge", correct: false }
+  - type: single
+    prompt: "A developer wants to go from source code or a container image straight to a scalable web application, without deciding which compute service to use or configuring infrastructure. Which service is built for that?"
+    explanation: "AWS App Runner deploys from source code or a container image to a scalable web app. Note that AWS has stopped onboarding new customers to App Runner and recommends ECS Express Mode for them."
+    theoryUrl: https://docs.aws.amazon.com/apprunner/latest/dg/what-is-apprunner.html
+    options:
+      - { text: "AWS App Runner", correct: true }
+      - { text: "AWS Direct Connect", correct: false }
+      - { text: "Amazon ECR", correct: false }
+      - { text: "AWS Config", correct: false }
+  - type: multi
+    prompt: "Which of the following can trigger an AWS Lambda function? (Select three)"
+    explanation: "Lambda connects to many event sources, including API Gateway, S3, SQS and EventBridge. AWS Artifact and security group rules are not event sources."
+    theoryUrl: https://docs.aws.amazon.com/lambda/latest/dg/welcome.html
+    options:
+      - { text: "Amazon API Gateway", correct: true }
+      - { text: "Amazon S3", correct: true }
+      - { text: "AWS Artifact", correct: false }
+      - { text: "Amazon SQS", correct: true }
+      - { text: "An EC2 security group rule", correct: false }
+  - type: multi
+    prompt: "Which are capacity options for running Amazon ECS tasks? (Select two)"
+    explanation: "ECS can run on EC2 instances you manage or on serverless Fargate. Lambda layers and Lightsail instances are not ECS capacity."
+    theoryUrl: https://docs.aws.amazon.com/AmazonECS/latest/developerguide/Welcome.html
+    options:
+      - { text: "AWS Lambda layers", correct: false }
+      - { text: "Amazon Lightsail instances", correct: false }
+      - { text: "Amazon EC2 instances", correct: true }
+      - { text: "AWS Fargate", correct: true }
+  - type: multi
+    prompt: "Which are benefits of running containers on AWS Fargate? (Select two)"
+    explanation: "Fargate means no servers or clusters to provision and scale, and each task has its own isolation boundary. Choosing instance types and patching hosts is what you do on EC2."
+    theoryUrl: https://docs.aws.amazon.com/AmazonECS/latest/developerguide/AWS_Fargate.html
+    options:
+      - { text: "You choose the EC2 instance type for each task", correct: false }
+      - {
+          text: "No servers or clusters of EC2 instances to provision, configure or scale",
+          correct: true,
+        }
+      - { text: "You patch the host operating system yourself", correct: false }
+      - { text: "Each task has its own isolation boundary", correct: true }
+  - type: multi
+    prompt: "Which services are directly related to running or storing container workloads on AWS? (Select three)"
+    explanation: "ECS and EKS run containers, and ECR stores their images. Direct Connect is networking and CloudFront is a CDN."
+    theoryUrl: https://docs.aws.amazon.com/AmazonECR/latest/userguide/what-is-ecr.html
+    options:
+      - { text: "Amazon ECS", correct: true }
+      - { text: "AWS Direct Connect", correct: false }
+      - { text: "Amazon ECR", correct: true }
+      - { text: "Amazon CloudFront", correct: false }
+      - { text: "Amazon EKS", correct: true }
+  - type: boolean
+    prompt: "To use AWS Lambda you must first provision and patch EC2 instances to host your functions."
+    answer: false
+    explanation: "Lambda is serverless: AWS manages the infrastructure, including capacity, scaling and patching."
+    theoryUrl: https://docs.aws.amazon.com/lambda/latest/dg/welcome.html
+  - type: boolean
+    prompt: "AWS Fargate can be used with Amazon ECS to run containers without managing servers."
+    answer: true
+    explanation: "Fargate is the serverless capacity option for ECS tasks and services."
+    theoryUrl: https://docs.aws.amazon.com/AmazonECS/latest/developerguide/AWS_Fargate.html
+  - type: boolean
+    prompt: "Amazon EKS is certified Kubernetes-conformant, so Kubernetes-compatible applications can be deployed without refactoring."
+    answer: true
+    explanation: "EKS is a managed Kubernetes service that is certified conformant, so community tooling and plugins keep working."
+    theoryUrl: https://docs.aws.amazon.com/eks/latest/userguide/what-is-eks.html
+  - type: boolean
+    prompt: "With AWS Lambda you keep paying a fixed amount even when your function is idle."
+    answer: false
+    explanation: "Lambda uses pay-per-use billing based on requests and execution duration, with no upfront commitment."
+    theoryUrl: https://docs.aws.amazon.com/lambda/latest/dg/welcome.html

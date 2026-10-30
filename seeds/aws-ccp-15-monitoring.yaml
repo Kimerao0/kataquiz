@@ -1,0 +1,181 @@
+version: 1
+title: "AWS Cloud Practitioner 15: Monitoring workloads"
+description: "CloudWatch, CloudTrail, AWS Config, X-Ray and the AWS Health Dashboard, and how to tell them apart."
+language: en
+tags: [aws, cloud-practitioner, monitoring, observability]
+run:
+  questionsPerRun: 10
+  maxErrors: 3
+  timePerQuestionSec: 45
+questions:
+  - type: single
+    prompt: "Which service collects metrics and logs from your AWS resources and applications and lets you build dashboards and alarms?"
+    explanation: "Amazon CloudWatch monitors resources and applications in real time with metrics, logs, alarms and dashboards."
+    theoryUrl: https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/WhatIsCloudWatch.html
+    options:
+      - { text: "Amazon CloudWatch", correct: true }
+      - { text: "AWS CloudTrail", correct: false }
+      - { text: "AWS Artifact", correct: false }
+      - { text: "AWS CloudFormation", correct: false }
+  - type: single
+    prompt: "Which service records actions taken by a user, role or AWS service in your account, such as API calls made from the console, CLI or SDKs?"
+    explanation: "CloudTrail records account activity as events, so you can identify who or what took which action, on which resource and when."
+    theoryUrl: https://docs.aws.amazon.com/awscloudtrail/latest/userguide/cloudtrail-user-guide.html
+    options:
+      - { text: "Amazon CloudWatch", correct: false }
+      - { text: "AWS X-Ray", correct: false }
+      - { text: "AWS Config", correct: false }
+      - { text: "AWS CloudTrail", correct: true }
+  - type: single
+    prompt: "Which service shows how your AWS resources were configured in the past and evaluates them against compliance rules?"
+    explanation: "AWS Config gives a detailed view of resource configurations and how they changed over time, and AWS Config rules flag resources as noncompliant."
+    theoryUrl: https://docs.aws.amazon.com/config/latest/developerguide/WhatIsConfig.html
+    options:
+      - { text: "AWS CloudTrail", correct: false }
+      - { text: "AWS Config", correct: true }
+      - { text: "Amazon CloudWatch Logs", correct: false }
+      - { text: "AWS X-Ray", correct: false }
+  - type: single
+    prompt: "Someone deleted a security group yesterday and you need to find out which IAM user did it. Where do you look?"
+    explanation: "This is a who did what question, which CloudTrail answers. CloudWatch shows metrics and logs, and Config would show the configuration change, but not who made the API call."
+    theoryUrl: https://docs.aws.amazon.com/awscloudtrail/latest/userguide/cloudtrail-user-guide.html
+    options:
+      - { text: "AWS CloudTrail event history", correct: true }
+      - { text: "CloudWatch metrics for EC2", correct: false }
+      - { text: "AWS X-Ray service map", correct: false }
+      - { text: "AWS Health Dashboard", correct: false }
+  - type: single
+    prompt: "You want to be emailed when the CPU utilization of an EC2 instance stays above a threshold. What do you set up?"
+    explanation: "A CloudWatch alarm watches a metric against a threshold and can send a notification to an SNS topic, which then emails you."
+    theoryUrl: https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/AlarmThatSendsEmail.html
+    options:
+      - { text: "An AWS Config rule", correct: false }
+      - { text: "A CloudWatch alarm that notifies an SNS topic", correct: true }
+      - { text: "A CloudTrail trail", correct: false }
+      - { text: "An X-Ray sampling rule", correct: false }
+  - type: single
+    prompt: "You need to see what a security group's rules looked like last month and check whether it is compliant with a rule that forbids open SSH access. Which service?"
+    explanation: "AWS Config keeps configuration history and evaluates resources with rules. This configuration history and compliance question is the Config use case."
+    theoryUrl: https://docs.aws.amazon.com/config/latest/developerguide/WhatIsConfig.html
+    options:
+      - { text: "Amazon CloudWatch dashboards", correct: false }
+      - { text: "AWS Health Dashboard", correct: false }
+      - { text: "AWS Config", correct: true }
+      - { text: "Amazon SNS", correct: false }
+  - type: single
+    prompt: "How much management event history does the CloudTrail Event history give you automatically when you create an account?"
+    explanation: "Event history is a viewable, searchable record of the past 90 days of management events in a Region, available automatically with no CloudTrail charge for viewing it."
+    theoryUrl: https://docs.aws.amazon.com/awscloudtrail/latest/userguide/cloudtrail-user-guide.html
+    options:
+      - { text: "The past 24 hours", correct: false }
+      - { text: "The past 7 days", correct: false }
+      - { text: "Unlimited history", correct: false }
+      - { text: "The past 90 days", correct: true }
+  - type: single
+    prompt: "You want to keep CloudTrail events beyond the default Event history window, delivered to an Amazon S3 bucket. What do you create?"
+    explanation: "A trail delivers and stores events in an S3 bucket, with optional delivery to CloudWatch Logs and EventBridge."
+    theoryUrl: https://docs.aws.amazon.com/awscloudtrail/latest/userguide/cloudtrail-user-guide.html
+    options:
+      - { text: "A CloudWatch dashboard", correct: false }
+      - { text: "An AWS Config aggregator", correct: false }
+      - { text: "An X-Ray group", correct: false }
+      - { text: "A CloudTrail trail", correct: true }
+  - type: single
+    prompt: "Users report that requests to your microservices application are slow, and you want to follow a request across services to find the bottleneck. Which service helps?"
+    explanation: "AWS X-Ray collects trace data about requests and builds a trace map of client, front-end and backend services, so you can spot latency bottlenecks."
+    theoryUrl: https://docs.aws.amazon.com/xray/latest/devguide/aws-xray.html
+    options:
+      - { text: "AWS Config", correct: false }
+      - { text: "AWS X-Ray", correct: true }
+      - { text: "AWS CloudTrail", correct: false }
+      - { text: "AWS Health Dashboard", correct: false }
+  - type: single
+    prompt: "Where do you collect and query the log output of your applications, for example from EC2 instances or Lambda functions?"
+    explanation: "CloudWatch Logs stores logs in log groups and streams, and CloudWatch Logs Insights lets you query them interactively."
+    theoryUrl: https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/WhatIsCloudWatch.html
+    options:
+      - { text: "AWS Config", correct: false }
+      - { text: "AWS Artifact", correct: false }
+      - { text: "Amazon CloudWatch Logs", correct: true }
+      - { text: "Amazon Route 53", correct: false }
+  - type: single
+    prompt: "Which service gives you a personalized view of AWS service events that may affect the resources in your account, with no setup required?"
+    explanation: "The AWS Health Dashboard is available to all customers, requires no setup, and shows events that affect your applications and resources."
+    theoryUrl: https://docs.aws.amazon.com/health/latest/ug/what-is-aws-health.html
+    options:
+      - { text: "AWS Health Dashboard", correct: true }
+      - { text: "AWS Config rules", correct: false }
+      - { text: "CloudTrail Lake", correct: false }
+      - { text: "Amazon Inspector", correct: false }
+  - type: single
+    prompt: "Which CloudWatch feature provides a unified view of your metrics and logs in a single place?"
+    explanation: "CloudWatch dashboards visualize metrics and logs together, and can be shared across accounts and Regions."
+    theoryUrl: https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/WhatIsCloudWatch.html
+    options:
+      - { text: "CloudWatch dashboards", correct: true }
+      - { text: "CloudTrail trails", correct: false }
+      - { text: "Config conformance packs", correct: false }
+      - { text: "X-Ray daemons", correct: false }
+  - type: multi
+    prompt: "Which are capabilities of Amazon CloudWatch? (Select three)"
+    explanation: "CloudWatch offers metrics, alarms and dashboards. Auditing who called an API is CloudTrail, and configuration history is AWS Config."
+    theoryUrl: https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/WhatIsCloudWatch.html
+    options:
+      - { text: "Metrics", correct: true }
+      - { text: "Auditing which user made each API call", correct: false }
+      - { text: "Alarms", correct: true }
+      - { text: "Recording the configuration history of resources", correct: false }
+      - { text: "Dashboards", correct: true }
+  - type: multi
+    prompt: "Which kinds of activity does AWS CloudTrail record? (Select three)"
+    explanation: "CloudTrail records actions taken in the console, with the CLI and through SDKs and APIs. CPU utilization is a CloudWatch metric, and request traces belong to X-Ray."
+    theoryUrl: https://docs.aws.amazon.com/awscloudtrail/latest/userguide/cloudtrail-user-guide.html
+    options:
+      - { text: "Actions taken in the AWS Management Console", correct: true }
+      - { text: "CPU utilization of EC2 instances", correct: false }
+      - { text: "Actions taken with the AWS CLI", correct: true }
+      - { text: "Latency traces between microservices", correct: false }
+      - { text: "Actions taken through AWS SDKs and APIs", correct: true }
+  - type: multi
+    prompt: "Which are features of AWS Config? (Select three)"
+    explanation: "Config records resource configurations over time, evaluates them with rules and can aggregate data across accounts and Regions. API call auditing is CloudTrail and request tracing is X-Ray."
+    theoryUrl: https://docs.aws.amazon.com/config/latest/developerguide/WhatIsConfig.html
+    options:
+      - { text: "Configuration history of resources", correct: true }
+      - { text: "Compliance evaluation with Config rules", correct: true }
+      - { text: "Auditing the API calls of each user", correct: false }
+      - { text: "Aggregating data from multiple accounts and Regions", correct: true }
+      - { text: "Tracing requests between services", correct: false }
+  - type: multi
+    prompt: "Which statements about the AWS Health Dashboard are true? (Select three)"
+    explanation: "It is available to all customers at no additional cost, needs no setup, and AWS Health events can be received through EventBridge. It does not need an agent."
+    theoryUrl: https://docs.aws.amazon.com/health/latest/ug/what-is-aws-health.html
+    options:
+      - { text: "It requires no setup for authenticated AWS users", correct: true }
+      - { text: "You must install an agent on every EC2 instance", correct: false }
+      - { text: "It is available to all customers at no additional cost", correct: true }
+      - { text: "AWS Health events can be received through Amazon EventBridge", correct: true }
+      - {
+          text: "It only shows global status and never events affecting your account",
+          correct: false,
+        }
+  - type: boolean
+    prompt: "A CloudWatch alarm can trigger an Amazon EC2 action or an Auto Scaling action when a metric breaches a threshold."
+    answer: true
+    explanation: "A metric alarm can send an SNS notification, perform EC2 actions or Auto Scaling actions, among others."
+    theoryUrl: https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/AlarmThatSendsEmail.html
+  - type: boolean
+    prompt: "AWS Config tells you which IAM user made a specific API call."
+    answer: false
+    explanation: "That is CloudTrail. Config tracks resource configurations and compliance, not who called the API."
+    theoryUrl: https://docs.aws.amazon.com/config/latest/developerguide/WhatIsConfig.html
+  - type: boolean
+    prompt: "The CloudTrail Event history is available automatically when you create your AWS account."
+    answer: true
+    explanation: "You automatically have access to Event history, which covers the past 90 days of management events in a Region."
+    theoryUrl: https://docs.aws.amazon.com/awscloudtrail/latest/userguide/cloudtrail-user-guide.html
+  - type: boolean
+    prompt: "CloudWatch keeps your metric data forever."
+    answer: false
+    explanation: "Metrics expire automatically after 15 months if no new data is published, and older data points are aggregated and then dropped."
+    theoryUrl: https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/cloudwatch_concepts.html

@@ -1,0 +1,193 @@
+version: 1
+title: "AWS Cloud Practitioner 14: App integration with SQS, SNS and EventBridge"
+description: "Decoupling applications with SQS queues, SNS topics, EventBridge, Step Functions and Amazon MQ."
+language: en
+tags: [aws, cloud-practitioner, integration, messaging]
+run:
+  questionsPerRun: 10
+  maxErrors: 3
+  timePerQuestionSec: 45
+questions:
+  - type: single
+    prompt: "Why would you put an Amazon SQS queue between two components of an application?"
+    explanation: "A queue decouples the sending and receiving components, so they do not need to be available at the same time and can scale independently."
+    theoryUrl: https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/welcome.html
+    options:
+      - {
+          text: "To decouple them so they do not have to be available at the same time",
+          correct: true,
+        }
+      - { text: "To encrypt the database at rest", correct: false }
+      - { text: "To assign public IP addresses to both components", correct: false }
+      - { text: "To make both components run in the same Availability Zone", correct: false }
+  - type: single
+    prompt: "How do consumers get messages from an Amazon SQS queue?"
+    explanation: "SQS uses a polling model: consumers pull messages from the queue. SNS, in contrast, pushes messages to subscribers."
+    theoryUrl: https://docs.aws.amazon.com/sns/latest/dg/sns-sqs-as-subscriber.html
+    options:
+      - { text: "SQS pushes each message to every consumer automatically", correct: false }
+      - { text: "Consumers poll the queue to pull messages", correct: true }
+      - { text: "Consumers receive messages by email", correct: false }
+      - { text: "Messages are copied into each consumer's S3 bucket", correct: false }
+  - type: single
+    prompt: "An application must process commands in exactly the order they were sent, and avoid duplicates. Which queue type fits?"
+    explanation: "FIFO queues deliver messages in order within each message group and support exactly-once processing. Standard queues only offer best-effort ordering and at-least-once delivery."
+    theoryUrl: https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-queue-types.html
+    options:
+      - { text: "SQS standard queue", correct: false }
+      - { text: "SNS topic", correct: false }
+      - { text: "SQS FIFO queue", correct: true }
+      - { text: "Amazon EventBridge schedule", correct: false }
+  - type: single
+    prompt: "An SQS standard queue can occasionally deliver the same message more than once. What is the delivery guarantee called?"
+    explanation: "Standard queues guarantee at-least-once delivery, so applications should be designed to handle duplicates (idempotent processing)."
+    theoryUrl: https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-queue-types.html
+    options:
+      - { text: "At-most-once delivery", correct: false }
+      - { text: "At-least-once delivery", correct: true }
+      - { text: "Never-twice delivery", correct: false }
+      - { text: "Exactly-once delivery", correct: false }
+  - type: single
+    prompt: "What does the SQS visibility timeout do?"
+    explanation: "After a consumer receives a message, it stays in the queue but is hidden from other consumers for the visibility timeout. If it is not deleted in time, it becomes visible again."
+    theoryUrl: https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-visibility-timeout.html
+    options:
+      - { text: "It deletes the message after a fixed time", correct: false }
+      - { text: "It encrypts the message for a limited time", correct: false }
+      - { text: "It limits how long a consumer may stay connected to AWS", correct: false }
+      - {
+          text: "It hides a received message from other consumers while it is being processed",
+          correct: true,
+        }
+  - type: single
+    prompt: "What is an SQS dead-letter queue (DLQ) used for?"
+    explanation: "A source queue can send messages that were not processed successfully to a DLQ, so you can isolate them and find out why processing failed."
+    theoryUrl: https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-dead-letter-queues.html
+    options:
+      - {
+          text: "To store messages that could not be processed successfully, for debugging",
+          correct: true,
+        }
+      - { text: "To make a queue faster", correct: false }
+      - { text: "To send emails to customers", correct: false }
+      - { text: "To archive queue messages into Glacier automatically", correct: false }
+  - type: single
+    prompt: "Which service lets a publisher send one message to a topic and have it delivered to many subscribers?"
+    explanation: "Amazon SNS is a pub/sub service. Publishers send messages to a topic, and SNS delivers them to all subscribers."
+    theoryUrl: https://docs.aws.amazon.com/sns/latest/dg/welcome.html
+    options:
+      - { text: "Amazon SQS", correct: false }
+      - { text: "AWS Step Functions", correct: false }
+      - { text: "Amazon SNS", correct: true }
+      - { text: "Amazon EBS", correct: false }
+  - type: single
+    prompt: "A new order must be sent to a fulfillment queue, an analytics queue and a notification queue at the same time. Which pattern fits?"
+    explanation: "Fanout: publish once to an SNS topic and subscribe multiple SQS queues to it. Each queue gets an identical copy of the message."
+    theoryUrl: https://docs.aws.amazon.com/sns/latest/dg/welcome.html
+    options:
+      - {
+          text: "Publish to an SNS topic with several SQS queues subscribed (fanout)",
+          correct: true,
+        }
+      - {
+          text: "Use one SQS queue and have all three consumers delete the same message",
+          correct: false,
+        }
+      - { text: "Use a CloudWatch alarm", correct: false }
+      - { text: "Use AWS Config rules", correct: false }
+  - type: single
+    prompt: "You want to send an order confirmation to customers by email and SMS. Which service is the best fit?"
+    explanation: "SNS supports application-to-person messaging, delivering to email, SMS and mobile push, as well as application-to-application endpoints."
+    theoryUrl: https://docs.aws.amazon.com/sns/latest/dg/welcome.html
+    options:
+      - { text: "Amazon SQS", correct: false }
+      - { text: "Amazon SNS", correct: true }
+      - { text: "Amazon ECR", correct: false }
+      - { text: "AWS Step Functions", correct: false }
+  - type: single
+    prompt: "Which service uses an event bus and rules to route events from AWS services, your own apps and SaaS providers to targets such as Lambda?"
+    explanation: "Amazon EventBridge is a serverless event bus. Rules match incoming events and send them to targets. EventBridge Scheduler also supports cron and rate schedules."
+    theoryUrl: https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-what-is.html
+    options:
+      - { text: "Amazon EventBridge", correct: true }
+      - { text: "Amazon Lightsail", correct: false }
+      - { text: "AWS Artifact", correct: false }
+      - { text: "Amazon Inspector", correct: false }
+  - type: single
+    prompt: "Which service lets you build a workflow of steps, also called a state machine, that orchestrates Lambda functions and other AWS services?"
+    explanation: "AWS Step Functions creates workflows (state machines) made of states, where each Task state does a unit of work such as calling a Lambda function or another AWS service."
+    theoryUrl: https://docs.aws.amazon.com/step-functions/latest/dg/welcome.html
+    options:
+      - { text: "Amazon SNS", correct: false }
+      - { text: "Amazon SQS", correct: false }
+      - { text: "AWS Step Functions", correct: true }
+      - { text: "Amazon Route 53", correct: false }
+  - type: single
+    prompt: "A company runs an on-premises Apache ActiveMQ broker and wants to move it to AWS without rewriting its messaging code. Which service fits?"
+    explanation: "Amazon MQ is a managed broker for ActiveMQ and RabbitMQ that supports standard protocols, so existing brokers can migrate without rewriting messaging code."
+    theoryUrl: https://docs.aws.amazon.com/amazon-mq/latest/developer-guide/welcome.html
+    options:
+      - { text: "Amazon SNS", correct: false }
+      - { text: "Amazon MQ", correct: true }
+      - { text: "Amazon SQS", correct: false }
+      - { text: "AWS Lambda", correct: false }
+  - type: multi
+    prompt: "Which of the following can be subscribers (endpoints) of an Amazon SNS topic? (Select three)"
+    explanation: "SNS can deliver to SQS queues, Lambda functions, email, SMS, HTTP(S) endpoints and more. It cannot deliver into an RDS table or an EBS volume."
+    theoryUrl: https://docs.aws.amazon.com/sns/latest/dg/welcome.html
+    options:
+      - { text: "Amazon SQS queue", correct: true }
+      - { text: "A table in Amazon RDS", correct: false }
+      - { text: "AWS Lambda function", correct: true }
+      - { text: "An Amazon EBS volume", correct: false }
+      - { text: "Email address", correct: true }
+  - type: multi
+    prompt: "Which of these are part of Amazon EventBridge? (Select three)"
+    explanation: "EventBridge has event buses, rules that match events to targets, and EventBridge Scheduler for cron, rate and one-time schedules. Message groups and visibility timeouts are SQS concepts."
+    theoryUrl: https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-what-is.html
+    options:
+      - { text: "Event buses", correct: true }
+      - { text: "FIFO message groups", correct: false }
+      - { text: "Rules that route events to targets", correct: true }
+      - { text: "SQS visibility timeout", correct: false }
+      - { text: "EventBridge Scheduler", correct: true }
+  - type: multi
+    prompt: "Which are features of Amazon SQS? (Select three)"
+    explanation: "SQS offers standard and FIFO queues, a visibility timeout and dead-letter queues. Pub/sub topics and push delivery to HTTP endpoints are SNS features."
+    theoryUrl: https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/welcome.html
+    options:
+      - { text: "Standard and FIFO queue types", correct: true }
+      - { text: "Pub/sub topics with email subscribers", correct: false }
+      - { text: "Visibility timeout", correct: true }
+      - { text: "Push delivery to HTTP endpoints", correct: false }
+      - { text: "Dead-letter queues", correct: true }
+  - type: multi
+    prompt: "Which statements about AWS Step Functions are true? (Select three)"
+    explanation: "Step Functions orchestrates AWS services as workflows, which are state machines, and its console lets you visualize them. It is not a JMS message broker nor a message queue."
+    theoryUrl: https://docs.aws.amazon.com/step-functions/latest/dg/welcome.html
+    options:
+      - { text: "It orchestrates multiple AWS services into a workflow", correct: true }
+      - { text: "Its workflows are state machines made of states", correct: true }
+      - { text: "It is a JMS message broker", correct: false }
+      - { text: "You can visualize and debug workflows in the console", correct: true }
+      - { text: "It is a persistent queue that holds messages for consumers", correct: false }
+  - type: boolean
+    prompt: "Amazon SNS pushes messages to its subscribers, while Amazon SQS relies on consumers polling for messages."
+    answer: true
+    explanation: "SNS uses a push mechanism and SQS uses a polling model. Combining them is a common pattern."
+    theoryUrl: https://docs.aws.amazon.com/sns/latest/dg/sns-sqs-as-subscriber.html
+  - type: boolean
+    prompt: "SQS standard queues guarantee strict first-in-first-out ordering."
+    answer: false
+    explanation: "Standard queues offer best-effort ordering. Use a FIFO queue when strict ordering matters."
+    theoryUrl: https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-queue-types.html
+  - type: boolean
+    prompt: "For a brand new application, AWS recommends Amazon MQ over SQS and SNS as the default choice."
+    answer: false
+    explanation: "SQS and SNS are recommended for new applications. Amazon MQ is recommended when migrating from existing message brokers that rely on protocols such as AMQP, MQTT or JMS."
+    theoryUrl: https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/welcome.html
+  - type: boolean
+    prompt: "If an SQS consumer does not delete a message before the visibility timeout expires, the message becomes visible again and can be received by another consumer."
+    answer: true
+    explanation: "This is how SQS avoids losing messages when a consumer fails mid-processing. The consumer should delete the message after processing it successfully."
+    theoryUrl: https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-visibility-timeout.html

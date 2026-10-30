@@ -1,0 +1,187 @@
+version: 1
+title: "AWS Cloud Practitioner 10: Global networking and content delivery"
+description: "Route 53 DNS and routing policies, CloudFront, Global Accelerator, and the AWS edge and hybrid offerings: Local Zones, Wavelength and Outposts."
+language: en
+tags: [aws, cloud-practitioner, networking, route53, cloudfront]
+run:
+  questionsPerRun: 10
+  maxErrors: 3
+  timePerQuestionSec: 45
+questions:
+  - type: single
+    prompt: "Which set of functions can Amazon Route 53 perform?"
+    explanation: "Route 53 is a highly available and scalable DNS web service that does domain registration, DNS routing and health checking, in any combination."
+    theoryUrl: https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/Welcome.html
+    options:
+      - { text: "Content caching, DDoS scrubbing and object storage", correct: false }
+      - { text: "Domain registration, DNS routing and health checking", correct: true }
+      - { text: "Load balancing at layer 7, auto scaling and instance launching", correct: false }
+      - { text: "Private network connections, VPN and packet inspection", correct: false }
+  - type: single
+    prompt: "You want Route 53 to send 70 percent of traffic to one resource and 30 percent to another, for example to test a new version. Which routing policy do you use?"
+    explanation: "Weighted routing sends traffic to multiple resources in proportions that you specify."
+    theoryUrl: https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/routing-policy.html
+    options:
+      - { text: "Weighted routing", correct: true }
+      - { text: "Latency routing", correct: false }
+      - { text: "Failover routing", correct: false }
+      - { text: "Simple routing", correct: false }
+  - type: single
+    prompt: "Your application runs in several AWS Regions. Which Route 53 routing policy sends each user to the Region that gives the best response time?"
+    explanation: "Latency routing is for resources in multiple AWS Regions, and routes traffic to the Region that provides the best latency."
+    theoryUrl: https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/routing-policy.html
+    options:
+      - { text: "Weighted routing", correct: false }
+      - { text: "Geolocation routing", correct: false }
+      - { text: "Latency routing", correct: true }
+      - { text: "Simple routing", correct: false }
+  - type: single
+    prompt: "You want an active-passive setup: traffic goes to the primary site and only goes to a standby site if the primary is unhealthy. Which Route 53 routing policy fits?"
+    explanation: "Failover routing is for active-passive failover, and it relies on Route 53 health checks to detect an unhealthy primary."
+    theoryUrl: https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/routing-policy.html
+    options:
+      - { text: "Weighted routing", correct: false }
+      - { text: "Geolocation routing", correct: false }
+      - { text: "Latency routing", correct: false }
+      - { text: "Failover routing", correct: true }
+  - type: single
+    prompt: "A company wants to send users in France to a French-language site and users in Germany to a German-language site. Which Route 53 routing policy bases decisions on where the user is located?"
+    explanation: "Geolocation routing routes traffic based on the location of your users. Latency routing is about response time, not user location."
+    theoryUrl: https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/routing-policy.html
+    options:
+      - { text: "Latency routing", correct: false }
+      - { text: "Geolocation routing", correct: true }
+      - { text: "Weighted routing", correct: false }
+      - { text: "Failover routing", correct: false }
+  - type: single
+    prompt: "How does Route 53 know when to fail over to a healthy resource?"
+    explanation: "Route 53 health checks send automated requests to a resource to verify that it is reachable and healthy. With DNS failover configured, Route 53 routes traffic away from unhealthy resources."
+    theoryUrl: https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/dns-failover.html
+    options:
+      - { text: "It reads the CPU graphs of each EC2 instance in the console", correct: false }
+      - { text: "It waits for the DNS TTL of the record to expire", correct: false }
+      - { text: "It uses Route 53 health checks that monitor the resource", correct: true }
+      - { text: "It asks the S3 bucket for its status", correct: false }
+  - type: single
+    prompt: "What is Amazon CloudFront?"
+    explanation: "CloudFront is a content delivery network (CDN). It caches copies of your content in edge locations around the world, so users get lower latency and higher transfer rates."
+    theoryUrl: https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/Introduction.html
+    options:
+      - { text: "A managed relational database service", correct: false }
+      - { text: "A DNS service that registers domain names", correct: false }
+      - { text: "A service that launches EC2 instances at the edge", correct: false }
+      - {
+          text: "A content delivery network that serves cached content from edge locations",
+          correct: true,
+        }
+  - type: single
+    prompt: "In CloudFront, what is an origin?"
+    explanation: "An origin is where CloudFront gets the definitive version of your content, such as an Amazon S3 bucket or an HTTP server (for example a web server on EC2)."
+    theoryUrl: https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/Introduction.html
+    options:
+      - { text: "The source of the content, such as an S3 bucket or an HTTP server", correct: true }
+      - { text: "The edge location closest to the viewer", correct: false }
+      - { text: "The Region where the CloudFront distribution is billed", correct: false }
+      - { text: "The domain name that CloudFront assigns to a distribution", correct: false }
+  - type: single
+    prompt: "A viewer requests a file, but the nearest CloudFront edge location does not have it cached. What does CloudFront do?"
+    explanation: "On a cache miss CloudFront retrieves the file from the origin you defined, serves it, and keeps a cached copy at the edge location for later requests."
+    theoryUrl: https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/Introduction.html
+    options:
+      - { text: "It returns an error to the viewer", correct: false }
+      - { text: "It retrieves the file from the origin", correct: true }
+      - { text: "It asks the viewer to try a different edge location", correct: false }
+      - { text: "It looks the file up in Amazon Route 53", correct: false }
+  - type: single
+    prompt: "A global application needs two static IP addresses as a fixed entry point, with traffic sent over the AWS global network to the nearest healthy Regional endpoint. Which service provides this?"
+    explanation: "AWS Global Accelerator provides static anycast IP addresses and routes traffic over the AWS global network to optimal healthy endpoints such as Application or Network Load Balancers. CloudFront is for caching content."
+    theoryUrl: https://docs.aws.amazon.com/global-accelerator/latest/dg/what-is-global-accelerator.html
+    options:
+      - { text: "Amazon CloudFront", correct: false }
+      - { text: "Amazon Route 53", correct: false }
+      - { text: "AWS Direct Connect", correct: false }
+      - { text: "AWS Global Accelerator", correct: true }
+  - type: single
+    prompt: "Which AWS offering places compute, storage and database resources close to large population and industry centers, to give users low-latency access to applications?"
+    explanation: "AWS Local Zones places select AWS resources close to large population and industry centers, for use cases like real-time gaming, live streaming and virtual workstations."
+    theoryUrl: https://docs.aws.amazon.com/local-zones/latest/ug/what-is-aws-local-zones.html
+    options:
+      - { text: "AWS Local Zones", correct: true }
+      - { text: "AWS Outposts", correct: false }
+      - { text: "Amazon S3 Glacier", correct: false }
+      - { text: "AWS Direct Connect", correct: false }
+  - type: single
+    prompt: "Which AWS offering deploys compute and storage at the edge of communications service providers' networks, to give mobile devices and end users very low latency?"
+    explanation: "AWS Wavelength deploys AWS compute and storage in Wavelength Zones at the edge of communications service provider networks. A Wavelength Zone is a logical extension of an AWS Region."
+    theoryUrl: https://docs.aws.amazon.com/wavelength/latest/developerguide/what-is-wavelength.html
+    options:
+      - { text: "AWS Local Zones", correct: false }
+      - { text: "Amazon CloudFront", correct: false }
+      - { text: "AWS Wavelength", correct: true }
+      - { text: "AWS Global Accelerator", correct: false }
+  - type: multi
+    prompt: "Which of these are Amazon Route 53 routing policies?"
+    explanation: "Weighted, latency and geolocation are real Route 53 routing policies, alongside simple, failover, geoproximity, IP-based and multivalue answer. Throughput-based and cost-based routing do not exist."
+    theoryUrl: https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/routing-policy.html
+    options:
+      - { text: "Throughput-based routing", correct: false }
+      - { text: "Weighted routing", correct: true }
+      - { text: "Latency routing", correct: true }
+      - { text: "Cost-based routing", correct: false }
+      - { text: "Geolocation routing", correct: true }
+  - type: multi
+    prompt: "Which services use the AWS edge network (edge locations) to speed up access for users around the world?"
+    explanation: "CloudFront caches content in edge locations, S3 Transfer Acceleration uses CloudFront edge locations to speed uploads, and Global Accelerator's static IPs are anycast from the AWS edge network. EBS is block storage inside an Availability Zone."
+    theoryUrl: https://docs.aws.amazon.com/AmazonS3/latest/userguide/transfer-acceleration.html
+    options:
+      - { text: "Amazon CloudFront", correct: true }
+      - { text: "Amazon EBS", correct: false }
+      - { text: "Amazon S3 Transfer Acceleration", correct: true }
+      - { text: "AWS Global Accelerator", correct: true }
+  - type: multi
+    prompt: "Which statements about AWS Outposts are true?"
+    explanation: "Outposts extends AWS infrastructure, services, APIs and tools to customer premises, and AWS operates and manages the capacity as part of an AWS Region. You can run resources such as EC2 instances and EBS volumes on it."
+    theoryUrl: https://docs.aws.amazon.com/outposts/latest/userguide/what-is-outposts.html
+    options:
+      - {
+          text: "It extends AWS infrastructure, services and APIs to your own premises",
+          correct: true,
+        }
+      - { text: "You can run resources such as EC2 instances and EBS volumes on it", correct: true }
+      - {
+          text: "AWS operates, monitors and manages the capacity as part of an AWS Region",
+          correct: true,
+        }
+      - {
+          text: "It is a standalone product that has no relation to any AWS Region",
+          correct: false,
+        }
+  - type: multi
+    prompt: "What can a Route 53 health check monitor?"
+    explanation: "A health check can monitor a specified resource such as a web server, the status of other health checks, or the status of a CloudWatch alarm. It does not inspect the contents of S3 objects."
+    theoryUrl: https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/dns-failover.html
+    options:
+      - { text: "The health of a specified resource, such as a web server", correct: true }
+      - { text: "The contents of the objects stored in an S3 bucket", correct: false }
+      - { text: "The status of other health checks", correct: true }
+      - { text: "The status of an Amazon CloudWatch alarm", correct: true }
+  - type: boolean
+    prompt: "Amazon CloudFront caches copies of your content in edge locations around the world."
+    answer: true
+    explanation: "Copies of your objects are held in multiple edge locations, which lowers latency for viewers and increases availability."
+    theoryUrl: https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/Introduction.html
+  - type: boolean
+    prompt: "Route 53 geolocation routing picks the endpoint with the lowest network latency for each user."
+    answer: false
+    explanation: "Geolocation routing is based on where the user is located. Choosing the Region with the best latency is what latency routing does."
+    theoryUrl: https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/routing-policy.html
+  - type: boolean
+    prompt: "S3 Transfer Acceleration takes advantage of the globally distributed CloudFront edge locations to speed up transfers to an S3 bucket."
+    answer: true
+    explanation: "Data arriving at an edge location is routed to S3 over an optimized network path, which helps uploads over long distances."
+    theoryUrl: https://docs.aws.amazon.com/AmazonS3/latest/userguide/transfer-acceleration.html
+  - type: boolean
+    prompt: "AWS Outposts runs only inside AWS data centers and cannot be installed at a customer site."
+    answer: false
+    explanation: "Outposts is a pool of AWS compute and storage capacity deployed at a customer site, which AWS operates and manages as part of a Region."
+    theoryUrl: https://docs.aws.amazon.com/outposts/latest/userguide/what-is-outposts.html

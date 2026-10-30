@@ -1,0 +1,187 @@
+version: 1
+title: "AWS Cloud Practitioner 01: Getting started"
+description: Cloud computing basics, the benefits of the cloud, service and deployment models, AWS global infrastructure and the shared responsibility model.
+language: en
+tags: [aws, cloud-practitioner, cloud-basics, global-infrastructure]
+run:
+  questionsPerRun: 10
+  maxErrors: 3
+  timePerQuestionSec: 45
+questions:
+  - type: single
+    prompt: "Which definition best describes cloud computing?"
+    explanation: "Cloud computing is the on-demand delivery of compute, database, storage and other IT resources over the internet with pay-as-you-go pricing. You don't buy and run the hardware yourself."
+    theoryUrl: https://docs.aws.amazon.com/whitepapers/latest/aws-overview/what-is-cloud-computing.html
+    options:
+      - { text: "Buying servers and running them in your own data center", correct: false }
+      - {
+          text: "On-demand delivery of IT resources over the internet with pay-as-you-go pricing",
+          correct: true,
+        }
+      - { text: "Renting a physical server for a fixed multi-year contract", correct: false }
+      - { text: "Storing backups of on-premises data on tape", correct: false }
+  - type: single
+    prompt: 'What does the cloud benefit "trade fixed expense for variable expense" mean?'
+    explanation: "Instead of investing heavily in data centers and servers before you know how you'll use them, you pay only when you consume resources, and only for the amount you consume."
+    theoryUrl: https://docs.aws.amazon.com/whitepapers/latest/aws-overview/six-advantages-of-cloud-computing.html
+    options:
+      - { text: "You pay a flat monthly fee regardless of usage", correct: false }
+      - { text: "You pay for hardware up front but get a discount later", correct: false }
+      - {
+          text: "You pay only for the computing resources you consume instead of large upfront investments",
+          correct: true,
+        }
+      - { text: "You pay only for data that leaves AWS", correct: false }
+  - type: single
+    prompt: "A company no longer wants to guess how much infrastructure capacity it needs before launching an application. Which cloud benefit addresses this?"
+    explanation: "With the cloud you can scale up and down as required with only a few minutes' notice. This removes the idle-resources-or-not-enough-capacity problem of guessing in advance."
+    theoryUrl: https://docs.aws.amazon.com/whitepapers/latest/aws-overview/six-advantages-of-cloud-computing.html
+    options:
+      - { text: "Stop guessing capacity (elasticity)", correct: true }
+      - { text: "Hardware ownership", correct: false }
+      - { text: "Manual capacity planning", correct: false }
+      - { text: "Fixed-term capacity contracts", correct: false }
+  - type: single
+    prompt: "Which cloud service model gives you the most control over IT resources, offering basic building blocks such as networking, virtual computers and data storage?"
+    explanation: "IaaS (Infrastructure as a Service) provides the basic building blocks of cloud IT and the highest level of flexibility and management control. Amazon EC2 is a typical IaaS example."
+    theoryUrl: https://aws.amazon.com/types-of-cloud-computing/
+    options:
+      - { text: "SaaS (Software as a Service)", correct: false }
+      - { text: "PaaS (Platform as a Service)", correct: false }
+      - { text: "FaaS (Function as a Service)", correct: false }
+      - { text: "IaaS (Infrastructure as a Service)", correct: true }
+  - type: single
+    prompt: "Web-based email, where you send and receive messages without maintaining the servers or the email software, is an example of which service model?"
+    explanation: "With SaaS the vendor runs and manages the software application. You only decide how to use it."
+    theoryUrl: https://aws.amazon.com/types-of-cloud-computing/
+    options:
+      - { text: "IaaS", correct: false }
+      - { text: "SaaS", correct: true }
+      - { text: "PaaS", correct: false }
+      - { text: "On-premises", correct: false }
+  - type: single
+    prompt: "With Platform as a Service (PaaS), who manages the underlying hardware and operating systems?"
+    explanation: "In PaaS the provider manages the underlying infrastructure and OS, so you can focus on deploying and managing your applications instead of capacity planning or patching."
+    theoryUrl: https://aws.amazon.com/types-of-cloud-computing/
+    options:
+      - { text: "You, the customer", correct: false }
+      - { text: "A third-party auditor", correct: false }
+      - { text: "The provider", correct: true }
+      - { text: "The end users of your application", correct: false }
+  - type: single
+    prompt: "A company connects its existing on-premises infrastructure to resources running in AWS so both work together. Which deployment model is this?"
+    explanation: "A hybrid deployment connects cloud-based resources with existing resources that are not in the cloud, most commonly on-premises infrastructure."
+    theoryUrl: https://docs.aws.amazon.com/whitepapers/latest/aws-overview/types-of-cloud-computing.html
+    options:
+      - { text: "Hybrid", correct: true }
+      - { text: "All-in cloud", correct: false }
+      - { text: "Private cloud only", correct: false }
+      - { text: "Multi-tenant SaaS", correct: false }
+  - type: single
+    prompt: "What is an AWS Region?"
+    explanation: "A Region is a physical location in the world where AWS has multiple Availability Zones. Regions are isolated from each other, so a problem in one doesn't affect the others."
+    theoryUrl: https://docs.aws.amazon.com/whitepapers/latest/aws-overview/global-infrastructure.html
+    options:
+      - { text: "A single data center building", correct: false }
+      - { text: "A content delivery cache close to end users", correct: false }
+      - { text: "A virtual network inside your AWS account", correct: false }
+      - { text: "A physical location in the world with multiple Availability Zones", correct: true }
+  - type: single
+    prompt: "What is an Availability Zone (AZ)?"
+    explanation: "An AZ is one or more discrete data centers with redundant power, networking and connectivity, housed in separate facilities within a Region."
+    theoryUrl: https://docs.aws.amazon.com/whitepapers/latest/aws-overview/global-infrastructure.html
+    options:
+      - { text: "A group of Regions in the same country", correct: false }
+      - {
+          text: "One or more discrete data centers with redundant power, networking and connectivity",
+          correct: true,
+        }
+      - { text: "An AWS account boundary", correct: false }
+      - { text: "A subnet that you define in your VPC", correct: false }
+  - type: single
+    prompt: "How many Availability Zones does a public AWS Region have at minimum?"
+    explanation: "Public AWS Regions are built with at least three Availability Zones. This lets you spread workloads across zones for high availability."
+    theoryUrl: https://docs.aws.amazon.com/whitepapers/latest/aws-fault-isolation-boundaries/regions.html
+    options:
+      - { text: "One", correct: false }
+      - { text: "Two", correct: false }
+      - { text: "Three", correct: true }
+      - { text: "Ten", correct: false }
+  - type: single
+    prompt: "What are edge locations (points of presence) mainly used for?"
+    explanation: "Edge locations are used by Amazon CloudFront to cache content close to users, so requests are served with lower latency. They are not places where you run your core workloads."
+    theoryUrl: https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/HowCloudFrontWorks.html
+    options:
+      - { text: "Caching and delivering content close to end users", correct: true }
+      - { text: "Running your primary databases", correct: false }
+      - { text: "Hosting the AWS Management Console", correct: false }
+      - { text: "Storing your account's billing data", correct: false }
+  - type: single
+    prompt: "You run an application on Amazon EC2. Under the shared responsibility model, who is responsible for patching the guest operating system?"
+    explanation: "For EC2 (IaaS) the customer manages the guest OS, including updates and security patches, plus installed applications and security group configuration. AWS patches its own infrastructure."
+    theoryUrl: https://aws.amazon.com/compliance/shared-responsibility-model/
+    options:
+      - { text: "AWS, automatically for all customers", correct: false }
+      - { text: "The hardware vendor", correct: false }
+      - { text: "AWS and the customer share the task equally", correct: false }
+      - { text: "The customer", correct: true }
+  - type: multi
+    prompt: "Which of these are benefits of cloud computing?"
+    explanation: "Massive economies of scale, speed and agility, and going global in minutes are all listed advantages. Running your own data centers and large upfront hardware spend are what the cloud helps you avoid."
+    theoryUrl: https://docs.aws.amazon.com/whitepapers/latest/aws-overview/six-advantages-of-cloud-computing.html
+    options:
+      - { text: "Benefit from massive economies of scale", correct: true }
+      - { text: "Large upfront capital expense for servers", correct: false }
+      - { text: "Increase speed and agility", correct: true }
+      - { text: "Spend more time running and maintaining your own data centers", correct: false }
+      - { text: "Go global in minutes", correct: true }
+  - type: multi
+    prompt: "Which of these are the customer's responsibility under the shared responsibility model (security in the cloud)?"
+    explanation: "Customers manage their data and who can access it (for example via IAM), and for EC2 they patch the guest OS. Physical facilities and patching AWS's own infrastructure belong to AWS."
+    theoryUrl: https://aws.amazon.com/compliance/shared-responsibility-model/
+    options:
+      - { text: "Physical security of AWS data centers", correct: false }
+      - { text: "Applying permissions to data through IAM", correct: true }
+      - { text: "Patching the guest OS on EC2 instances", correct: true }
+      - { text: "Patching the hardware and software of AWS infrastructure", correct: false }
+      - { text: "Configuring security groups for EC2 instances", correct: true }
+  - type: multi
+    prompt: "Which of these are cloud deployment models?"
+    explanation: "Cloud (all-in), hybrid and on-premises (private cloud) are deployment models. IaaS and SaaS are service models, which is a different classification and a common mix-up."
+    theoryUrl: https://docs.aws.amazon.com/whitepapers/latest/aws-overview/types-of-cloud-computing.html
+    options:
+      - { text: "Cloud", correct: true }
+      - { text: "SaaS", correct: false }
+      - { text: "On-premises", correct: true }
+      - { text: "IaaS", correct: false }
+      - { text: "Hybrid", correct: true }
+  - type: multi
+    prompt: "Which statements about Availability Zones are true?"
+    explanation: "An AZ is one or more discrete data centers, and AZs in a Region are connected by high-bandwidth, low-latency networking. Using several AZs makes an application better protected from issues in a single AZ. AZs do not share power and cooling."
+    theoryUrl: https://docs.aws.amazon.com/whitepapers/latest/aws-fault-isolation-boundaries/availability-zones.html
+    options:
+      - { text: "All AZs in a Region share the same power and cooling", correct: false }
+      - { text: "AZs in a Region are interconnected with low-latency networking", correct: true }
+      - { text: "An AZ can consist of more than one data center", correct: true }
+      - { text: "An AZ can never contain more than one data center", correct: false }
+      - { text: "Using multiple AZs makes an application more highly available", correct: true }
+  - type: boolean
+    prompt: "Under the shared responsibility model, AWS is responsible for the physical security of the data centers that run AWS services."
+    answer: true
+    explanation: "Physical and environmental controls are part of security of the cloud, which is AWS's side of the model."
+    theoryUrl: https://aws.amazon.com/compliance/shared-responsibility-model/
+  - type: boolean
+    prompt: "Data you create in one AWS Region is automatically copied to every other Region."
+    answer: false
+    explanation: "Resources and data in a Region don't exist in any other Region unless you explicitly use a replication or copy feature, or replicate them yourself."
+    theoryUrl: https://docs.aws.amazon.com/whitepapers/latest/aws-fault-isolation-boundaries/regions.html
+  - type: boolean
+    prompt: "Deploying an application across multiple Availability Zones helps it stay operational if one Availability Zone has a failure."
+    answer: true
+    explanation: "AZs are isolated from each other, so an application built redundantly across AZs can remain operational even if one AZ fails."
+    theoryUrl: https://docs.aws.amazon.com/whitepapers/latest/aws-fault-isolation-boundaries/availability-zones.html
+  - type: boolean
+    prompt: "Of IaaS, PaaS and SaaS, IaaS gives the customer the least control over the underlying IT resources."
+    answer: false
+    explanation: "IaaS gives the most control and flexibility. SaaS gives the least, because the vendor runs and manages the whole application."
+    theoryUrl: https://aws.amazon.com/types-of-cloud-computing/

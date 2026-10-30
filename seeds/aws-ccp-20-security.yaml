@@ -1,0 +1,184 @@
+version: 1
+title: "AWS Cloud Practitioner 20: Security, a closer look"
+description: Shared responsibility, Shield, WAF, GuardDuty, Inspector, Macie, Security Hub, Detective, KMS, CloudHSM, Secrets Manager, ACM, Artifact and Cognito.
+language: en
+tags: [aws, cloud-practitioner, security, compliance]
+run:
+  questionsPerRun: 10
+  maxErrors: 3
+  timePerQuestionSec: 45
+questions:
+  - type: single
+    prompt: "You run a Linux web server on Amazon EC2. Who is responsible for installing guest operating system security patches?"
+    explanation: "For EC2, which is IaaS, the customer manages the guest OS including updates and security patches, plus applications and security group configuration. AWS patches the underlying infrastructure."
+    theoryUrl: https://aws.amazon.com/compliance/shared-responsibility-model/
+    options:
+      - { text: "The customer", correct: true }
+      - { text: "AWS", correct: false }
+      - { text: "The Linux distribution vendor automatically", correct: false }
+      - { text: "AWS Support, on request only", correct: false }
+  - type: single
+    prompt: "Which of these is an example of a control the customer fully inherits from AWS?"
+    explanation: "Physical and environmental controls of the data centers are inherited. Guest OS patching and IAM permissions stay with the customer."
+    theoryUrl: https://aws.amazon.com/compliance/shared-responsibility-model/
+    options:
+      - { text: "Guest operating system patching", correct: false }
+      - { text: "IAM permissions on S3 buckets", correct: false }
+      - { text: "Physical and environmental security of data centers", correct: true }
+      - { text: "Security group rules", correct: false }
+  - type: single
+    prompt: "Which DDoS protection is automatically included for all AWS customers at no additional charge?"
+    explanation: "AWS Shield Standard protects against common volumetric attacks such as UDP reflection and TCP SYN floods. Shield Advanced is the paid tier with additional detection, mitigation and response capabilities."
+    theoryUrl: https://docs.aws.amazon.com/waf/latest/developerguide/shield-chapter.html
+    options:
+      - { text: "AWS Shield Advanced", correct: false }
+      - { text: "AWS WAF", correct: false }
+      - { text: "AWS Shield Standard", correct: true }
+      - { text: "Amazon GuardDuty", correct: false }
+  - type: single
+    prompt: "Which service lets you filter HTTP(S) requests to an Application Load Balancer or CloudFront distribution based on IP addresses or query string values?"
+    explanation: "AWS WAF is a web application firewall that monitors and controls HTTP(S) requests, answering with content, a 403 or a custom response based on your rules."
+    theoryUrl: https://docs.aws.amazon.com/waf/latest/developerguide/waf-chapter.html
+    options:
+      - { text: "AWS WAF", correct: true }
+      - { text: "Amazon Macie", correct: false }
+      - { text: "AWS KMS", correct: false }
+      - { text: "Amazon Inspector", correct: false }
+  - type: single
+    prompt: "Which service continuously analyzes CloudTrail management events, VPC flow logs and DNS logs to detect threats such as compromised credentials or cryptomining?"
+    explanation: "Amazon GuardDuty uses threat intelligence and machine learning on those data sources. It generates findings and needs no agents for foundational detection."
+    theoryUrl: https://docs.aws.amazon.com/guardduty/latest/ug/what-is-guardduty.html
+    options:
+      - { text: "Amazon Inspector", correct: false }
+      - { text: "AWS Artifact", correct: false }
+      - { text: "Amazon Cognito", correct: false }
+      - { text: "Amazon GuardDuty", correct: true }
+  - type: single
+    prompt: "Which service automatically scans EC2 instances, container images in ECR and Lambda functions for software vulnerabilities and unintended network exposure?"
+    explanation: "Amazon Inspector is the vulnerability management service. GuardDuty detects threats from activity, while Inspector finds weaknesses in workloads."
+    theoryUrl: https://docs.aws.amazon.com/inspector/latest/user/what-is-inspector.html
+    options:
+      - { text: "Amazon GuardDuty", correct: false }
+      - { text: "Amazon Inspector", correct: true }
+      - { text: "AWS WAF", correct: false }
+      - { text: "AWS CloudHSM", correct: false }
+  - type: single
+    prompt: "Which service uses machine learning and pattern matching to discover sensitive data such as PII in Amazon S3 buckets?"
+    explanation: "Amazon Macie discovers sensitive data in S3 and also monitors bucket security and access control."
+    theoryUrl: https://docs.aws.amazon.com/macie/latest/user/what-is-macie.html
+    options:
+      - { text: "AWS Secrets Manager", correct: false }
+      - { text: "AWS Shield", correct: false }
+      - { text: "AWS Certificate Manager", correct: false }
+      - { text: "Amazon Macie", correct: true }
+  - type: single
+    prompt: "Which service gives a single, consolidated view of security findings from GuardDuty, Inspector and Macie, and checks your environment against security standards?"
+    explanation: "AWS Security Hub (Security Hub CSPM in the docs) aggregates findings from other AWS services and partner products and runs checks against standards such as CIS and PCI DSS."
+    theoryUrl: https://docs.aws.amazon.com/securityhub/latest/userguide/what-is-securityhub.html
+    options:
+      - { text: "Amazon Detective", correct: false }
+      - { text: "AWS Security Hub", correct: true }
+      - { text: "AWS Artifact", correct: false }
+      - { text: "AWS WAF", correct: false }
+  - type: single
+    prompt: "After GuardDuty raises a finding, which service helps you analyze and investigate the root cause with visualizations built from your log data?"
+    explanation: "Amazon Detective collects log data and builds a behavior graph so you can scope and understand security findings. It investigates, while GuardDuty detects."
+    theoryUrl: https://docs.aws.amazon.com/detective/latest/userguide/detective-investigation-about.html
+    options:
+      - { text: "Amazon Macie", correct: false }
+      - { text: "AWS Shield Advanced", correct: false }
+      - { text: "Amazon Cognito", correct: false }
+      - { text: "Amazon Detective", correct: true }
+  - type: single
+    prompt: "Which AWS managed service makes it easy to create and control the encryption keys used to encrypt your data, with keys protected by hardware security modules?"
+    explanation: "AWS KMS creates and manages keys, with KMS keys protected by FIPS 140-3 Level 3 validated HSMs. They never leave KMS unencrypted."
+    theoryUrl: https://docs.aws.amazon.com/kms/latest/developerguide/overview.html
+    options:
+      - { text: "AWS KMS", correct: true }
+      - { text: "AWS Artifact", correct: false }
+      - { text: "Amazon Macie", correct: false }
+      - { text: "AWS WAF", correct: false }
+  - type: single
+    prompt: "A company must use its own single-tenant hardware security module with full control of the keys and algorithms. Which AWS service fits?"
+    explanation: "AWS CloudHSM gives you dedicated, single-tenant HSMs. With KMS you use a managed service and do not operate HSMs yourself."
+    theoryUrl: https://docs.aws.amazon.com/cloudhsm/latest/userguide/introduction.html
+    options:
+      - { text: "AWS KMS", correct: false }
+      - { text: "AWS Secrets Manager", correct: false }
+      - { text: "AWS CloudHSM", correct: true }
+      - { text: "AWS Certificate Manager", correct: false }
+  - type: single
+    prompt: "Which service stores database credentials and API keys and can rotate them automatically on a schedule, so applications no longer need hard-coded secrets?"
+    explanation: "AWS Secrets Manager manages and rotates credentials and other secrets. Parameter Store can hold secrets as SecureString but has no credential rotation."
+    theoryUrl: https://docs.aws.amazon.com/secretsmanager/latest/userguide/intro.html
+    options:
+      - { text: "AWS Systems Manager Parameter Store", correct: false }
+      - { text: "AWS KMS", correct: false }
+      - { text: "Amazon Inspector", correct: false }
+      - { text: "AWS Secrets Manager", correct: true }
+  - type: multi
+    prompt: "Which statements about AWS Certificate Manager (ACM) are true?"
+    explanation: "ACM creates, stores and renews SSL/TLS certificates, and certificates managed by ACM have no additional charge. Certificates are regional, so you cannot copy one between Regions."
+    theoryUrl: https://docs.aws.amazon.com/acm/latest/userguide/acm-overview.html
+    options:
+      - {
+          text: "It creates, stores and renews public and private SSL/TLS certificates",
+          correct: true,
+        }
+      - { text: "A certificate can be copied between Regions", correct: false }
+      - { text: "There is no additional charge for certificates managed with ACM", correct: true }
+      - { text: "It stores database passwords and rotates them", correct: false }
+  - type: multi
+    prompt: "Which of these can you get from AWS Artifact?"
+    explanation: "Artifact provides on-demand downloads of compliance reports such as SOC, ISO and PCI, and lets you review and accept agreements with AWS. It is free and does not scan your resources."
+    theoryUrl: https://docs.aws.amazon.com/artifact/latest/ug/what-is-aws-artifact.html
+    options:
+      - { text: "Vulnerability scan results for your EC2 instances", correct: false }
+      - { text: "SOC, ISO and PCI compliance reports", correct: true }
+      - { text: "A way to review and accept agreements with AWS", correct: true }
+      - { text: "Downloads provided free of charge", correct: true }
+  - type: multi
+    prompt: "Which statements about Amazon Cognito are true?"
+    explanation: "User pools are a user directory for sign-up and sign-in, with MFA support. Identity pools exchange trusted tokens for temporary AWS credentials. Cognito does not encrypt S3 data."
+    theoryUrl: https://docs.aws.amazon.com/cognito/latest/developerguide/what-is-amazon-cognito.html
+    options:
+      - {
+          text: "A user pool is a user directory that authenticates users and issues tokens",
+          correct: true,
+        }
+      - {
+          text: "An identity pool provides temporary, limited-privilege AWS credentials",
+          correct: true,
+        }
+      - { text: "It encrypts objects stored in Amazon S3", correct: false }
+      - { text: "User pools support multi-factor authentication", correct: true }
+  - type: multi
+    prompt: "Which services send findings to AWS Security Hub?"
+    explanation: "GuardDuty, Inspector and Macie all send findings to Security Hub. KMS and CloudHSM are key management services, not finding sources."
+    theoryUrl: https://docs.aws.amazon.com/securityhub/latest/userguide/what-is-securityhub.html
+    options:
+      - { text: "AWS KMS", correct: false }
+      - { text: "Amazon GuardDuty", correct: true }
+      - { text: "Amazon Macie", correct: true }
+      - { text: "AWS CloudHSM", correct: false }
+      - { text: "Amazon Inspector", correct: true }
+  - type: boolean
+    prompt: "AWS Shield Standard requires a paid subscription."
+    answer: false
+    explanation: "Shield Standard protection is automatic and comes at no additional cost. Only Shield Advanced is a paid service."
+    theoryUrl: https://docs.aws.amazon.com/waf/latest/developerguide/shield-chapter.html
+  - type: boolean
+    prompt: "A Systems Manager Parameter Store SecureString parameter is encrypted using AWS KMS."
+    answer: true
+    explanation: "SecureString values are encrypted with AWS KMS. For secrets that need rotation, AWS recommends Secrets Manager."
+    theoryUrl: https://docs.aws.amazon.com/systems-manager/latest/userguide/systems-manager-parameter-store.html
+  - type: boolean
+    prompt: "Parameter Store provides automatic rotation of credentials, just like Secrets Manager."
+    answer: false
+    explanation: "Parameter Store has no credential rotation, while Secrets Manager offers automatic rotation, including native database integrations."
+    theoryUrl: https://docs.aws.amazon.com/systems-manager/latest/userguide/systems-manager-parameter-store.html
+  - type: boolean
+    prompt: "SSL/TLS is used to protect data in transit between systems, while KMS-based encryption is used to protect data at rest."
+    answer: true
+    explanation: "Encryption in transit protects data as it moves, for example with SSL/TLS, and encryption at rest protects stored data, for example with KMS keys. AWS DMS uses both models."
+    theoryUrl: https://docs.aws.amazon.com/dms/latest/userguide/Welcome.html

@@ -1,0 +1,178 @@
+version: 1
+title: "AWS Cloud Practitioner 18: Data analytics and data science"
+description: Analytics services such as Athena, Redshift, EMR, Glue, Kinesis and Quick Sight, plus SageMaker AI and the AWS AI services.
+language: en
+tags: [aws, cloud-practitioner, analytics, ai-ml]
+run:
+  questionsPerRun: 10
+  maxErrors: 3
+  timePerQuestionSec: 45
+questions:
+  - type: single
+    prompt: "Which service lets you run standard SQL queries directly on data stored in Amazon S3, with no servers to manage and payment only for the queries you run?"
+    explanation: "Amazon Athena is a serverless interactive query service for data in S3. You point it at your data and query with SQL."
+    theoryUrl: https://docs.aws.amazon.com/athena/latest/ug/what-is.html
+    options:
+      - { text: "Amazon Athena", correct: true }
+      - { text: "Amazon Redshift provisioned cluster", correct: false }
+      - { text: "Amazon EMR", correct: false }
+      - { text: "Amazon OpenSearch Service", correct: false }
+  - type: single
+    prompt: "Which AWS service is a fully managed, petabyte-scale data warehouse for analytics with SQL?"
+    explanation: "Amazon Redshift is the data warehouse service. It also has a serverless option that scales capacity automatically."
+    theoryUrl: https://docs.aws.amazon.com/redshift/latest/mgmt/welcome.html
+    options:
+      - { text: "Amazon Athena", correct: false }
+      - { text: "Amazon Redshift", correct: true }
+      - { text: "AWS Glue", correct: false }
+      - { text: "Amazon Kinesis Data Streams", correct: false }
+  - type: single
+    prompt: "A team wants to run Apache Hadoop and Apache Spark jobs on large datasets without building the cluster platform itself. Which service should they choose?"
+    explanation: "Amazon EMR is a managed cluster platform for big data frameworks such as Hadoop and Spark. It was previously called Elastic MapReduce."
+    theoryUrl: https://docs.aws.amazon.com/emr/latest/ManagementGuide/emr-what-is-emr.html
+    options:
+      - { text: "Amazon QuickSight", correct: false }
+      - { text: "AWS Lake Formation", correct: false }
+      - { text: "Amazon Lex", correct: false }
+      - { text: "Amazon EMR", correct: true }
+  - type: single
+    prompt: "Which serverless service discovers data with crawlers, keeps a central Data Catalog and runs ETL jobs to prepare data for analytics?"
+    explanation: "AWS Glue is a serverless data integration service. Crawlers infer schemas into the Glue Data Catalog, and ETL jobs transform and load data."
+    theoryUrl: https://docs.aws.amazon.com/glue/latest/dg/what-is-glue.html
+    options:
+      - { text: "AWS Glue", correct: true }
+      - { text: "Amazon Kinesis Data Streams", correct: false }
+      - { text: "Amazon Rekognition", correct: false }
+      - { text: "Amazon Redshift", correct: false }
+  - type: single
+    prompt: "A clickstream application needs to collect and process large streams of records in real time, with custom consumer applications reading from the stream. Which service fits?"
+    explanation: "Amazon Kinesis Data Streams ingests and holds streaming records so that multiple applications can process them in near real time. Firehose is the easier option when you only need to deliver the data to a destination."
+    theoryUrl: https://docs.aws.amazon.com/streams/latest/dev/introduction.html
+    options:
+      - { text: "AWS Glue crawlers", correct: false }
+      - { text: "Amazon Athena", correct: false }
+      - { text: "Amazon Kinesis Data Streams", correct: true }
+      - { text: "Amazon Textract", correct: false }
+  - type: single
+    prompt: "Which fully managed service delivers streaming data to destinations such as S3, Redshift, OpenSearch Service and Splunk without you writing consumer applications? (It was formerly called Kinesis Data Firehose.)"
+    explanation: "Amazon Data Firehose loads streaming data into destinations automatically, and can transform it before delivery. You do not manage resources or write applications."
+    theoryUrl: https://docs.aws.amazon.com/firehose/latest/dev/what-is-this-service.html
+    options:
+      - { text: "Amazon EMR", correct: false }
+      - { text: "Amazon Data Firehose", correct: true }
+      - { text: "AWS Lake Formation", correct: false }
+      - { text: "Amazon Lex", correct: false }
+  - type: single
+    prompt: "Which service lets business users build interactive dashboards and visualizations from their data sources?"
+    explanation: "Amazon Quick Sight, formerly known as QuickSight and now part of Amazon Quick, is the BI and data visualization service."
+    theoryUrl: https://docs.aws.amazon.com/quicksight/latest/user/welcome.html
+    options:
+      - { text: "AWS Glue", correct: false }
+      - { text: "Amazon Quick Sight", correct: true }
+      - { text: "Amazon Polly", correct: false }
+      - { text: "Amazon SageMaker AI", correct: false }
+  - type: single
+    prompt: "Which managed service runs OpenSearch clusters for use cases such as log analytics, real-time application monitoring and search?"
+    explanation: "Amazon OpenSearch Service deploys, operates and scales OpenSearch clusters for you, and replaced the older Elasticsearch-based naming."
+    theoryUrl: https://docs.aws.amazon.com/opensearch-service/latest/developerguide/what-is.html
+    options:
+      - { text: "Amazon Athena", correct: false }
+      - { text: "AWS Batch", correct: false }
+      - { text: "Amazon Translate", correct: false }
+      - { text: "Amazon OpenSearch Service", correct: true }
+  - type: single
+    prompt: "Which service lets you centrally govern and secure a data lake, with fine-grained access control at the database, table, column and row level?"
+    explanation: "AWS Lake Formation manages permissions for data lake data in S3 and its metadata in the Glue Data Catalog. Athena, Redshift Spectrum, EMR and Glue enforce those permissions."
+    theoryUrl: https://docs.aws.amazon.com/lake-formation/latest/dg/what-is-lake-formation.html
+    options:
+      - { text: "Amazon Kinesis Data Streams", correct: false }
+      - { text: "Amazon Comprehend", correct: false }
+      - { text: "AWS Lake Formation", correct: true }
+      - { text: "Amazon Textract", correct: false }
+  - type: single
+    prompt: "Which service is a fully managed machine learning service for data scientists and developers to build, train and deploy ML models?"
+    explanation: "Amazon SageMaker AI (renamed from Amazon SageMaker in December 2024) covers building, training and deploying ML models on managed infrastructure."
+    theoryUrl: https://docs.aws.amazon.com/sagemaker/latest/dg/whatis.html
+    options:
+      - { text: "Amazon SageMaker AI", correct: true }
+      - { text: "Amazon Athena", correct: false }
+      - { text: "Amazon Rekognition", correct: false }
+      - { text: "Amazon OpenSearch Service", correct: false }
+  - type: single
+    prompt: "An app needs to detect objects, faces and unsafe content in images and videos without any ML expertise. Which service should it call?"
+    explanation: "Amazon Rekognition offers image and video analysis through a simple API, including object, text and face detection and content moderation."
+    theoryUrl: https://docs.aws.amazon.com/rekognition/latest/dg/what-is.html
+    options:
+      - { text: "Amazon Comprehend", correct: false }
+      - { text: "Amazon Polly", correct: false }
+      - { text: "Amazon Lex", correct: false }
+      - { text: "Amazon Rekognition", correct: true }
+  - type: single
+    prompt: "Which service lets you build voice and text chatbots with automatic speech recognition and natural language understanding?"
+    explanation: "Amazon Lex builds conversational interfaces. Comprehend analyzes text but does not hold a conversation with the user."
+    theoryUrl: https://docs.aws.amazon.com/lexv2/latest/dg/what-is.html
+    options:
+      - { text: "Amazon Comprehend", correct: false }
+      - { text: "Amazon Translate", correct: false }
+      - { text: "Amazon Lex", correct: true }
+      - { text: "Amazon Textract", correct: false }
+  - type: multi
+    prompt: "Which of these services work with human language (text or speech)?"
+    explanation: "Comprehend analyzes text, Translate translates it and Polly turns text into speech. Redshift and Lake Formation are data services."
+    theoryUrl: https://docs.aws.amazon.com/comprehend/latest/dg/what-is.html
+    options:
+      - { text: "Amazon Redshift", correct: false }
+      - { text: "Amazon Comprehend", correct: true }
+      - { text: "Amazon Translate", correct: true }
+      - { text: "AWS Lake Formation", correct: false }
+      - { text: "Amazon Polly", correct: true }
+  - type: multi
+    prompt: "Which are supported destinations for Amazon Data Firehose?"
+    explanation: "Firehose delivers to S3, Redshift, OpenSearch Service, Splunk and HTTP endpoints. DynamoDB and Aurora are not destinations."
+    theoryUrl: https://docs.aws.amazon.com/firehose/latest/dev/what-is-this-service.html
+    options:
+      - { text: "Amazon S3", correct: true }
+      - { text: "Amazon DynamoDB", correct: false }
+      - { text: "Amazon Redshift", correct: true }
+      - { text: "Amazon Aurora", correct: false }
+      - { text: "Amazon OpenSearch Service", correct: true }
+  - type: multi
+    prompt: "What can Amazon Textract extract from scanned documents?"
+    explanation: "Textract goes beyond basic OCR: it detects typed and handwritten text and extracts forms and tables. It does not process audio or translate."
+    theoryUrl: https://docs.aws.amazon.com/textract/latest/dg/what-is.html
+    options:
+      - { text: "Typed and handwritten text", correct: true }
+      - { text: "Spoken words from audio recordings", correct: false }
+      - { text: "Key-value pairs from forms", correct: true }
+      - { text: "Tables", correct: true }
+      - { text: "Translated versions of the text", correct: false }
+  - type: multi
+    prompt: "Which statements about Amazon Athena are true?"
+    explanation: "Athena is serverless, uses standard SQL and queries data in S3, so there is no cluster to provision. It is not limited to DynamoDB."
+    theoryUrl: https://docs.aws.amazon.com/athena/latest/ug/what-is.html
+    options:
+      - { text: "It is serverless, so there is no infrastructure to manage", correct: true }
+      - { text: "You must provision a cluster before running queries", correct: false }
+      - { text: "It queries data in Amazon S3 using standard SQL", correct: true }
+      - { text: "You pay for the queries you run", correct: true }
+      - { text: "It can only query Amazon DynamoDB tables", correct: false }
+  - type: boolean
+    prompt: "Amazon Polly converts text into lifelike speech."
+    answer: true
+    explanation: "Polly is the text-to-speech service. Its counterpart for the opposite direction is Amazon Transcribe."
+    theoryUrl: https://docs.aws.amazon.com/polly/latest/dg/what-is.html
+  - type: boolean
+    prompt: "Amazon Transcribe converts text into speech."
+    answer: false
+    explanation: "Transcribe is automatic speech recognition: it converts audio to text. Text to speech is Amazon Polly."
+    theoryUrl: https://docs.aws.amazon.com/transcribe/latest/dg/what-is.html
+  - type: boolean
+    prompt: "Amazon Bedrock is a fully managed service that gives access to foundation models from multiple AI companies for building generative AI applications."
+    answer: true
+    explanation: "Bedrock provides secure access to foundation models from several providers through one managed service, so you do not host the models."
+    theoryUrl: https://docs.aws.amazon.com/bedrock/latest/userguide/what-is-bedrock.html
+  - type: boolean
+    prompt: "Amazon Quick Sight (formerly QuickSight) is a petabyte-scale data warehouse service."
+    answer: false
+    explanation: "Quick Sight is for BI dashboards and visualization. The data warehouse service is Amazon Redshift."
+    theoryUrl: https://docs.aws.amazon.com/quicksight/latest/user/welcome.html

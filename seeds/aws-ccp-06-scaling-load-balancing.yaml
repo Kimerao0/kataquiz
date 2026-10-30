@@ -1,0 +1,209 @@
+version: 1
+title: "AWS Cloud Practitioner 06: Scaling and load balancing"
+description: "Vertical vs horizontal scaling, EC2 Auto Scaling, and the Elastic Load Balancing family."
+language: en
+tags: [aws, cloud-practitioner, scaling, load-balancing]
+run:
+  questionsPerRun: 10
+  maxErrors: 3
+  timePerQuestionSec: 45
+questions:
+  - type: single
+    prompt: "Which action is an example of vertical scaling?"
+    explanation: "Vertical scaling means making one server bigger (more CPU and memory), for example moving to a larger instance type. Horizontal scaling adds more servers instead."
+    theoryUrl: https://docs.aws.amazon.com/autoscaling/ec2/userguide/auto-scaling-groups.html
+    options:
+      - {
+          text: "Launching five more identical EC2 instances behind a load balancer",
+          correct: false,
+        }
+      - {
+          text: "Changing an EC2 instance to a larger instance type with more vCPUs and memory",
+          correct: true,
+        }
+      - { text: "Adding a second Availability Zone to an Auto Scaling group", correct: false }
+      - { text: "Creating a read replica of a database", correct: false }
+  - type: single
+    prompt: "What does Elastic Load Balancing do?"
+    explanation: "Elastic Load Balancing distributes incoming traffic across multiple targets (EC2 instances, containers, IP addresses) in one or more Availability Zones, and sends traffic only to healthy targets."
+    theoryUrl: https://docs.aws.amazon.com/elasticloadbalancing/latest/userguide/what-is-load-balancing.html
+    options:
+      - {
+          text: "It distributes incoming traffic across multiple targets in one or more Availability Zones",
+          correct: true,
+        }
+      - { text: "It resizes an EC2 instance to match its CPU load", correct: false }
+      - { text: "It translates domain names into IP addresses", correct: false }
+      - { text: "It caches static content at edge locations", correct: false }
+  - type: single
+    prompt: "Which type of Elastic Load Balancer operates at the application layer (layer 7) and can route requests based on the content of the request, such as the URL path?"
+    explanation: "The Application Load Balancer works at layer 7 and supports path, host and header based routing. The Network Load Balancer works at layer 4, and the Gateway Load Balancer at layer 3."
+    theoryUrl: https://docs.aws.amazon.com/elasticloadbalancing/latest/application/introduction.html
+    options:
+      - { text: "Network Load Balancer", correct: false }
+      - { text: "Gateway Load Balancer", correct: false }
+      - { text: "Application Load Balancer", correct: true }
+      - { text: "Amazon Route 53", correct: false }
+  - type: single
+    prompt: "An application receives millions of TCP and UDP requests per second and needs static IP addresses for its load balancer. Which load balancer fits best?"
+    explanation: "The Network Load Balancer works at layer 4, handles millions of requests per second and gets a static IP per enabled Availability Zone (you can attach an Elastic IP). The Application Load Balancer is layer 7 and HTTP-oriented."
+    theoryUrl: https://docs.aws.amazon.com/elasticloadbalancing/latest/network/introduction.html
+    options:
+      - { text: "Application Load Balancer", correct: false }
+      - { text: "Classic Load Balancer", correct: false }
+      - { text: "Gateway Load Balancer", correct: false }
+      - { text: "Network Load Balancer", correct: true }
+  - type: single
+    prompt: "A security team wants to route all traffic through a fleet of third-party firewall and intrusion detection virtual appliances, and scale that fleet with demand. Which load balancer is built for this?"
+    explanation: "The Gateway Load Balancer works at layer 3 and is designed to deploy, scale and manage virtual appliances such as firewalls and intrusion detection systems."
+    theoryUrl: https://docs.aws.amazon.com/elasticloadbalancing/latest/gateway/introduction.html
+    options:
+      - { text: "Application Load Balancer", correct: false }
+      - { text: "Gateway Load Balancer", correct: true }
+      - { text: "Network Load Balancer", correct: false }
+      - { text: "AWS Global Accelerator", correct: false }
+  - type: single
+    prompt: "An instance in an Auto Scaling group fails its health check. What does the group do?"
+    explanation: "The group terminates the unhealthy instance and launches a replacement, so it keeps its desired number of instances."
+    theoryUrl: https://docs.aws.amazon.com/autoscaling/ec2/userguide/auto-scaling-groups.html
+    options:
+      - {
+          text: "It terminates the unhealthy instance and launches another one to replace it",
+          correct: true,
+        }
+      - { text: "It leaves the instance running and lowers the desired capacity", correct: false }
+      - {
+          text: "It stops the instance and waits for an administrator to restart it",
+          correct: false,
+        }
+      - { text: "It resizes the instance to a larger instance type", correct: false }
+  - type: single
+    prompt: "A dynamic scaling policy wants to add three instances, but the group is already one instance below its maximum capacity. What happens?"
+    explanation: "The new capacity never goes outside the minimum and maximum limits, so the group adds only one instance. The maximum is the hard ceiling, which helps cap cost."
+    theoryUrl: https://docs.aws.amazon.com/autoscaling/ec2/userguide/as-scale-based-on-demand.html
+    options:
+      - { text: "It adds three instances and raises the maximum", correct: false }
+      - { text: "It adds no instances and reports an error", correct: false }
+      - {
+          text: "It adds only one instance, so the group stays within its maximum capacity",
+          correct: true,
+        }
+      - { text: "It adds three instances and later terminates two of them", correct: false }
+  - type: single
+    prompt: "Which scaling policy works like a thermostat: you pick a metric and a target value (for example 50 percent average CPU) and Auto Scaling adjusts capacity to stay near it?"
+    explanation: "Target tracking scaling adds and removes capacity to keep a CloudWatch metric near the target you set. It also creates and manages the CloudWatch alarms for you."
+    theoryUrl: https://docs.aws.amazon.com/autoscaling/ec2/userguide/as-scale-based-on-demand.html
+    options:
+      - { text: "Simple scaling", correct: false }
+      - { text: "Step scaling", correct: false }
+      - { text: "Manual scaling", correct: false }
+      - { text: "Target tracking scaling", correct: true }
+  - type: single
+    prompt: "What does an EC2 launch template store?"
+    explanation: "A launch template stores launch parameters such as the AMI ID, instance type and network settings, so you do not have to enter them every time. An Auto Scaling group uses it to know what to launch."
+    theoryUrl: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-launch-templates.html
+    options:
+      - { text: "The data stored on the instance's EBS volumes", correct: false }
+      - {
+          text: "Instance launch parameters such as the AMI ID, instance type and network settings",
+          correct: true,
+        }
+      - { text: "The history of CloudWatch metrics for the group", correct: false }
+      - { text: "The list of healthy targets of a load balancer", correct: false }
+  - type: single
+    prompt: "You want an Auto Scaling group to keep running if a whole Availability Zone becomes unavailable. What should you do?"
+    explanation: "When you specify multiple Availability Zones, the desired capacity is distributed across them and Auto Scaling keeps them balanced. A group confined to a single AZ cannot survive losing it."
+    theoryUrl: https://docs.aws.amazon.com/autoscaling/ec2/userguide/auto-scaling-groups.html
+    options:
+      - { text: "Choose the largest instance type available", correct: false }
+      - { text: "Set the minimum capacity to zero", correct: false }
+      - { text: "Configure the group to use subnets in multiple Availability Zones", correct: true }
+      - { text: "Attach a larger EBS volume to each instance", correct: false }
+  - type: single
+    prompt: "A target registered with a load balancer fails its health check. How does the load balancer react?"
+    explanation: "A load balancer monitors target health and routes requests only to healthy targets. Replacing the failed instance is the job of Auto Scaling, not of the load balancer."
+    theoryUrl: https://docs.aws.amazon.com/elasticloadbalancing/latest/userguide/what-is-load-balancing.html
+    options:
+      - { text: "It terminates the target and launches a new one", correct: false }
+      - { text: "It shuts itself down until the target recovers", correct: false }
+      - { text: "It keeps sending a share of the traffic to the target", correct: false }
+      - {
+          text: "It stops routing requests to that target and uses only the healthy ones",
+          correct: true,
+        }
+  - type: single
+    prompt: "Which combination lets a web tier automatically add or remove EC2 instances with demand and spread incoming requests across them?"
+    explanation: "Elastic Load Balancing spreads the traffic and EC2 Auto Scaling changes the number of instances. Instances launched by Auto Scaling are automatically registered with the load balancer's target group."
+    theoryUrl: https://docs.aws.amazon.com/elasticloadbalancing/latest/userguide/what-is-load-balancing.html
+    options:
+      - { text: "Amazon S3 and AWS Backup", correct: false }
+      - { text: "Elastic Load Balancing and EC2 Auto Scaling", correct: true }
+      - { text: "Amazon EBS and Amazon EFS", correct: false }
+      - { text: "AWS CloudTrail and AWS Config", correct: false }
+  - type: multi
+    prompt: "Which of these are Elastic Load Balancing load balancer types?"
+    explanation: "Application, Network and Gateway Load Balancers are the current-generation ELB types. Route 53 is a DNS service and Global Accelerator is a separate networking service, even though both can sit in front of load balancers."
+    theoryUrl: https://docs.aws.amazon.com/elasticloadbalancing/latest/userguide/what-is-load-balancing.html
+    options:
+      - { text: "Application Load Balancer", correct: true }
+      - { text: "Amazon Route 53", correct: false }
+      - { text: "Gateway Load Balancer", correct: true }
+      - { text: "AWS Global Accelerator", correct: false }
+      - { text: "Network Load Balancer", correct: true }
+  - type: multi
+    prompt: "Which of these does an EC2 Auto Scaling group do?"
+    explanation: "An Auto Scaling group replaces unhealthy instances, keeps capacity between its minimum and maximum, and spreads instances across the Availability Zones you choose. It adds or removes instances (horizontal scaling) and does not resize one instance in place."
+    theoryUrl: https://docs.aws.amazon.com/autoscaling/ec2/userguide/auto-scaling-groups.html
+    options:
+      - { text: "Replaces unhealthy instances", correct: true }
+      - {
+          text: "Keeps the number of instances between a minimum and a maximum capacity",
+          correct: true,
+        }
+      - { text: "Changes the CPU and memory of a running instance in place", correct: false }
+      - { text: "Distributes instances across the Availability Zones you specify", correct: true }
+  - type: multi
+    prompt: "Which are benefits of putting a load balancer in front of your application servers?"
+    explanation: "A load balancer spreads traffic, avoids unhealthy targets and can offload TLS encryption and decryption. It does not change the size of your instances."
+    theoryUrl: https://docs.aws.amazon.com/elasticloadbalancing/latest/userguide/what-is-load-balancing.html
+    options:
+      - { text: "It resizes each EC2 instance to a larger type when traffic grows", correct: false }
+      - { text: "It sends requests only to healthy targets", correct: true }
+      - { text: "It distributes traffic across multiple targets", correct: true }
+      - { text: "It can offload encryption and decryption from the servers", correct: true }
+  - type: multi
+    prompt: "Which of these are capabilities of an Application Load Balancer?"
+    explanation: "An Application Load Balancer can route on URL path and host header, and can use Lambda functions as targets. Static IPs per AZ are a Network Load Balancer feature, and appliance chaining belongs to the Gateway Load Balancer."
+    theoryUrl: https://docs.aws.amazon.com/elasticloadbalancing/latest/application/introduction.html
+    options:
+      - { text: "Route requests based on the URL path", correct: true }
+      - { text: "Route requests based on the host field in the HTTP header", correct: true }
+      - {
+          text: "Send traffic through third-party virtual security appliances at layer 3",
+          correct: false,
+        }
+      - { text: "Register Lambda functions as targets", correct: true }
+      - {
+          text: "Operate at layer 4 and keep a static IP address per Availability Zone",
+          correct: false,
+        }
+  - type: boolean
+    prompt: "A Network Load Balancer operates at layer 4 and can handle millions of requests per second."
+    answer: true
+    explanation: "The Network Load Balancer functions at the fourth layer of the OSI model (transport) and is designed for volatile, very high-volume workloads."
+    theoryUrl: https://docs.aws.amazon.com/elasticloadbalancing/latest/network/introduction.html
+  - type: boolean
+    prompt: "Moving a workload from a t3.medium instance to a t3.xlarge instance is an example of horizontal scaling."
+    answer: false
+    explanation: "Changing to a bigger instance type is vertical scaling (scale up). Horizontal scaling means adding more instances."
+    theoryUrl: https://docs.aws.amazon.com/autoscaling/ec2/userguide/auto-scaling-groups.html
+  - type: boolean
+    prompt: "The Classic Load Balancer is the recommended current-generation load balancer for new applications."
+    answer: false
+    explanation: "Classic Load Balancers are the previous generation. AWS recommends migrating to a current-generation load balancer (Application, Network or Gateway)."
+    theoryUrl: https://docs.aws.amazon.com/elasticloadbalancing/latest/userguide/what-is-load-balancing.html
+  - type: boolean
+    prompt: "Once an Auto Scaling group reaches its maximum capacity, it keeps adding instances if demand keeps growing."
+    answer: false
+    explanation: "When the desired capacity reaches the maximum size, scale-out stops. The maximum is a hard limit, which protects you from runaway cost."
+    theoryUrl: https://docs.aws.amazon.com/autoscaling/ec2/userguide/as-scale-based-on-demand.html

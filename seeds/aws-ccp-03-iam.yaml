@@ -1,0 +1,187 @@
+version: 1
+title: "AWS Cloud Practitioner 03: Account security, permissions and IAM"
+description: IAM users, groups, roles and policies, least privilege, MFA, access keys, root user protection, password policies and IAM Identity Center.
+language: en
+tags: [aws, cloud-practitioner, iam, security]
+run:
+  questionsPerRun: 10
+  maxErrors: 3
+  timePerQuestionSec: 45
+questions:
+  - type: single
+    prompt: "What does AWS Identity and Access Management (IAM) let you control?"
+    explanation: "IAM controls who is authenticated (signed in) and who is authorized (has permissions) to use AWS resources."
+    theoryUrl: https://docs.aws.amazon.com/IAM/latest/UserGuide/introduction.html
+    options:
+      - { text: "The physical location of your data", correct: false }
+      - { text: "Who can sign in and what they are allowed to do on AWS resources", correct: true }
+      - { text: "The network traffic between your instances", correct: false }
+      - { text: "How much your account is billed each month", correct: false }
+  - type: single
+    prompt: "What is the cost of using IAM itself?"
+    explanation: "IAM is a feature of your AWS account offered at no additional charge. You pay only for the other AWS services your IAM users access."
+    theoryUrl: https://docs.aws.amazon.com/IAM/latest/UserGuide/introduction.html
+    options:
+      - { text: "A monthly fee per IAM user", correct: false }
+      - { text: "A fee per policy created", correct: false }
+      - { text: "A fee per sign-in", correct: false }
+      - { text: "No additional charge", correct: true }
+  - type: single
+    prompt: "What is an IAM user group?"
+    explanation: "A group is a collection of IAM users. You attach permissions to the group and every user in it gets them, which makes managing permissions for many users easier."
+    theoryUrl: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_groups.html
+    options:
+      - {
+          text: "A collection of IAM users that share the permissions attached to the group",
+          correct: true,
+        }
+      - { text: "A set of AWS accounts in an organization", correct: false }
+      - { text: "A group of Regions with the same policies", correct: false }
+      - { text: "A collection of access keys", correct: false }
+  - type: single
+    prompt: "What kind of credentials does someone get when they assume an IAM role?"
+    explanation: "A role has no long-term credentials such as a password or access keys. Assuming it provides temporary security credentials for the role session."
+    theoryUrl: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles.html
+    options:
+      - { text: "A permanent password", correct: false }
+      - { text: "A long-term access key pair", correct: false }
+      - { text: "Temporary security credentials", correct: true }
+      - { text: "The root user's credentials", correct: false }
+  - type: single
+    prompt: "An application on an EC2 instance needs to read objects from S3. What is the recommended way to give it access without storing access keys on the instance?"
+    explanation: "Attach an IAM role to the instance. AWS delivers temporary credentials of the role to the instance, and applications using an AWS SDK discover and use them automatically."
+    theoryUrl: https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html
+    options:
+      - { text: "Save an IAM user's access keys in the application code", correct: false }
+      - { text: "Attach an IAM role to the instance", correct: true }
+      - { text: "Use the root user's access keys", correct: false }
+      - { text: "Make the S3 bucket public", correct: false }
+  - type: single
+    prompt: "In an IAM policy statement, which element specifies whether the statement allows or denies access?"
+    explanation: "The Effect element takes the value Allow or Deny. Action lists what is allowed or denied, and Resource says which resources it applies to."
+    theoryUrl: https://docs.aws.amazon.com/IAM/latest/UserGuide/access_policies.html#policies-introduction
+    options:
+      - { text: "Action", correct: false }
+      - { text: "Resource", correct: false }
+      - { text: "Version", correct: false }
+      - { text: "Effect", correct: true }
+  - type: single
+    prompt: "What does the principle of least privilege mean?"
+    explanation: "You grant only the permissions required to perform a task. It is safer to start with a minimum set and add permissions as needed than to start too broad and tighten later."
+    theoryUrl: https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html
+    options:
+      - { text: "Granting only the permissions needed to perform a task", correct: true }
+      - { text: "Giving every user administrator access to avoid blockers", correct: false }
+      - { text: "Giving permissions only to the root user", correct: false }
+      - { text: "Granting each user the same permissions as their manager", correct: false }
+  - type: single
+    prompt: "A brand-new IAM user has just been created and no policies are attached. What can the user do?"
+    explanation: "By default a new IAM user has no permissions. They are not authorized to perform any AWS operation or access any resource until you grant permissions."
+    theoryUrl: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_users.html
+    options:
+      - { text: "Read all resources but not change them", correct: false }
+      - { text: "Everything except billing tasks", correct: false }
+      - { text: "Create other IAM users", correct: false }
+      - { text: "Nothing, until permissions are granted", correct: true }
+  - type: single
+    prompt: "One policy attached to a user allows s3:DeleteObject on a bucket, and another policy attached to the same user explicitly denies it. What is the result?"
+    explanation: "An explicit deny in any applicable policy overrides an allow. The user can't delete the object."
+    theoryUrl: https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_evaluation-logic.html
+    options:
+      - { text: "The Allow wins because it was attached first", correct: false }
+      - { text: "The request is allowed only during business hours", correct: false }
+      - { text: "The explicit Deny overrides the Allow and the request is denied", correct: true }
+      - { text: "AWS asks the root user to decide", correct: false }
+  - type: single
+    prompt: "You created an access key for an IAM user but didn't save the secret access key. What can you do?"
+    explanation: "The secret access key can be retrieved only when you create it. If it is lost, you delete that access key and create a new one."
+    theoryUrl: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html
+    options:
+      - { text: "View it again in the IAM console", correct: false }
+      - { text: "Delete the access key and create a new one", correct: true }
+      - { text: "Ask AWS Support to email it", correct: false }
+      - { text: "Retrieve it with the AWS CLI", correct: false }
+  - type: single
+    prompt: "What was AWS IAM Identity Center called before it was renamed in 2022?"
+    explanation: "On July 26, 2022, AWS Single Sign-On (AWS SSO) was renamed to AWS IAM Identity Center. Some API and CLI names still use sso for backward compatibility."
+    theoryUrl: https://docs.aws.amazon.com/singlesignon/latest/userguide/what-is.html
+    options:
+      - { text: "AWS Single Sign-On (AWS SSO)", correct: true }
+      - { text: "AWS Directory Service", correct: false }
+      - { text: "Amazon Cognito", correct: false }
+      - { text: "AWS Organizations", correct: false }
+  - type: single
+    prompt: "To which of these does the IAM account password policy not apply?"
+    explanation: "The IAM password policy applies to IAM user passwords. It does not apply to the root user's password or to IAM user access keys."
+    theoryUrl: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_passwords_account-policy.html
+    options:
+      - { text: "IAM user console passwords", correct: false }
+      - { text: "Passwords of new IAM users created after the policy is set", correct: false }
+      - { text: "The root user's password", correct: true }
+      - { text: "IAM users who change their own passwords", correct: false }
+  - type: multi
+    prompt: "Which of these are MFA types supported by AWS?"
+    explanation: "AWS supports passkeys and security keys, virtual authenticator apps and hardware TOTP tokens. SMS text message MFA is no longer supported, and email codes are not an MFA option."
+    theoryUrl: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_mfa.html
+    options:
+      - { text: "Passkeys and security keys", correct: true }
+      - { text: "SMS text message codes", correct: false }
+      - { text: "Virtual authenticator apps", correct: true }
+      - { text: "One-time codes sent by email", correct: false }
+      - { text: "Hardware TOTP tokens", correct: true }
+  - type: multi
+    prompt: "Which of these are IAM security best practices?"
+    explanation: "Require MFA, use temporary credentials through roles, and apply least privilege. Sharing access keys between people or creating root access keys for daily use goes against the guidance."
+    theoryUrl: https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html
+    options:
+      - { text: "Share one set of access keys across the whole team", correct: false }
+      - { text: "Require multi-factor authentication (MFA)", correct: true }
+      - {
+          text: "Use roles and temporary credentials instead of long-term access keys where possible",
+          correct: true,
+        }
+      - { text: "Create root user access keys for everyday work", correct: false }
+      - { text: "Apply least-privilege permissions", correct: true }
+  - type: multi
+    prompt: "Which of these are elements of an IAM JSON policy statement?"
+    explanation: "A statement uses Effect, Action and Resource to say whether to allow or deny which actions on which resources. Hostname and AMI are not policy elements."
+    theoryUrl: https://docs.aws.amazon.com/IAM/latest/UserGuide/access_policies.html#policies-introduction
+    options:
+      - { text: "Effect", correct: true }
+      - { text: "Hostname", correct: false }
+      - { text: "Action", correct: true }
+      - { text: "AMI", correct: false }
+      - { text: "Resource", correct: true }
+  - type: multi
+    prompt: "Which of these can assume an IAM role?"
+    explanation: "Roles can be assumed by IAM users (same or another account), AWS services such as EC2 and Lambda, and external users authenticated by a SAML 2.0 or OpenID Connect identity provider. Groups can't be principals and anonymous users have no identity to trust."
+    theoryUrl: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles.html
+    options:
+      - { text: "An IAM user in the same or another AWS account", correct: true }
+      - { text: "Anonymous internet users with no credentials", correct: false }
+      - { text: "An AWS service such as EC2 or Lambda", correct: true }
+      - { text: "An IAM user group as a principal", correct: false }
+      - {
+          text: "An external user authenticated by a SAML 2.0 or OpenID Connect provider",
+          correct: true,
+        }
+  - type: boolean
+    prompt: "You don't need to choose a Region to use IAM."
+    answer: true
+    explanation: "The console docs say you don't need to choose a Region for some services, such as IAM. Your users, groups, roles and policies aren't created per Region."
+    theoryUrl: https://docs.aws.amazon.com/awsconsolehelpdocs/latest/gsg/select-region.html
+  - type: boolean
+    prompt: "IAM user groups can contain other IAM user groups (nesting)."
+    answer: false
+    explanation: "Groups can't be nested. They contain only users, and a user can belong to multiple groups."
+    theoryUrl: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_groups.html
+  - type: boolean
+    prompt: "Using the root user for your everyday tasks is a recommended practice."
+    answer: false
+    explanation: "AWS strongly recommends not using the root user for everyday tasks. Use it only for the tasks that require root credentials, and use an administrative identity for daily work."
+    theoryUrl: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_root-user.html
+  - type: boolean
+    prompt: "An IAM user can be a member of more than one IAM group."
+    answer: true
+    explanation: "A group can contain many users and a user can belong to multiple groups. Their permissions combine."
+    theoryUrl: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_groups.html

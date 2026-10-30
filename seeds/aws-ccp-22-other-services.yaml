@@ -1,0 +1,185 @@
+version: 1
+title: "AWS Cloud Practitioner 22: Other services"
+description: "Assorted services the CLF-C02 exam names: virtual desktops, contact centers, email and messaging, IoT, app testing, media, backup and disaster recovery."
+language: en
+tags: [aws, cloud-practitioner, services, end-user-computing]
+run:
+  questionsPerRun: 10
+  maxErrors: 3
+  timePerQuestionSec: 45
+questions:
+  - type: single
+    prompt: "A company wants to give remote employees persistent virtual Windows or Linux desktops in the cloud, without buying hardware. Which service fits?"
+    explanation: "Amazon WorkSpaces provisions cloud-based desktops (WorkSpaces Personal gives each user a persistent one). Application streaming is a different service."
+    theoryUrl: https://docs.aws.amazon.com/workspaces/latest/adminguide/amazon-workspaces.html
+    options:
+      - { text: "Amazon AppStream 2.0", correct: false }
+      - { text: "Amazon WorkSpaces", correct: true }
+      - { text: "Amazon Lightsail", correct: false }
+      - { text: "Amazon EC2 Dedicated Hosts", correct: false }
+  - type: single
+    prompt: "A software vendor wants users to run its Windows desktop application from a web browser, streamed from AWS, without exposing a full desktop. Which service should it use?"
+    explanation: "Amazon AppStream 2.0 (now called Amazon WorkSpaces Applications) streams individual desktop applications. WorkSpaces gives users a whole desktop instead."
+    theoryUrl: https://docs.aws.amazon.com/appstream2/latest/developerguide/what-is-appstream.html
+    options:
+      - { text: "Amazon WorkSpaces", correct: false }
+      - { text: "AWS Device Farm", correct: false }
+      - { text: "AWS Outposts", correct: false }
+      - { text: "Amazon AppStream 2.0 (now Amazon WorkSpaces Applications)", correct: true }
+  - type: boolean
+    prompt: "Amazon SES can only send email. It cannot receive email."
+    answer: false
+    explanation: "SES sends and receives email. Incoming mail can be stored in Amazon S3, published to Amazon SNS or used to trigger Lambda functions."
+    theoryUrl: https://docs.aws.amazon.com/ses/latest/dg/Welcome.html
+  - type: single
+    prompt: "Which AWS service is an omnichannel cloud contact center where you pay only for what you use?"
+    explanation: "Amazon Connect (documented today as Amazon Connect Customer) is the cloud contact center. SES and SNS only send messages, they do not route customer conversations to agents."
+    theoryUrl: https://docs.aws.amazon.com/connect/latest/adminguide/what-is-amazon-connect.html
+    options:
+      - { text: "Amazon Connect", correct: true }
+      - { text: "Amazon SES", correct: false }
+      - { text: "Amazon SNS", correct: false }
+      - { text: "Amazon WorkSpaces", correct: false }
+  - type: single
+    prompt: "An online shop needs to send order confirmations and marketing emails from its own domain at scale. Which service is designed for this?"
+    explanation: "Amazon Simple Email Service (SES) sends transactional and marketing email. SQS and SNS are messaging services, but they are not email platforms for your own domain."
+    theoryUrl: https://docs.aws.amazon.com/ses/latest/dg/Welcome.html
+    options:
+      - { text: "Amazon SQS", correct: false }
+      - { text: "Amazon Connect", correct: false }
+      - { text: "Amazon SES", correct: true }
+      - { text: "AWS IoT Core", correct: false }
+  - type: single
+    prompt: "A manufacturer wants thousands of sensors to connect securely to the cloud and publish messages over MQTT. Which service should it use?"
+    explanation: "AWS IoT Core connects devices to AWS and supports protocols such as MQTT, MQTT over WebSockets, HTTPS and LoRaWAN."
+    theoryUrl: https://docs.aws.amazon.com/iot/latest/developerguide/what-is-aws-iot.html
+    options:
+      - { text: "Amazon Kinesis Data Streams", correct: false }
+      - { text: "AWS IoT Core", correct: true }
+      - { text: "Amazon SQS", correct: false }
+      - { text: "AWS Direct Connect", correct: false }
+  - type: multi
+    prompt: "Which statements about Amazon WorkSpaces are true? (Select TWO.)"
+    explanation: "WorkSpaces Personal gives users persistent desktops, and billing can be monthly or hourly. There is no hardware to buy and Linux is supported too."
+    theoryUrl: https://docs.aws.amazon.com/workspaces/latest/adminguide/amazon-workspaces.html
+    options:
+      - { text: "It requires you to procure and deploy desktop hardware", correct: false }
+      - { text: "It can only run Microsoft Windows", correct: false }
+      - {
+          text: "WorkSpaces Personal provides persistent desktops for individual users",
+          correct: true,
+        }
+      - { text: "You can choose monthly or hourly billing", correct: true }
+  - type: single
+    prompt: "A mobile team wants to test its Android and iOS apps on many real physical phones and tablets without buying the devices. Which service should it use?"
+    explanation: "AWS Device Farm runs tests on real devices hosted by AWS, either automatically or through interactive remote access."
+    theoryUrl: https://docs.aws.amazon.com/devicefarm/latest/developerguide/welcome.html
+    options:
+      - { text: "AWS Amplify", correct: false }
+      - { text: "Amazon AppStream 2.0", correct: false }
+      - { text: "AWS CodeBuild", correct: false }
+      - { text: "AWS Device Farm", correct: true }
+  - type: boolean
+    prompt: "AWS Device Farm tests apps only on software emulators, not on real devices."
+    answer: false
+    explanation: "Device Farm uses real, physical phones and tablets hosted by AWS."
+    theoryUrl: https://docs.aws.amazon.com/devicefarm/latest/developerguide/welcome.html
+  - type: single
+    prompt: "A media company needs to convert large video files into formats suitable for phones, tablets and TVs. Which AWS service performs this file-based video transcoding?"
+    explanation: "AWS Elemental MediaConvert is a file-based video processing service. Rekognition analyzes images and video, and Polly turns text into speech, so neither converts formats."
+    theoryUrl: https://docs.aws.amazon.com/mediaconvert/latest/ug/what-is.html
+    options:
+      - { text: "AWS Elemental MediaConvert", correct: true }
+      - { text: "Amazon Rekognition", correct: false }
+      - { text: "Amazon Polly", correct: false }
+      - { text: "Amazon Kinesis Data Streams", correct: false }
+  - type: single
+    prompt: "A company wants to centralize and automate backups of EC2, EBS, RDS, DynamoDB and EFS using policy-based backup plans. Which service should it use?"
+    explanation: "AWS Backup is a fully managed service for centralized, policy-based backups across AWS services. Storage Gateway connects on-premises storage to AWS and is not a backup policy service."
+    theoryUrl: https://docs.aws.amazon.com/aws-backup/latest/devguide/whatisbackup.html
+    options:
+      - { text: "AWS Storage Gateway", correct: false }
+      - { text: "Amazon S3 Glacier", correct: false }
+      - { text: "AWS Backup", correct: true }
+      - { text: "AWS Elastic Disaster Recovery", correct: false }
+  - type: multi
+    prompt: "Which capabilities does AWS Backup provide? (Select THREE.)"
+    explanation: "AWS Backup supports backup plans, tag-based assignment and copying backups to other Regions. It centralizes backup management, so you do not write per-service scripts."
+    theoryUrl: https://docs.aws.amazon.com/aws-backup/latest/devguide/whatisbackup.html
+    options:
+      - { text: "Policy-based backup plans", correct: true }
+      - { text: "Assigning resources to a plan using tags", correct: true }
+      - { text: "Backing up only Amazon S3 data", correct: false }
+      - { text: "Copying backups to other AWS Regions", correct: true }
+      - { text: "It requires custom scripts for each AWS service", correct: false }
+  - type: single
+    prompt: "A company wants to prevent anyone, including administrators, from deleting its backups or changing their retention period. Which AWS Backup feature helps?"
+    explanation: "AWS Backup Vault Lock enforces a write-once-read-many (WORM) model on backup vaults."
+    theoryUrl: https://docs.aws.amazon.com/aws-backup/latest/devguide/whatisbackup.html
+    options:
+      - { text: "Backup lifecycle policy", correct: false }
+      - { text: "Cross-Region backup copy", correct: false }
+      - { text: "AWS Backup Vault Lock", correct: true }
+      - { text: "Backup Audit Manager", correct: false }
+  - type: single
+    prompt: "A company wants to recover on-premises servers in AWS after a disaster, using continuous replication into a low-cost staging area. Which service is built for this?"
+    explanation: "AWS Elastic Disaster Recovery replicates servers into a staging area with affordable storage and minimal compute, then launches full recovery instances when needed. AWS Backup takes point-in-time backups instead of continuous server replication."
+    theoryUrl: https://docs.aws.amazon.com/drs/latest/userguide/what-is-drs.html
+    options:
+      - { text: "AWS Backup", correct: false }
+      - { text: "AWS Elastic Disaster Recovery", correct: true }
+      - { text: "AWS Storage Gateway", correct: false }
+      - { text: "AWS Database Migration Service", correct: false }
+  - type: multi
+    prompt: "Which statements about AWS Elastic Disaster Recovery are true? (Select THREE.)"
+    explanation: "It replicates on-premises or cloud-based applications into AWS, keeps a cheap staging area, and supports failing back to the primary site. It does not need a full duplicate environment running all the time."
+    theoryUrl: https://docs.aws.amazon.com/drs/latest/userguide/what-is-drs.html
+    options:
+      - { text: "It replicates on-premises or cloud-based applications into AWS", correct: true }
+      - {
+          text: "It keeps a full-capacity duplicate environment running at all times",
+          correct: false,
+        }
+      - {
+          text: "It uses a staging area with affordable storage and minimal compute",
+          correct: true,
+        }
+      - { text: "It works only for Amazon RDS databases", correct: false }
+      - { text: "You can fail back to the primary site when the issue is resolved", correct: true }
+  - type: single
+    prompt: "A company that used Amazon Pinpoint now only needs application-to-person SMS and voice messaging. Which AWS service does the documentation point to for that?"
+    explanation: "AWS End User Messaging handles SMS and voice messaging. Amazon Pinpoint reaches end of support on October 30, 2026, and SES covers email only."
+    theoryUrl: https://docs.aws.amazon.com/pinpoint/latest/userguide/welcome.html
+    options:
+      - { text: "Amazon SES", correct: false }
+      - { text: "AWS End User Messaging", correct: true }
+      - { text: "Amazon Connect", correct: false }
+      - { text: "AWS IoT Core", correct: false }
+  - type: boolean
+    prompt: "AWS IoT Core only supports the HTTPS protocol for device communication."
+    answer: false
+    explanation: "IoT Core supports MQTT, MQTT over WebSockets Secure, HTTPS and LoRaWAN."
+    theoryUrl: https://docs.aws.amazon.com/iot/latest/developerguide/what-is-aws-iot.html
+  - type: single
+    prompt: "Which AWS service lets you create private blockchain networks with the Hyperledger Fabric framework?"
+    explanation: "Amazon Managed Blockchain does. Be aware that AWS announced end of support for it: it stopped accepting new customers on October 29, 2026, and existing customers can use it until September 29, 2027."
+    theoryUrl: https://docs.aws.amazon.com/managed-blockchain/latest/hyperledger-fabric-dev/what-is-managed-blockchain.html
+    options:
+      - { text: "AWS Key Management Service", correct: false }
+      - { text: "Amazon Neptune", correct: false }
+      - { text: "AWS Certificate Manager", correct: false }
+      - { text: "Amazon Managed Blockchain", correct: true }
+  - type: boolean
+    prompt: "With Amazon Connect, you pay only for what you use."
+    answer: true
+    explanation: "Amazon Connect uses pay-as-you-go pricing, so there is no upfront commitment to a fixed number of seats."
+    theoryUrl: https://docs.aws.amazon.com/connect/latest/adminguide/what-is-amazon-connect.html
+  - type: multi
+    prompt: "Which are valid ways to use AWS Device Farm? (Select TWO.)"
+    explanation: "Device Farm supports automated test runs on real devices and interactive remote access through a browser. It does not host app backends or convert video."
+    theoryUrl: https://docs.aws.amazon.com/devicefarm/latest/developerguide/welcome.html
+    options:
+      - { text: "Hosting the backend API of a mobile app", correct: false }
+      - { text: "Running automated tests on real devices in parallel", correct: true }
+      - { text: "Interacting with a real device live through your web browser", correct: true }
+      - { text: "Transcoding video files for mobile playback", correct: false }

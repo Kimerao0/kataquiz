@@ -1,0 +1,181 @@
+version: 1
+title: "AWS Cloud Practitioner 04: Compute services and EC2"
+description: Amazon EC2 basics, AMIs, instance types, security groups, key pairs, user data, root volumes and the EC2 purchasing options.
+language: en
+tags: [aws, cloud-practitioner, ec2, compute]
+run:
+  questionsPerRun: 10
+  maxErrors: 3
+  timePerQuestionSec: 45
+questions:
+  - type: single
+    prompt: "What is an Amazon EC2 instance?"
+    explanation: "An EC2 instance is a virtual server in the AWS Cloud. The instance type you choose determines the hardware available to it."
+    theoryUrl: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/concepts.html
+    options:
+      - { text: "A managed relational database", correct: false }
+      - { text: "A storage bucket for objects", correct: false }
+      - { text: "A virtual server in the AWS Cloud", correct: true }
+      - { text: "A virtual network in your account", correct: false }
+  - type: single
+    prompt: "What is an Amazon Machine Image (AMI)?"
+    explanation: "An AMI is a preconfigured template that packages what you need for a server, including the operating system and extra software. You must specify one when you launch an instance."
+    theoryUrl: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/AMIs.html
+    options:
+      - {
+          text: "A preconfigured template with the operating system and software used to launch instances",
+          correct: true,
+        }
+      - { text: "A backup of your IAM users", correct: false }
+      - { text: "A firewall configuration for your instances", correct: false }
+      - { text: "A monitoring dashboard for instance health", correct: false }
+  - type: single
+    prompt: "What does the EC2 instance type determine?"
+    explanation: "The instance type sets the hardware of the host used for your instance. Each type offers a different balance of compute, memory, network and storage resources."
+    theoryUrl: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/concepts.html
+    options:
+      - { text: "The Region where the instance runs", correct: false }
+      - { text: "Who is allowed to connect to the instance", correct: false }
+      - { text: "The operating system that is installed", correct: false }
+      - { text: "The balance of CPU, memory, network and storage resources", correct: true }
+  - type: single
+    prompt: "You need to run a large in-memory database. Which EC2 instance category fits best?"
+    explanation: "Memory optimized instances are designed for workloads that process large datasets in memory, such as in-memory databases and analytics."
+    theoryUrl: https://aws.amazon.com/ec2/instance-types/
+    options:
+      - { text: "Compute optimized", correct: false }
+      - { text: "Memory optimized", correct: true }
+      - { text: "General purpose", correct: false }
+      - { text: "Accelerated computing", correct: false }
+  - type: single
+    prompt: "Security groups are stateful. What does that mean?"
+    explanation: "If you send a request from your instance, the response traffic is allowed in regardless of inbound rules. Responses to allowed inbound traffic are likewise allowed out regardless of outbound rules."
+    theoryUrl: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-security-groups.html
+    options:
+      - { text: "Rules are evaluated in numbered order", correct: false }
+      - { text: "They keep a history of every blocked request", correct: false }
+      - { text: "Response traffic for allowed requests is automatically allowed", correct: true }
+      - { text: "They can only be changed when the instance is stopped", correct: false }
+  - type: single
+    prompt: "You launch a Linux instance with an EC2 key pair. Who holds the private key, and what happens if it is lost?"
+    explanation: "You store the private key. Amazon EC2 keeps only the public key and no copy of the private key, so a lost private key can't be recovered from AWS."
+    theoryUrl: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-key-pairs.html
+    options:
+      - { text: "AWS holds it and can resend it on request", correct: false }
+      - { text: "You hold it, and AWS can't recover it for you", correct: true }
+      - { text: "It is stored in the AMI and reused automatically", correct: false }
+      - { text: "It is stored in IAM and tied to your user", correct: false }
+  - type: single
+    prompt: "What is EC2 user data typically used for?"
+    explanation: "User data lets you pass scripts or cloud-init directives that run when the instance starts, so you can automate configuration. By default they run only during the first boot."
+    theoryUrl: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/user-data.html
+    options:
+      - { text: "Storing the private key of the instance", correct: false }
+      - { text: "Defining which ports are open", correct: false }
+      - { text: "Choosing the instance type", correct: false }
+      - { text: "Running a script at launch to configure the instance", correct: true }
+  - type: single
+    prompt: "Which EC2 purchasing option lets you pay for instances by the second, with no long-term commitment or upfront payment?"
+    explanation: "On-Demand Instances are billed by the second (with a 60-second minimum) with no commitment. Savings Plans and Reserved Instances require a 1- or 3-year term."
+    theoryUrl: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/concepts.html#ec2-pricing
+    options:
+      - { text: "On-Demand Instances", correct: true }
+      - { text: "Reserved Instances", correct: false }
+      - { text: "Savings Plans", correct: false }
+      - { text: "Dedicated Hosts with a reservation", correct: false }
+  - type: single
+    prompt: "Which workload is best suited to Spot Instances?"
+    explanation: "Spot Instances use spare capacity at a steep discount, but EC2 can interrupt them when it needs the capacity back. They suit flexible, interruptible work such as batch jobs and data analysis."
+    theoryUrl: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/using-spot-instances.html
+    options:
+      - { text: "A production database that must never stop", correct: false }
+      - { text: "A single server hosting a customer-facing checkout page", correct: false }
+      - { text: "A fault-tolerant batch job that can be interrupted and restarted", correct: true }
+      - { text: "A license-bound workload that must stay on one physical server", correct: false }
+  - type: single
+    prompt: "Which purchasing option involves committing to a consistent amount of usage, measured in USD per hour, for a 1- or 3-year term?"
+    explanation: "Savings Plans commit you to a consistent hourly spend. Reserved Instances commit to a specific instance configuration, such as instance type and Region."
+    theoryUrl: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/concepts.html#ec2-pricing
+    options:
+      - { text: "Spot Instances", correct: false }
+      - { text: "Savings Plans", correct: true }
+      - { text: "On-Demand Instances", correct: false }
+      - { text: "Capacity Reservations", correct: false }
+  - type: single
+    prompt: "A company must reuse its existing per-socket and per-core software licenses on AWS. Which option is the best fit?"
+    explanation: "Dedicated Hosts give you a physical server fully dedicated to you, with visibility of sockets and cores, which supports bring-your-own-license scenarios."
+    theoryUrl: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/dedicated-hosts-overview.html
+    options:
+      - { text: "Spot Instances", correct: false }
+      - { text: "On-Demand Instances on shared hardware", correct: false }
+      - { text: "Burstable general purpose instances", correct: false }
+      - { text: "Dedicated Hosts", correct: true }
+  - type: single
+    prompt: "What happens to the data on an instance store volume when you stop the instance?"
+    explanation: "Instance store volumes hold temporary data that is deleted when you stop, hibernate or terminate the instance. Use EBS for data that must persist."
+    theoryUrl: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/concepts.html
+    options:
+      - { text: "It is deleted", correct: true }
+      - { text: "It is copied to Amazon S3 automatically", correct: false }
+      - { text: "It is kept and reattached when the instance restarts", correct: false }
+      - { text: "It is converted to an EBS volume", correct: false }
+  - type: multi
+    prompt: "Which of these workloads are well suited to Spot Instances?"
+    explanation: "Spot suits flexible workloads that can be interrupted, such as data analysis, batch jobs and background processing. Stateful systems that can't tolerate interruption should not run on Spot."
+    theoryUrl: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/using-spot-instances.html
+    options:
+      - { text: "Batch processing jobs", correct: true }
+      - { text: "A stateful database that cannot tolerate interruptions", correct: false }
+      - { text: "Data analysis tasks that can be restarted", correct: true }
+      - { text: "A workload that needs guaranteed uptime at all times", correct: false }
+      - { text: "Optional background processing", correct: true }
+  - type: multi
+    prompt: "Which statements about EC2 security groups are true?"
+    explanation: "Security groups are stateful, contain allow rules only, and you can associate multiple groups with an instance. They are not applied at the subnet level, which is what network ACLs do."
+    theoryUrl: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-security-groups.html
+    options:
+      - { text: "They are stateful", correct: true }
+      - { text: "They can contain explicit deny rules", correct: false }
+      - { text: "An instance can be associated with multiple security groups", correct: true }
+      - { text: "They are applied at the subnet level", correct: false }
+      - { text: "They contain allow rules only", correct: true }
+  - type: multi
+    prompt: "Which statements about AMIs are true?"
+    explanation: "An AMI is specific to a Region, but you can copy it to another Region. One AMI can launch many instances with the same configuration."
+    theoryUrl: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/AMIs.html
+    options:
+      - { text: "An AMI is specific to a Region", correct: true }
+      - { text: "An AMI is automatically available in every Region", correct: false }
+      - { text: "You can copy an AMI to another Region", correct: true }
+      - { text: "An AMI can launch only one instance", correct: false }
+      - { text: "You can launch multiple instances from a single AMI", correct: true }
+  - type: multi
+    prompt: "Which of these are EC2 instance type categories?"
+    explanation: "Compute optimized, memory optimized and storage optimized are instance categories, along with general purpose and accelerated computing. Identity optimized and Region optimized don't exist."
+    theoryUrl: https://aws.amazon.com/ec2/instance-types/
+    options:
+      - { text: "Identity optimized", correct: false }
+      - { text: "Compute optimized", correct: true }
+      - { text: "Memory optimized", correct: true }
+      - { text: "Region optimized", correct: false }
+      - { text: "Storage optimized", correct: true }
+  - type: boolean
+    prompt: "An EC2 instance with an EBS root volume can be stopped and started again without affecting the data on its attached volumes."
+    answer: true
+    explanation: "EBS volumes are persistent. Instances with an EBS root volume can be stopped and restarted, unlike instances with an instance store root volume, which can't be stopped."
+    theoryUrl: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/RootDeviceStorage.html
+  - type: boolean
+    prompt: "Dedicated Instances give you visibility of the number of sockets and physical cores of the underlying host."
+    answer: false
+    explanation: "That visibility is a feature of Dedicated Hosts. Dedicated Instances run on single-tenant hardware but give no visibility of sockets, cores or host ID."
+    theoryUrl: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/dedicated-hosts-overview.html
+  - type: boolean
+    prompt: "If you lose the private key of an EC2 key pair, Amazon EC2 can send you a copy because it stores one for you."
+    answer: false
+    explanation: "Amazon EC2 stores only the public key and doesn't keep a copy of your private key, so there is no way to recover it."
+    theoryUrl: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-key-pairs.html
+  - type: boolean
+    prompt: "By default, EC2 user data scripts run only during the boot cycle when you first launch the instance."
+    answer: true
+    explanation: "Unless you change the configuration, user data scripts and cloud-init directives don't run again on later restarts."
+    theoryUrl: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/user-data.html

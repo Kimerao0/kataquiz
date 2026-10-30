@@ -1,0 +1,181 @@
+version: 1
+title: "AWS Cloud Practitioner 07: Storing files with EBS and EFS"
+description: "EBS volumes and snapshots, instance store, EFS and FSx, and the difference between block, file and object storage."
+language: en
+tags: [aws, cloud-practitioner, storage, ebs, efs]
+run:
+  questionsPerRun: 10
+  maxErrors: 3
+  timePerQuestionSec: 45
+questions:
+  - type: single
+    prompt: "What type of storage does Amazon EBS provide for EC2 instances?"
+    explanation: "EBS volumes are block-level storage devices. You attach one to an instance and use it like a physical hard drive: format it, mount it and store files or install applications."
+    theoryUrl: https://docs.aws.amazon.com/ebs/latest/userguide/what-is-ebs.html
+    options:
+      - { text: "Object storage", correct: false }
+      - { text: "Archive storage", correct: false }
+      - { text: "Block storage", correct: true }
+      - { text: "Network file storage over NFS", correct: false }
+  - type: single
+    prompt: "Your EC2 instance runs in Availability Zone us-east-1a. In which Availability Zone must an EBS volume be to attach to it?"
+    explanation: "An EBS volume and the instance it attaches to must be in the same Availability Zone. To use the data in another AZ, create a snapshot and restore a new volume there."
+    theoryUrl: https://docs.aws.amazon.com/ebs/latest/userguide/ebs-volumes.html
+    options:
+      - { text: "us-east-1a, the same Availability Zone as the instance", correct: true }
+      - { text: "Any Availability Zone in the Region", correct: false }
+      - { text: "Any Availability Zone in any Region", correct: false }
+      - { text: "A different Availability Zone from the instance, for resilience", correct: false }
+  - type: single
+    prompt: "What happens to the data on an EC2 instance store volume when the instance is stopped?"
+    explanation: "Instance store data persists across a reboot but not when the instance is stopped, hibernated or terminated. Do not keep valuable long-term data there."
+    theoryUrl: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/instance-store-lifetime.html
+    options:
+      - { text: "It is copied to Amazon S3 automatically", correct: false }
+      - { text: "It is kept and available again when the instance restarts", correct: false }
+      - { text: "It is moved to an EBS snapshot", correct: false }
+      - { text: "It does not persist and is lost", correct: true }
+  - type: single
+    prompt: "You need to move the data of an EBS volume to a new volume in a different Availability Zone. What is the standard approach?"
+    explanation: "Snapshots are replicated across all AZs in the Region, so you create a snapshot of the volume and restore a new volume from it in the target AZ."
+    theoryUrl: https://docs.aws.amazon.com/ebs/latest/userguide/ebs-snapshots.html
+    options:
+      - { text: "Attach the volume directly to an instance in the other AZ", correct: false }
+      - {
+          text: "Take an EBS snapshot, then create a new volume from it in the target AZ",
+          correct: true,
+        }
+      - { text: "Change the volume type to gp3, which moves it between AZs", correct: false }
+      - { text: "Enable Multi-AZ on the volume", correct: false }
+  - type: single
+    prompt: "Which EBS volume type is a General Purpose SSD that fits boot volumes, development and test environments, and medium-sized databases?"
+    explanation: "gp3 (and the older gp2) are General Purpose SSD volumes. st1 and sc1 are HDD-backed and cannot be used as boot volumes."
+    theoryUrl: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ebs-volume-types.html
+    options:
+      - { text: "st1", correct: false }
+      - { text: "sc1", correct: false }
+      - { text: "gp3", correct: true }
+      - { text: "Instance store", correct: false }
+  - type: single
+    prompt: "A database needs sustained, high IOPS performance with low latency. Which EBS volume type is designed for this?"
+    explanation: "Provisioned IOPS SSD volumes (io2 and io1) are built for I/O-intensive workloads such as databases that need sustained IOPS. HDD volumes are optimized for throughput, not IOPS."
+    theoryUrl: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ebs-volume-types.html
+    options:
+      - { text: "Throughput Optimized HDD (st1)", correct: false }
+      - { text: "Provisioned IOPS SSD (io2)", correct: true }
+      - { text: "Cold HDD (sc1)", correct: false }
+      - { text: "Amazon S3 Glacier", correct: false }
+  - type: single
+    prompt: "Which EBS volume type is the lowest-cost option, for throughput-oriented data that is infrequently accessed?"
+    explanation: "Cold HDD (sc1) targets infrequently accessed data where the lowest storage cost matters. Throughput Optimized HDD (st1) is for frequently accessed streaming workloads like big data and log processing."
+    theoryUrl: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ebs-volume-types.html
+    options:
+      - { text: "gp3", correct: false }
+      - { text: "io2", correct: false }
+      - { text: "st1", correct: false }
+      - { text: "sc1", correct: true }
+  - type: single
+    prompt: "Dozens of Linux EC2 instances in several Availability Zones must read and write the same files at the same time. Which service is the best fit?"
+    explanation: "Amazon EFS is a shared, elastic file system accessed over NFS by many instances across multiple AZs. An EBS volume normally attaches to a single instance and lives in one AZ."
+    theoryUrl: https://docs.aws.amazon.com/efs/latest/ug/whatisefs.html
+    options:
+      - { text: "Amazon EBS gp3", correct: false }
+      - { text: "Amazon EFS", correct: true }
+      - { text: "EC2 instance store", correct: false }
+      - { text: "Amazon EBS snapshots", correct: false }
+  - type: single
+    prompt: "A company is migrating a Windows application that needs an SMB file share integrated with Microsoft Active Directory. Which service should it use?"
+    explanation: "Amazon FSx for Windows File Server provides fully managed Windows file servers, accessed over SMB and integrated with Active Directory. EFS is not supported on Windows instances."
+    theoryUrl: https://docs.aws.amazon.com/fsx/latest/WindowsGuide/what-is.html
+    options:
+      - { text: "Amazon FSx for Windows File Server", correct: true }
+      - { text: "Amazon EFS", correct: false }
+      - { text: "Amazon EBS st1", correct: false }
+      - { text: "Amazon FSx for Lustre", correct: false }
+  - type: single
+    prompt: "Which service is a fully managed Lustre file system for workloads where storage speed matters, such as high performance computing and machine learning?"
+    explanation: "Amazon FSx for Lustre is built for fast storage workloads like HPC, ML and video processing, and it can be linked to an S3 bucket."
+    theoryUrl: https://docs.aws.amazon.com/fsx/latest/LustreGuide/what-is.html
+    options:
+      - { text: "Amazon EFS", correct: false }
+      - { text: "Amazon EBS io2", correct: false }
+      - { text: "Amazon FSx for Lustre", correct: true }
+      - { text: "Amazon FSx for Windows File Server", correct: false }
+  - type: single
+    prompt: "Which of these is object storage rather than block or file storage?"
+    explanation: "Amazon S3 stores data as objects in buckets and is accessed through an API. EBS is block storage and EFS and FSx are file storage."
+    theoryUrl: https://docs.aws.amazon.com/AmazonS3/latest/userguide/Welcome.html
+    options:
+      - { text: "Amazon EBS", correct: false }
+      - { text: "Amazon EFS", correct: false }
+      - { text: "Amazon FSx for Windows File Server", correct: false }
+      - { text: "Amazon S3", correct: true }
+  - type: single
+    prompt: "Which storage is ideal for temporary data that changes frequently, such as buffers, caches and scratch data, and is physically attached to the host computer?"
+    explanation: "An instance store provides temporary block-level storage on disks physically attached to the host. It suits scratch data, but is lost when the instance stops or terminates."
+    theoryUrl: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/InstanceStorage.html
+    options:
+      - { text: "Amazon EFS", correct: false }
+      - { text: "EC2 instance store", correct: true }
+      - { text: "Amazon S3 Standard", correct: false }
+      - { text: "EBS snapshot", correct: false }
+  - type: multi
+    prompt: "Which statements about Amazon EFS are true?"
+    explanation: "EFS is a shared NFS file system that grows and shrinks automatically, and regional file systems store data across multiple AZs. It is not supported on Windows-based EC2 instances, and it is not block storage."
+    theoryUrl: https://docs.aws.amazon.com/efs/latest/ug/whatisefs.html
+    options:
+      - { text: "It uses the Network File System (NFS) protocol", correct: true }
+      - {
+          text: "Regional file systems store data across multiple Availability Zones",
+          correct: true,
+        }
+      - { text: "It is supported on Windows-based EC2 instances", correct: false }
+      - { text: "It grows and shrinks automatically as you add and remove files", correct: true }
+      - { text: "It is block storage attached to a single instance", correct: false }
+  - type: multi
+    prompt: "Which of these EBS volume types are SSD-backed?"
+    explanation: "gp3 (General Purpose SSD) and io2 (Provisioned IOPS SSD) are SSD-backed. st1 and sc1 are HDD-backed."
+    theoryUrl: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ebs-volume-types.html
+    options:
+      - { text: "st1", correct: false }
+      - { text: "gp3", correct: true }
+      - { text: "sc1", correct: false }
+      - { text: "io2", correct: true }
+  - type: multi
+    prompt: "Which statements about EC2 instance store volumes are true?"
+    explanation: "Instance store provides temporary block-level storage on disks physically attached to the host. Volumes are attached only at launch and the data does not survive a stop or termination."
+    theoryUrl: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/instance-store-lifetime.html
+    options:
+      - { text: "It provides temporary block-level storage", correct: true }
+      - { text: "Its data persists when the instance is stopped", correct: false }
+      - { text: "It uses disks physically attached to the host computer", correct: true }
+      - { text: "You can detach it and attach it to a different instance", correct: false }
+  - type: multi
+    prompt: "Which are typical uses of an Amazon EBS volume?"
+    explanation: "EBS volumes serve as the system (boot) drive of an instance and as storage for databases. Sharing one file system across many Linux servers is the job of EFS, and object storage is S3."
+    theoryUrl: https://docs.aws.amazon.com/ebs/latest/userguide/ebs-volumes.html
+    options:
+      - { text: "Boot (system) drive of an EC2 instance", correct: true }
+      - { text: "Shared file system mounted by hundreds of Linux servers at once", correct: false }
+      - { text: "Storage for a database application running on EC2", correct: true }
+      - { text: "Storing website images as objects served over an API", correct: false }
+  - type: boolean
+    prompt: "An EBS volume in us-east-1a can be attached to an EC2 instance running in us-east-1b."
+    answer: false
+    explanation: "The volume and the instance must be in the same Availability Zone. To use the data in another AZ, restore a snapshot there."
+    theoryUrl: https://docs.aws.amazon.com/ebs/latest/userguide/ebs-volumes.html
+  - type: boolean
+    prompt: "EBS snapshots are incremental: after the first one, only the blocks that changed since the previous snapshot are saved."
+    answer: true
+    explanation: "A snapshot is an incremental backup, which saves time and storage cost compared to copying the whole volume every time."
+    theoryUrl: https://docs.aws.amazon.com/ebs/latest/userguide/ebs-snapshots.html
+  - type: boolean
+    prompt: "Amazon EFS is supported on Windows-based EC2 instances."
+    answer: false
+    explanation: "The EFS documentation states that using EFS with Microsoft Windows-based EC2 instances is not supported. Use FSx for Windows File Server for SMB shares."
+    theoryUrl: https://docs.aws.amazon.com/efs/latest/ug/whatisefs.html
+  - type: boolean
+    prompt: "AWS automatically takes regular snapshots of your EBS volumes, so you do not need to configure backups."
+    answer: false
+    explanation: "AWS does not automatically back up EBS volumes. You create snapshots yourself or automate them with Amazon Data Lifecycle Manager or AWS Backup."
+    theoryUrl: https://docs.aws.amazon.com/ebs/latest/userguide/ebs-snapshots.html

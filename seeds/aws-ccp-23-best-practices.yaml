@@ -1,0 +1,183 @@
+version: 1
+title: "AWS Cloud Practitioner 23: Cloud best practices"
+description: "The AWS Well-Architected Framework pillars, design principles, high availability versus fault tolerance, disaster recovery strategies, and RTO and RPO."
+language: en
+tags: [aws, cloud-practitioner, well-architected, resilience]
+run:
+  questionsPerRun: 10
+  maxErrors: 3
+  timePerQuestionSec: 45
+questions:
+  - type: single
+    prompt: "Which Well-Architected pillar is about running and monitoring systems and continually improving processes and procedures?"
+    explanation: "That is operational excellence. Reliability is about recovering from failure, and performance efficiency is about using resources well for the workload."
+    theoryUrl: https://docs.aws.amazon.com/wellarchitected/latest/framework/the-pillars-of-the-framework.html
+    options:
+      - { text: "Operational excellence", correct: true }
+      - { text: "Reliability", correct: false }
+      - { text: "Performance efficiency", correct: false }
+      - { text: "Security", correct: false }
+  - type: single
+    prompt: "A company wants its workload to recover automatically from failures and to meet demand as it changes. Which Well-Architected pillar does this describe?"
+    explanation: "Reliability covers recovering from disruptions and dynamically acquiring resources to meet demand."
+    theoryUrl: https://docs.aws.amazon.com/wellarchitected/latest/reliability-pillar/design-principles.html
+    options:
+      - { text: "Cost optimization", correct: false }
+      - { text: "Sustainability", correct: false }
+      - { text: "Operational excellence", correct: false }
+      - { text: "Reliability", correct: true }
+  - type: boolean
+    prompt: "In the Well-Architected Framework, the Recovery Time Objective (RTO) is the maximum acceptable amount of data loss, measured in time."
+    answer: false
+    explanation: "That definition belongs to the Recovery Point Objective (RPO). RTO is the maximum acceptable delay between the interruption of service and its restoration."
+    theoryUrl: https://docs.aws.amazon.com/whitepapers/latest/disaster-recovery-workloads-on-aws/business-continuity-plan-bcp.html
+  - type: single
+    prompt: "Which Well-Architected pillar focuses on avoiding unnecessary costs, for example by adopting a consumption model and not paying for idle capacity?"
+    explanation: "Cost optimization is about delivering business value at the lowest price point. Performance efficiency is about fit for purpose, not about the bill."
+    theoryUrl: https://docs.aws.amazon.com/wellarchitected/latest/framework/the-pillars-of-the-framework.html
+    options:
+      - { text: "Performance efficiency", correct: false }
+      - { text: "Cost optimization", correct: true }
+      - { text: "Operational excellence", correct: false }
+      - { text: "Security", correct: false }
+  - type: single
+    prompt: "Which pillar is mainly concerned with environmental impact, especially energy consumption and efficiency?"
+    explanation: "The sustainability pillar focuses on environmental impacts, especially energy consumption and efficiency."
+    theoryUrl: https://docs.aws.amazon.com/wellarchitected/latest/framework/sustainability.html
+    options:
+      - { text: "Cost optimization", correct: false }
+      - { text: "Performance efficiency", correct: false }
+      - { text: "Sustainability", correct: true }
+      - { text: "Reliability", correct: false }
+  - type: single
+    prompt: "Which of the following is NOT one of the six pillars of the AWS Well-Architected Framework?"
+    explanation: "The six pillars are operational excellence, security, reliability, performance efficiency, cost optimization and sustainability. Agility is a benefit of the cloud, not a pillar."
+    theoryUrl: https://docs.aws.amazon.com/wellarchitected/latest/framework/the-pillars-of-the-framework.html
+    options:
+      - { text: "Agility", correct: true }
+      - { text: "Security", correct: false }
+      - { text: "Reliability", correct: false }
+      - { text: "Cost optimization", correct: false }
+  - type: multi
+    prompt: "Which of the following are pillars of the AWS Well-Architected Framework? (Select THREE.)"
+    explanation: "Security, performance efficiency and sustainability are pillars. Scalability and portability are useful properties, but they are not pillars."
+    theoryUrl: https://docs.aws.amazon.com/wellarchitected/latest/framework/the-pillars-of-the-framework.html
+    options:
+      - { text: "Security", correct: true }
+      - { text: "Scalability", correct: false }
+      - { text: "Performance efficiency", correct: true }
+      - { text: "Portability", correct: false }
+      - { text: "Sustainability", correct: true }
+  - type: single
+    prompt: "A team replaces one large server with several smaller ones behind a load balancer so that a single failure affects only a small part of the workload. Which reliability design principle is this?"
+    explanation: "Scaling horizontally increases aggregate availability, because requests are spread across multiple smaller resources that do not share a single point of failure."
+    theoryUrl: https://docs.aws.amazon.com/wellarchitected/latest/reliability-pillar/design-principles.html
+    options:
+      - { text: "Stop guessing capacity", correct: false }
+      - { text: "Test recovery procedures", correct: false }
+      - { text: "Manage change through automation", correct: false }
+      - { text: "Scale horizontally", correct: true }
+  - type: multi
+    prompt: "Which of the following are reliability design principles? (Select THREE.)"
+    explanation: "Reliability principles include automatically recovering from failure, testing recovery procedures and scaling horizontally. Guessing capacity and making manual production changes are the opposite of good practice."
+    theoryUrl: https://docs.aws.amazon.com/wellarchitected/latest/reliability-pillar/design-principles.html
+    options:
+      - { text: "Automatically recover from failure", correct: true }
+      - { text: "Provision for the peak you guess you might need", correct: false }
+      - { text: "Test recovery procedures", correct: true }
+      - { text: "Make manual changes directly in production", correct: false }
+      - { text: "Scale horizontally to increase aggregate availability", correct: true }
+  - type: single
+    prompt: "A company puts an Amazon SQS queue between its web tier and its order-processing tier so the two can scale and fail independently. Which design principle does this follow?"
+    explanation: "This is loose coupling (decoupling). Components that interact through a queue do not depend on each other being available at the same moment."
+    options:
+      - { text: "Think parallel", correct: false }
+      - { text: "Implement elasticity", correct: false }
+      - { text: "Decouple components", correct: true }
+      - { text: "Use serverless only", correct: false }
+  - type: boolean
+    prompt: "A tightly coupled architecture, where components depend directly on each other, is the preferred design on AWS."
+    answer: false
+    explanation: "Decoupling is the recommended practice. Tight coupling means a failure or overload in one component spreads to the others."
+  - type: single
+    prompt: "How does a fault-tolerant system differ from a highly available one?"
+    explanation: "High availability aims to minimize downtime, and a brief interruption during failover can be acceptable. Fault tolerance goes further and keeps operating without interruption when components fail, usually at a higher cost."
+    theoryUrl: https://docs.aws.amazon.com/wellarchitected/latest/reliability-pillar/design-principles.html
+    options:
+      - { text: "Fault tolerance only applies to on-premises systems", correct: false }
+      - {
+          text: "Fault tolerance keeps operating without interruption when components fail, while high availability tolerates a short interruption",
+          correct: true,
+        }
+      - { text: "High availability needs no redundant components", correct: false }
+      - { text: "They mean exactly the same thing", correct: false }
+  - type: boolean
+    prompt: "Deploying a workload across multiple Availability Zones is a common way to improve its availability."
+    answer: true
+    explanation: "Availability Zones have separate power, networking and connectivity, so most common disasters affect only one of them."
+    theoryUrl: https://docs.aws.amazon.com/whitepapers/latest/aws-overview/global-infrastructure.html
+  - type: single
+    prompt: "Which disaster recovery strategy has the lowest ongoing cost and complexity, but the longest recovery time?"
+    explanation: "Backup and restore only keeps backups in the recovery Region, so you have to redeploy infrastructure and restore the data after a disaster."
+    theoryUrl: https://docs.aws.amazon.com/whitepapers/latest/disaster-recovery-workloads-on-aws/disaster-recovery-options-in-the-cloud.html
+    options:
+      - { text: "Backup and restore", correct: true }
+      - { text: "Pilot light", correct: false }
+      - { text: "Warm standby", correct: false }
+      - { text: "Multi-site active/active", correct: false }
+  - type: single
+    prompt: "In a DR Region, a company keeps its databases replicated and always on, while application servers are deployed but switched off until a failover. Which strategy is this?"
+    explanation: "This is pilot light. The core infrastructure is always available, but it cannot process requests until you switch on and scale out the rest."
+    theoryUrl: https://docs.aws.amazon.com/whitepapers/latest/disaster-recovery-workloads-on-aws/disaster-recovery-options-in-the-cloud.html
+    options:
+      - { text: "Backup and restore", correct: false }
+      - { text: "Multi-site active/active", correct: false }
+      - { text: "Warm standby", correct: false }
+      - { text: "Pilot light", correct: true }
+  - type: single
+    prompt: "A scaled-down but fully functional copy of production runs in another Region and can handle traffic at reduced capacity right away. Which DR strategy is this?"
+    explanation: "Warm standby keeps everything deployed and running at lower capacity, so you only need to scale up. Pilot light needs extra steps before it can serve requests."
+    theoryUrl: https://docs.aws.amazon.com/whitepapers/latest/disaster-recovery-workloads-on-aws/disaster-recovery-options-in-the-cloud.html
+    options:
+      - { text: "Pilot light", correct: false }
+      - { text: "Backup and restore", correct: false }
+      - { text: "Warm standby", correct: true }
+      - { text: "Multi-site active/active", correct: false }
+  - type: multi
+    prompt: "Which statements about disaster recovery strategies are true? (Select TWO.)"
+    explanation: "Multi-site active/active serves traffic from every Region it runs in and is the most complex and costly option. Backup and restore is the cheapest and simplest, with the longest recovery time."
+    theoryUrl: https://docs.aws.amazon.com/whitepapers/latest/disaster-recovery-workloads-on-aws/disaster-recovery-options-in-the-cloud.html
+    options:
+      - {
+          text: "Pilot light gives the shortest recovery time of all four strategies",
+          correct: false,
+        }
+      - {
+          text: "Multi-site active/active serves traffic from all the Regions where it is deployed",
+          correct: true,
+        }
+      - { text: "Backup and restore is the lowest-cost, lowest-complexity approach", correct: true }
+      - { text: "Warm standby cannot handle any traffic until it is scaled up", correct: false }
+  - type: single
+    prompt: "A business can tolerate losing at most 15 minutes of data after an outage. Which disaster recovery metric does this describe?"
+    explanation: "That is the Recovery Point Objective (RPO), the maximum acceptable time since the last data recovery point. RTO is about how long the service may stay down."
+    theoryUrl: https://docs.aws.amazon.com/whitepapers/latest/disaster-recovery-workloads-on-aws/business-continuity-plan-bcp.html
+    options:
+      - { text: "Recovery Point Objective (RPO)", correct: true }
+      - { text: "Recovery Time Objective (RTO)", correct: false }
+      - { text: "Service Level Agreement (SLA)", correct: false }
+      - { text: "Mean time between failures (MTBF)", correct: false }
+  - type: multi
+    prompt: "Which of the following are examples of automating infrastructure and operations on AWS? (Select TWO.)"
+    explanation: "CloudFormation templates and Auto Scaling policies remove manual steps. Launching instances by hand or emailing an operator to restart servers does not scale or repeat reliably."
+    theoryUrl: https://docs.aws.amazon.com/wellarchitected/latest/reliability-pillar/design-principles.html
+    options:
+      - { text: "Defining resources in AWS CloudFormation templates", correct: true }
+      - { text: "Launching instances one by one in the console", correct: false }
+      - { text: "Using EC2 Auto Scaling policies to add and remove instances", correct: true }
+      - { text: "Emailing an operator to restart failed servers", correct: false }
+  - type: boolean
+    prompt: "AWS Elastic Disaster Recovery follows the pilot light strategy: it keeps replicated data and switched-off resources in a staging area until a failover."
+    answer: true
+    explanation: "Elastic Disaster Recovery maintains a copy of the data and switched-off resources in a staging Amazon VPC. On failover it creates a full-capacity deployment from them."
+    theoryUrl: https://docs.aws.amazon.com/whitepapers/latest/disaster-recovery-workloads-on-aws/disaster-recovery-options-in-the-cloud.html

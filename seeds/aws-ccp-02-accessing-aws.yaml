@@ -1,0 +1,193 @@
+version: 1
+title: "AWS Cloud Practitioner 02: Accessing and using AWS services"
+description: The ways to reach AWS (Console, CLI, SDKs, CloudShell), root user versus IAM user, access keys, Regions in the console, the Free Tier and support plans.
+language: en
+tags: [aws, cloud-practitioner, console, cli]
+run:
+  questionsPerRun: 10
+  maxErrors: 3
+  timePerQuestionSec: 45
+questions:
+  - type: single
+    prompt: "Which tool lets you manage AWS services with commands typed into your terminal and use them in shell scripts?"
+    explanation: "The AWS CLI is an open source tool that gives you command-line access to AWS services, with functionality equivalent to the browser-based console."
+    theoryUrl: https://docs.aws.amazon.com/cli/latest/userguide/cli-chap-welcome.html
+    options:
+      - { text: "AWS Management Console", correct: false }
+      - { text: "AWS Artifact", correct: false }
+      - { text: "AWS Command Line Interface (AWS CLI)", correct: true }
+      - { text: "AWS Marketplace", correct: false }
+  - type: single
+    prompt: "A developer wants to call AWS services directly from application code written in Python or JavaScript. What should they use?"
+    explanation: "AWS SDKs provide language-specific libraries (Python/Boto3, JavaScript, Java, .NET and others) for calling AWS services from code."
+    theoryUrl: https://docs.aws.amazon.com/sdkref/latest/guide/overview.html
+    options:
+      - { text: "An AWS SDK", correct: true }
+      - { text: "AWS CloudShell", correct: false }
+      - { text: "The AWS Billing console", correct: false }
+      - { text: "AWS Support Center", correct: false }
+  - type: single
+    prompt: "What is AWS CloudShell?"
+    explanation: "CloudShell is a browser-based, pre-authenticated shell that you launch from the AWS Management Console. The AWS CLI is already installed, so there is nothing to set up locally."
+    theoryUrl: https://docs.aws.amazon.com/cloudshell/latest/userguide/welcome.html
+    options:
+      - { text: "A managed virtual server you rent by the hour", correct: false }
+      - { text: "A desktop app for browsing S3 buckets", correct: false }
+      - { text: "A mobile app for billing alerts", correct: false }
+      - {
+          text: "A browser-based, pre-authenticated shell launched from the console",
+          correct: true,
+        }
+  - type: single
+    prompt: "How does AWS price the CloudShell service itself?"
+    explanation: "CloudShell is available at no additional charge. You still pay for any other AWS resources you create from it, and standard data transfer rates apply."
+    theoryUrl: https://docs.aws.amazon.com/cloudshell/latest/userguide/welcome.html
+    options:
+      - { text: "Per hour of shell session time", correct: false }
+      - {
+          text: "No additional charge, but you pay for other AWS resources you run with it",
+          correct: true,
+        }
+      - { text: "A fixed monthly subscription per user", correct: false }
+      - { text: "Per command executed", correct: false }
+  - type: single
+    prompt: "You open CloudShell from the console while signed in. How do you authenticate to run AWS CLI commands?"
+    explanation: "The credentials you used to sign in to the console are automatically available in the CloudShell session. There is no need to configure access keys."
+    theoryUrl: https://docs.aws.amazon.com/cloudshell/latest/userguide/welcome.html
+    options:
+      - { text: "Create a new access key and run the configure command", correct: false }
+      - { text: "Upload your root user password to the shell", correct: false }
+      - {
+          text: "Your console sign-in credentials are already available in the session",
+          correct: true,
+        }
+      - { text: "Import a key pair (.pem file)", correct: false }
+  - type: single
+    prompt: "What are the sign-in credentials of the AWS account root user?"
+    explanation: "The root user is the single sign-in identity created with the account. You sign in with the email address and password that you used to create the account."
+    theoryUrl: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_root-user.html
+    options:
+      - { text: "The email address and password used to create the account", correct: true }
+      - { text: "An IAM user name and an access key", correct: false }
+      - { text: "A key pair and a security group", correct: false }
+      - { text: "An AWS Support case number", correct: false }
+  - type: single
+    prompt: "Which of these tasks requires you to sign in as the root user of a standalone AWS account?"
+    explanation: "Closing a standalone account is one of the few root-only tasks. Launching instances, creating buckets and creating IAM users can all be done by an IAM identity with the right permissions."
+    theoryUrl: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_root-user.html#root-user-tasks
+    options:
+      - { text: "Launching an EC2 instance", correct: false }
+      - { text: "Creating an S3 bucket", correct: false }
+      - { text: "Creating an IAM user", correct: false }
+      - { text: "Closing the AWS account", correct: true }
+  - type: single
+    prompt: "An IAM user needs to run AWS CLI commands from a laptop using long-term credentials. What does the user need to sign those programmatic requests?"
+    explanation: "Access keys are long-term credentials made of an access key ID and a secret access key. You need both together to authenticate requests."
+    theoryUrl: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html
+    options:
+      - { text: "Only the console password", correct: false }
+      - { text: "An access key ID and a secret access key", correct: true }
+      - { text: "The AWS account ID alone", correct: false }
+      - { text: "An EC2 key pair", correct: false }
+  - type: single
+    prompt: "You created an EC2 instance, but you can't see it in the console. Others confirm it exists. What is the most likely cause?"
+    explanation: "Many resources, such as EC2 instances, are specific to the Region where they were created. The console may simply be showing a different Region than the one you used."
+    theoryUrl: https://docs.aws.amazon.com/awsconsolehelpdocs/latest/gsg/select-region.html
+    options:
+      - { text: "EC2 instances are only visible to the root user", correct: false }
+      - { text: "The instance was deleted after 24 hours", correct: false }
+      - { text: "The console is displaying a different Region", correct: true }
+      - { text: "Instances are only visible in the CLI", correct: false }
+  - type: single
+    prompt: "Which of these does the Basic Support plan include for every AWS account?"
+    explanation: "Basic Support gives all customers 24x7 access to one-on-one responses to account and billing questions, support forums, service health checks and documentation. A designated TAM and 24x7 engineer access come with paid plans."
+    theoryUrl: https://docs.aws.amazon.com/awssupport/latest/user/aws-support-plans.html
+    options:
+      - { text: "One-on-one responses to account and billing questions", correct: true }
+      - { text: "A designated Technical Account Manager", correct: false }
+      - { text: "24x7 phone access to Cloud Support Engineers", correct: false }
+      - { text: "Third-party software support", correct: false }
+  - type: single
+    prompt: "Which support plan includes a designated Technical Account Manager (TAM)?"
+    explanation: "A designated TAM is part of AWS Enterprise Support. Basic Support and Business Support+ don't include one."
+    theoryUrl: https://docs.aws.amazon.com/awssupport/latest/user/aws-support-plans.html
+    options:
+      - { text: "Basic Support", correct: false }
+      - { text: "Business Support+", correct: false }
+      - { text: "Enterprise Support", correct: true }
+      - { text: "The Free account plan", correct: false }
+  - type: single
+    prompt: "Which type of AWS Free Tier offer gives you an ongoing monthly usage allowance for selected services?"
+    explanation: "Always Free offers give a continuing monthly allowance for some services. Short-term trials are limited trials that start when you activate a service."
+    theoryUrl: https://docs.aws.amazon.com/awsaccountbilling/latest/aboutv2/free-tier.html
+    options:
+      - { text: "Short-term trials", correct: false }
+      - { text: "Savings Plans", correct: false }
+      - { text: "Spot credits", correct: false }
+      - { text: "Always Free", correct: true }
+  - type: multi
+    prompt: "Which of these are ways to access and manage AWS services?"
+    explanation: "The Management Console, the AWS CLI and the SDKs are the standard ways. You can't log in to AWS's physical servers, and support cases are not a way to run your own changes."
+    theoryUrl: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/concepts.html#access-ec2
+    options:
+      - { text: "AWS Management Console", correct: true }
+      - { text: "SSH into AWS's physical servers", correct: false }
+      - { text: "AWS CLI", correct: true }
+      - { text: "Emailing a request to AWS Support to make changes for you", correct: false }
+      - { text: "AWS SDKs", correct: true }
+  - type: multi
+    prompt: "Which of these tasks can only be done by signing in as the root user in a standalone account?"
+    explanation: "Changing the account email or root password, closing the account and restoring IAM permissions when the only administrator locked themselves out all need the root user. Launching EC2 instances and creating IAM users do not."
+    theoryUrl: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_root-user.html#root-user-tasks
+    options:
+      - { text: "Changing the root user email address or password", correct: true }
+      - { text: "Launching an EC2 instance", correct: false }
+      - {
+          text: "Restoring IAM permissions when the only IAM administrator revoked their own",
+          correct: true,
+        }
+      - { text: "Creating a new IAM user", correct: false }
+      - { text: "Closing the AWS account", correct: true }
+  - type: multi
+    prompt: "Which statements about AWS CloudShell are true?"
+    explanation: "CloudShell is pre-authenticated and lets you switch between Bash, PowerShell and Z shell. It runs in the browser, so there is no local install, and you don't need to set up access keys."
+    theoryUrl: https://docs.aws.amazon.com/cloudshell/latest/userguide/welcome.html
+    options:
+      - { text: "It is pre-authenticated with your console credentials", correct: true }
+      - { text: "You must create and configure access keys before using it", correct: false }
+      - { text: "It supports Bash, PowerShell and Z shell", correct: true }
+      - { text: "It must be installed on your local machine", correct: false }
+      - { text: "It is billed per hour of shell time", correct: false }
+  - type: multi
+    prompt: "Which statements about Regions in the AWS Management Console are true?"
+    explanation: "EC2 instances belong to the Region they were created in, and a mismatch between the selected Region and the Region of a resource is a common reason a resource looks missing. Some services, such as IAM, don't require a Region choice."
+    theoryUrl: https://docs.aws.amazon.com/awsconsolehelpdocs/latest/gsg/select-region.html
+    options:
+      - { text: "EC2 instances are specific to the Region where they were created", correct: true }
+      - { text: "Every resource is visible no matter which Region is selected", correct: false }
+      - { text: "You must pick a Region just to sign in to the console", correct: false }
+      - {
+          text: "If resources seem missing, the console may be showing a different Region",
+          correct: true,
+        }
+      - { text: "You don't need to choose a Region to use IAM", correct: true }
+  - type: boolean
+    prompt: "The AWS account root user is created automatically when you create an account and has complete access to all services and resources in it."
+    answer: true
+    explanation: "The root user is the single sign-in identity you begin with. It has complete access, which is why you should use it only for the few tasks that require it."
+    theoryUrl: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_root-user.html
+  - type: boolean
+    prompt: "An IAM user that has administrator permissions is the same thing as the AWS account root user."
+    answer: false
+    explanation: "They are different identities. An administrator IAM user can't do the tasks that only the root user can, and its permissions come from policies."
+    theoryUrl: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_users.html
+  - type: boolean
+    prompt: "Before using the AWS CLI inside CloudShell, you must always run a configuration step to enter an access key."
+    answer: false
+    explanation: "CloudShell users are pre-authenticated with the credentials they used to sign in to the console, so no credential setup is needed."
+    theoryUrl: https://docs.aws.amazon.com/cloudshell/latest/userguide/welcome.html
+  - type: boolean
+    prompt: "AWS provides SDKs for several programming languages, including Python, Java, JavaScript and .NET."
+    answer: true
+    explanation: "AWS SDKs exist for many languages, including Python (Boto3), Java, JavaScript, .NET, Go, PHP, Ruby, Rust and others."
+    theoryUrl: https://docs.aws.amazon.com/sdkref/latest/guide/overview.html

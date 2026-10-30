@@ -1,0 +1,180 @@
+version: 1
+title: "AWS Cloud Practitioner 17: Cloud migration and hybrid cloud"
+description: The 7 Rs migration strategies, AWS migration and data transfer services, hybrid options such as Outposts and Direct Connect, and the Cloud Adoption Framework.
+language: en
+tags: [aws, cloud-practitioner, migration, hybrid]
+run:
+  questionsPerRun: 10
+  maxErrors: 3
+  timePerQuestionSec: 45
+questions:
+  - type: single
+    prompt: "A company moves its servers to AWS exactly as they are, without changing the applications. Which of the 7 Rs is this?"
+    explanation: "Rehost, also called lift and shift, moves applications from the source environment to AWS without changes."
+    theoryUrl: https://docs.aws.amazon.com/prescriptive-guidance/latest/large-migration-guide/migration-strategies.html
+    options:
+      - { text: "Rehost", correct: true }
+      - { text: "Refactor", correct: false }
+      - { text: "Repurchase", correct: false }
+      - { text: "Retire", correct: false }
+  - type: single
+    prompt: "A team moves a Microsoft SQL Server database to Amazon RDS for SQL Server to get a managed service, with no change to the application's core design. Which strategy is this?"
+    explanation: "Replatform (lift, tinker and shift) moves the application and adds some optimization, such as using a managed service. The trap is rehost, which changes nothing."
+    theoryUrl: https://docs.aws.amazon.com/prescriptive-guidance/latest/large-migration-guide/migration-strategies.html
+    options:
+      - { text: "Rehost", correct: false }
+      - { text: "Retain", correct: false }
+      - { text: "Replatform", correct: true }
+      - { text: "Relocate", correct: false }
+  - type: single
+    prompt: "A company replaces its on-premises CRM with a vendor's SaaS product (sometimes called drop and shop). Which migration strategy is this?"
+    explanation: "Repurchase means replacing the application with a different version or product, typically moving from a traditional license to SaaS."
+    theoryUrl: https://docs.aws.amazon.com/prescriptive-guidance/latest/large-migration-guide/migration-strategies.html
+    options:
+      - { text: "Replatform", correct: false }
+      - { text: "Repurchase", correct: true }
+      - { text: "Refactor", correct: false }
+      - { text: "Rehost", correct: false }
+  - type: single
+    prompt: "During discovery you find applications that have had no inbound connections for 90 days and deliver no business value. Which strategy applies?"
+    explanation: "Retire means decommissioning or archiving applications you no longer need, so you can shut down their servers. Retain would keep them in place."
+    theoryUrl: https://docs.aws.amazon.com/prescriptive-guidance/latest/large-migration-guide/migration-strategies.html
+    options:
+      - { text: "Retain", correct: false }
+      - { text: "Relocate", correct: false }
+      - { text: "Repurchase", correct: false }
+      - { text: "Retire", correct: true }
+  - type: single
+    prompt: "Which service performs continuous block-level replication of physical, virtual or cloud servers to AWS, so you can rehost them with minimal downtime?"
+    explanation: "AWS Application Migration Service (MGN) automates lift-and-shift migrations using continuous block-level replication. Its console now appears under the AWS Transform MGN name."
+    theoryUrl: https://docs.aws.amazon.com/mgn/latest/ug/what-is-application-migration-service.html
+    options:
+      - { text: "AWS Application Migration Service (MGN)", correct: true }
+      - { text: "AWS DataSync", correct: false }
+      - { text: "AWS Direct Connect", correct: false }
+      - { text: "AWS Storage Gateway", correct: false }
+  - type: single
+    prompt: "You are migrating an Oracle database to Amazon Aurora PostgreSQL. Which tool converts the source schema to the new engine, before AWS DMS moves the data?"
+    explanation: "DMS Schema Conversion, or the downloadable AWS Schema Conversion Tool (SCT), converts source schemas and code objects to the target engine. DMS then migrates the data and can keep source and target in sync."
+    theoryUrl: https://docs.aws.amazon.com/dms/latest/userguide/Welcome.html
+    options:
+      - { text: "AWS DataSync", correct: false }
+      - { text: "AWS Schema Conversion Tool (or DMS Schema Conversion)", correct: true }
+      - { text: "AWS Snow Family", correct: false }
+      - { text: "AWS Storage Gateway", correct: false }
+  - type: single
+    prompt: "Which service transfers file data from on-premises NFS or SMB storage to Amazon S3, EFS or FSx over the network, with built-in encryption and integrity validation?"
+    explanation: "AWS DataSync is built for moving file and object data between on-premises storage and AWS storage services, with encryption and data integrity validation."
+    theoryUrl: https://docs.aws.amazon.com/datasync/latest/userguide/what-is-datasync.html
+    options:
+      - { text: "AWS Database Migration Service", correct: false }
+      - { text: "AWS Outposts", correct: false }
+      - { text: "AWS Direct Connect", correct: false }
+      - { text: "AWS DataSync", correct: true }
+  - type: single
+    prompt: "An on-premises application needs file shares over NFS or SMB, with the files stored as objects in Amazon S3 and low-latency local caching. Which option fits?"
+    explanation: "Amazon S3 File Gateway, a Storage Gateway type, exposes S3 as NFS and SMB file shares with transparent local caching."
+    theoryUrl: https://docs.aws.amazon.com/filegateway/latest/files3/what-is-file-s3.html
+    options:
+      - { text: "AWS Application Migration Service", correct: false }
+      - { text: "Amazon S3 File Gateway", correct: true }
+      - { text: "AWS Schema Conversion Tool", correct: false }
+      - { text: "AWS Batch", correct: false }
+  - type: single
+    prompt: "A hospital needs AWS services running on its own premises for low latency and local data processing, with AWS installing, operating and maintaining the hardware. What should it use?"
+    explanation: "AWS Outposts extends AWS infrastructure, services and APIs to customer sites. AWS operates, monitors and manages the capacity as part of an AWS Region."
+    theoryUrl: https://docs.aws.amazon.com/outposts/latest/userguide/what-is-outposts.html
+    options:
+      - { text: "AWS Storage Gateway", correct: false }
+      - { text: "AWS Direct Connect", correct: false }
+      - { text: "AWS DataSync", correct: false }
+      - { text: "AWS Outposts", correct: true }
+  - type: single
+    prompt: "A company wants a dedicated private network connection between its data center and AWS that does not go over the public internet. What should it use?"
+    explanation: "AWS Direct Connect links your network to AWS through a dedicated fiber connection at a Direct Connect location, bypassing internet service providers. Site-to-Site VPN, by contrast, runs encrypted tunnels over the internet."
+    theoryUrl: https://docs.aws.amazon.com/directconnect/latest/UserGuide/Welcome.html
+    options:
+      - { text: "AWS Direct Connect", correct: true }
+      - { text: "AWS Site-to-Site VPN", correct: false }
+      - { text: "AWS DataSync", correct: false }
+      - { text: "Amazon Route 53", correct: false }
+  - type: single
+    prompt: "Which AWS Cloud Adoption Framework (CAF) perspective focuses on the confidentiality, integrity and availability of data and cloud workloads?"
+    explanation: "The Security perspective covers this, with stakeholders such as the CISO and security architects. The six CAF perspectives are Business, People, Governance, Platform, Security and Operations."
+    theoryUrl: https://docs.aws.amazon.com/whitepapers/latest/aws-caf-business-perspective/aws-caf-business-perspective.html
+    options:
+      - { text: "Governance", correct: false }
+      - { text: "People", correct: false }
+      - { text: "Operations", correct: false }
+      - { text: "Security", correct: true }
+  - type: single
+    prompt: "What do AWS Snow Family devices such as Snowball Edge provide?"
+    explanation: "Snowball Edge devices are rugged physical appliances with onboard storage and compute. They can process data locally, run edge workloads and be shipped to move data to or from AWS. Check current availability, because AWS has closed Snowball Edge to new customers."
+    theoryUrl: https://docs.aws.amazon.com/snowball/latest/developer-guide/whatisedge.html
+    options:
+      - { text: "A dedicated fiber link into an AWS Region", correct: false }
+      - { text: "A managed SaaS replacement for on-premises applications", correct: false }
+      - { text: "A schema conversion tool for databases", correct: false }
+      - {
+          text: "Rugged physical devices with local storage and compute that can be shipped to move data to AWS",
+          correct: true,
+        }
+  - type: multi
+    prompt: "Which of these are among the 7 Rs of migration strategies?"
+    explanation: "Retain, relocate and repurchase are part of the 7 Rs (retire, retain, rehost, relocate, repurchase, replatform, refactor). Reconnect and rewind are not."
+    theoryUrl: https://docs.aws.amazon.com/prescriptive-guidance/latest/large-migration-guide/migration-strategies.html
+    options:
+      - { text: "Retain", correct: true }
+      - { text: "Reconnect", correct: false }
+      - { text: "Relocate", correct: true }
+      - { text: "Rewind", correct: false }
+      - { text: "Repurchase", correct: true }
+  - type: multi
+    prompt: "Which of these are perspectives of the AWS Cloud Adoption Framework?"
+    explanation: "The six perspectives are Business, People, Governance, Platform, Security and Operations. Compliance and Migration are not CAF perspectives."
+    theoryUrl: https://docs.aws.amazon.com/whitepapers/latest/aws-caf-business-perspective/aws-caf-business-perspective.html
+    options:
+      - { text: "Compliance", correct: false }
+      - { text: "People", correct: true }
+      - { text: "Governance", correct: true }
+      - { text: "Platform", correct: true }
+      - { text: "Migration", correct: false }
+  - type: multi
+    prompt: "Which of these are true of an AWS Site-to-Site VPN connection?"
+    explanation: "A Site-to-Site VPN uses encrypted IPsec tunnels, and each connection includes two tunnels for high availability. A dedicated physical link is Direct Connect, not VPN."
+    theoryUrl: https://docs.aws.amazon.com/vpn/latest/s2svpn/VPC_VPN.html
+    options:
+      - { text: "It uses a dedicated physical fiber connection", correct: false }
+      - { text: "It supports IPsec VPN connections", correct: true }
+      - { text: "Each VPN connection includes two tunnels", correct: true }
+      - { text: "It needs no customer gateway device on your side", correct: false }
+  - type: multi
+    prompt: "Which of these are Storage Gateway gateway types?"
+    explanation: "Storage Gateway offers file (S3 File Gateway), volume (Volume Gateway) and tape (Tape Gateway) solutions. Archive Gateway and Database Gateway do not exist."
+    theoryUrl: https://docs.aws.amazon.com/storagegateway/latest/tgw/WhatIsStorageGateway.html
+    options:
+      - { text: "Tape Gateway", correct: true }
+      - { text: "Archive Gateway", correct: false }
+      - { text: "Volume Gateway", correct: true }
+      - { text: "Database Gateway", correct: false }
+      - { text: "S3 File Gateway", correct: true }
+  - type: boolean
+    prompt: "AWS recommends refactoring as the first-choice strategy for large migrations, because it modernizes every application during the move."
+    answer: false
+    explanation: "Refactor is the most complex and costly strategy. For large migrations AWS recommends rehosting, relocating or replatforming first, and modernizing after the migration."
+    theoryUrl: https://docs.aws.amazon.com/prescriptive-guidance/latest/large-migration-guide/migration-strategies.html
+  - type: boolean
+    prompt: "AWS Direct Connect lets you create virtual interfaces to AWS services while bypassing internet service providers in your network path."
+    answer: true
+    explanation: "A Direct Connect connection uses virtual interfaces to reach public AWS services or a VPC without going through internet service providers in the network path."
+    theoryUrl: https://docs.aws.amazon.com/directconnect/latest/UserGuide/Welcome.html
+  - type: boolean
+    prompt: "With AWS Outposts, AWS operates, monitors and manages the on-premises capacity as part of an AWS Region."
+    answer: true
+    explanation: "An Outpost is a pool of AWS compute and storage capacity deployed at a customer site, and AWS runs it as an extension of a Region."
+    theoryUrl: https://docs.aws.amazon.com/outposts/latest/userguide/what-is-outposts.html
+  - type: boolean
+    prompt: "AWS DMS can only migrate data between two different database engines, never to the same engine."
+    answer: false
+    explanation: "DMS supports heterogeneous migrations, such as Oracle to Aurora, and also migrations that keep the same engine. It can also replicate ongoing changes to keep source and target in sync."
+    theoryUrl: https://docs.aws.amazon.com/dms/latest/userguide/Welcome.html

@@ -1,0 +1,189 @@
+version: 1
+title: "AWS Cloud Practitioner 16: Managing compute at scale"
+description: Systems Manager, AWS Batch, EC2 Image Builder, Compute Optimizer and launch templates for operating fleets of instances.
+language: en
+tags: [aws, cloud-practitioner, systems-manager, compute]
+run:
+  questionsPerRun: 10
+  maxErrors: 3
+  timePerQuestionSec: 45
+questions:
+  - type: single
+    prompt: "Your security team wants admins to open shell sessions on EC2 instances without opening inbound SSH ports, running bastion hosts or managing SSH keys. Which AWS service fits?"
+    explanation: "Session Manager, a Systems Manager tool, gives browser or CLI shell access controlled by IAM policies, so you can close inbound ports and drop bastion hosts and SSH keys."
+    theoryUrl: https://docs.aws.amazon.com/systems-manager/latest/userguide/session-manager.html
+    options:
+      - { text: "AWS Systems Manager Session Manager", correct: true }
+      - { text: "AWS Systems Manager Parameter Store", correct: false }
+      - { text: "AWS Batch", correct: false }
+      - { text: "AWS Compute Optimizer", correct: false }
+  - type: single
+    prompt: "You need to run the same maintenance script on hundreds of managed instances at once, without logging in to each one. Which Systems Manager tool do you use?"
+    explanation: "Run Command lets you remotely and securely run commands on many managed nodes at scale, with no SSH needed."
+    theoryUrl: https://docs.aws.amazon.com/systems-manager/latest/userguide/run-command.html
+    options:
+      - { text: "Session Manager", correct: false }
+      - { text: "Parameter Store", correct: false }
+      - { text: "Run Command", correct: true }
+      - { text: "EC2 Image Builder", correct: false }
+  - type: single
+    prompt: "Which AWS service automates patching of operating systems and applications across a fleet of managed EC2 instances and on-premises servers?"
+    explanation: "Patch Manager, part of Systems Manager, scans nodes for missing patches and can install them, using patch baselines to define what is approved."
+    theoryUrl: https://docs.aws.amazon.com/systems-manager/latest/userguide/patch-manager.html
+    options:
+      - { text: "AWS Compute Optimizer", correct: false }
+      - { text: "AWS Batch", correct: false }
+      - { text: "Systems Manager Parameter Store", correct: false }
+      - { text: "Systems Manager Patch Manager", correct: true }
+  - type: single
+    prompt: "Where in AWS Systems Manager can you centrally store configuration data such as endpoint URLs or approved AMI IDs, organized in a hierarchy like /prod/web/ami?"
+    explanation: "Parameter Store holds named parameters (String, StringList, SecureString) that you can organize with hierarchies and version."
+    theoryUrl: https://docs.aws.amazon.com/systems-manager/latest/userguide/systems-manager-parameter-store.html
+    options:
+      - { text: "Parameter Store", correct: true }
+      - { text: "Compute Optimizer", correct: false }
+      - { text: "Run Command", correct: false }
+      - { text: "Patch Manager", correct: false }
+  - type: single
+    prompt: "A research team submits thousands of containerized, compute-intensive jobs and wants AWS to provision capacity and schedule them without installing batch software. Which service is built for this?"
+    explanation: "AWS Batch runs batch computing workloads at any scale, provisioning compute (EC2, Spot or Fargate) as jobs are submitted. Batch itself needs no scheduler software from you."
+    theoryUrl: https://docs.aws.amazon.com/batch/latest/userguide/what-is-batch.html
+    options:
+      - { text: "AWS Systems Manager Run Command", correct: false }
+      - { text: "AWS Batch", correct: true }
+      - { text: "Amazon EC2 Image Builder", correct: false }
+      - { text: "AWS Compute Optimizer", correct: false }
+  - type: single
+    prompt: "Which service automates the creation, testing and distribution of up-to-date, secure server images such as AMIs?"
+    explanation: "EC2 Image Builder uses pipelines with build and test components to produce AMIs (or container images) on a schedule. Not to be confused with Patch Manager, which patches running nodes."
+    theoryUrl: https://docs.aws.amazon.com/imagebuilder/latest/userguide/what-is-image-builder.html
+    options:
+      - { text: "AWS Batch", correct: false }
+      - { text: "Systems Manager Patch Manager", correct: false }
+      - { text: "AWS Compute Optimizer", correct: false }
+      - { text: "Amazon EC2 Image Builder", correct: true }
+  - type: single
+    prompt: "Which service analyzes the configuration and CloudWatch utilization metrics of your EC2 instances and recommends rightsizing, such as a smaller instance type?"
+    explanation: "AWS Compute Optimizer reports whether resources are optimal and generates rightsizing recommendations to cut cost and improve performance. You have to opt in first."
+    theoryUrl: https://docs.aws.amazon.com/compute-optimizer/latest/ug/what-is-compute-optimizer.html
+    options:
+      - { text: "AWS Compute Optimizer", correct: true }
+      - { text: "EC2 Image Builder", correct: false }
+      - { text: "AWS Batch", correct: false }
+      - { text: "Systems Manager Run Command", correct: false }
+  - type: single
+    prompt: "What is the main purpose of an Amazon EC2 launch template?"
+    explanation: "A launch template stores launch parameters (AMI ID, instance type, network settings and more) so you do not re-enter them, and it supports multiple numbered versions."
+    theoryUrl: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-launch-templates.html
+    options:
+      - { text: "To recommend the cheapest instance type for a workload", correct: false }
+      - { text: "To patch running instances automatically", correct: false }
+      - {
+          text: "To store instance launch parameters so they can be reused, with versioning",
+          correct: true,
+        }
+      - { text: "To open a remote shell session to an instance", correct: false }
+  - type: single
+    prompt: "For database credentials that need automatic rotation, which service does AWS recommend over Systems Manager Parameter Store?"
+    explanation: "Parameter Store has no credential rotation. AWS recommends AWS Secrets Manager for credentials, API keys and tokens that need automatic rotation."
+    theoryUrl: https://docs.aws.amazon.com/systems-manager/latest/userguide/systems-manager-parameter-store.html
+    options:
+      - { text: "AWS Secrets Manager", correct: true }
+      - { text: "Amazon EC2 Image Builder", correct: false }
+      - { text: "AWS Compute Optimizer", correct: false }
+      - { text: "Amazon EC2 launch templates", correct: false }
+  - type: single
+    prompt: "What must be true for an EC2 instance to be a managed node that Systems Manager can work with?"
+    explanation: "A managed node has SSM Agent installed and can communicate with the Systems Manager service (with the right IAM permissions). No open inbound ports are needed."
+    theoryUrl: https://docs.aws.amazon.com/systems-manager/latest/userguide/what-is-systems-manager.html
+    options:
+      - { text: "It must have port 22 open to the internet", correct: false }
+      - { text: "It must be launched from a Systems Manager AMI only", correct: false }
+      - { text: "It must be inside an AWS Batch compute environment", correct: false }
+      - { text: "SSM Agent is installed and can reach the Systems Manager service", correct: true }
+  - type: single
+    prompt: "How is the EC2 Image Builder service itself charged?"
+    explanation: "There is no cost to use Image Builder to create custom AMIs or container images. You pay for the underlying resources it uses, such as the EC2 instances launched during the build and snapshot storage."
+    theoryUrl: https://docs.aws.amazon.com/imagebuilder/latest/userguide/what-is-image-builder.html
+    options:
+      - { text: "A fixed monthly fee per pipeline", correct: false }
+      - { text: "A fee per AMI created", correct: false }
+      - {
+          text: "No charge for the service, only for the underlying resources it uses",
+          correct: true,
+        }
+      - { text: "A fee per Region where images are distributed", correct: false }
+  - type: single
+    prompt: "In Patch Manager, what defines which patches are approved for installation on a group of nodes?"
+    explanation: "A patch baseline holds the rules (classification, severity, auto-approval delay) plus approved and rejected patch lists. AWS provides predefined baselines, but custom ones give you more control."
+    theoryUrl: https://docs.aws.amazon.com/systems-manager/latest/userguide/patch-manager.html
+    options:
+      - { text: "A launch template", correct: false }
+      - { text: "A patch baseline", correct: true }
+      - { text: "A Compute Optimizer recommendation", correct: false }
+      - { text: "A Session Manager document", correct: false }
+  - type: multi
+    prompt: "Which of these are tools or capabilities of AWS Systems Manager?"
+    explanation: "Run Command, Session Manager and Patch Manager are Systems Manager tools. Compute Optimizer and AWS Batch are separate services."
+    theoryUrl: https://docs.aws.amazon.com/systems-manager/latest/userguide/what-is-systems-manager.html
+    options:
+      - { text: "Run Command", correct: true }
+      - { text: "AWS Compute Optimizer", correct: false }
+      - { text: "Session Manager", correct: true }
+      - { text: "AWS Batch", correct: false }
+      - { text: "Patch Manager", correct: true }
+  - type: multi
+    prompt: "Which resource types can AWS Compute Optimizer generate recommendations for?"
+    explanation: "Compute Optimizer covers EC2 instances, EBS volumes, Lambda functions and more. It does not analyze S3 buckets or CloudFront distributions."
+    theoryUrl: https://docs.aws.amazon.com/compute-optimizer/latest/ug/what-is-compute-optimizer.html
+    options:
+      - { text: "Amazon S3 buckets", correct: false }
+      - { text: "Amazon EC2 instances", correct: true }
+      - { text: "Amazon EBS volumes", correct: true }
+      - { text: "AWS Lambda functions", correct: true }
+      - { text: "Amazon CloudFront distributions", correct: false }
+  - type: multi
+    prompt: "Which are benefits of using Session Manager to access instances?"
+    explanation: "Session Manager needs no inbound ports, bastion hosts or SSH keys, uses IAM for access control and can log session activity. The trap is thinking it still needs SSH keys."
+    theoryUrl: https://docs.aws.amazon.com/systems-manager/latest/userguide/session-manager.html
+    options:
+      - { text: "You must manage SSH key pairs for every user", correct: false }
+      - { text: "Access is controlled centrally with IAM policies", correct: true }
+      - { text: "No need to open inbound SSH or RDP ports", correct: true }
+      - { text: "A bastion host is required in every VPC", correct: false }
+      - {
+          text: "Session activity can be logged to CloudTrail, S3 or CloudWatch Logs",
+          correct: true,
+        }
+  - type: multi
+    prompt: "Why does AWS recommend launch templates over launch configurations for Auto Scaling groups?"
+    explanation: "Launch templates support versioning, mixed Spot and On-Demand purchase options with multiple instance types, and newer EC2 features such as Systems Manager parameters for AMI IDs. They do not patch running instances."
+    theoryUrl: https://docs.aws.amazon.com/autoscaling/ec2/userguide/launch-templates.html
+    options:
+      - { text: "They support multiple versions of the same template", correct: true }
+      - { text: "They patch running instances automatically", correct: false }
+      - {
+          text: "They let a group mix Spot and On-Demand Instances and use multiple instance types",
+          correct: true,
+        }
+      - { text: "They allow Systems Manager parameters in place of AMI IDs", correct: true }
+  - type: boolean
+    prompt: "Patch Manager tests every patch for you before making it available, so approved patches are guaranteed safe."
+    answer: false
+    explanation: "AWS does not test patches before making them available in Patch Manager. Test them in a non-production group first, and define what counts as approved in a patch baseline."
+    theoryUrl: https://docs.aws.amazon.com/systems-manager/latest/userguide/patch-manager.html
+  - type: boolean
+    prompt: "Patch Manager can upgrade the major version of an operating system, for example Windows Server 2016 to Windows Server 2019."
+    answer: false
+    explanation: "Patch Manager applies patches and minor updates but does not support major OS version upgrades."
+    theoryUrl: https://docs.aws.amazon.com/systems-manager/latest/userguide/patch-manager.html
+  - type: boolean
+    prompt: "Using Run Command on Amazon EC2 instances comes at no additional cost."
+    answer: true
+    explanation: "Run Command is offered at no additional cost on EC2 nodes. Use on hybrid and multicloud nodes is priced separately."
+    theoryUrl: https://docs.aws.amazon.com/systems-manager/latest/userguide/run-command.html
+  - type: boolean
+    prompt: "EC2 Image Builder distributes an image only if all of the configured tests have succeeded."
+    answer: true
+    explanation: "Image Builder lets you attach test components and only distributes the image when every configured test passes, which helps keep faulty images out of production."
+    theoryUrl: https://docs.aws.amazon.com/imagebuilder/latest/userguide/what-is-image-builder.html

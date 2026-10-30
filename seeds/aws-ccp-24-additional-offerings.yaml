@@ -1,0 +1,182 @@
+version: 1
+title: "AWS Cloud Practitioner 24: Additional offerings"
+description: "Billing and cost tools, AWS Support plans, AWS Marketplace, partners, Professional Services and the AWS learning resources."
+language: en
+tags: [aws, cloud-practitioner, billing, support]
+run:
+  questionsPerRun: 10
+  maxErrors: 3
+  timePerQuestionSec: 45
+questions:
+  - type: single
+    prompt: "A company is designing a new architecture and wants to estimate what it would cost on AWS before building anything. Which tool should it use?"
+    explanation: "AWS Pricing Calculator is a free planning tool for cost estimates. Cost Explorer and the Cost and Usage Report analyze costs you have already incurred."
+    theoryUrl: https://docs.aws.amazon.com/pricing-calculator/latest/userguide/what-is-pricing-calculator.html
+    options:
+      - { text: "AWS Pricing Calculator", correct: true }
+      - { text: "AWS Cost Explorer", correct: false }
+      - { text: "AWS Budgets", correct: false }
+      - { text: "AWS Cost and Usage Report", correct: false }
+  - type: single
+    prompt: "Which AWS tool lets you visualize and analyze your past costs and usage, and also forecast future spend?"
+    explanation: "AWS Cost Explorer shows historical cost and usage in graphs and reports, and it can forecast future spend. Pricing Calculator is for estimates of workloads that do not exist yet."
+    theoryUrl: https://docs.aws.amazon.com/cost-management/latest/userguide/ce-what-is.html
+    options:
+      - { text: "AWS Pricing Calculator", correct: false }
+      - { text: "AWS Budgets", correct: false }
+      - { text: "AWS Cost Explorer", correct: true }
+      - { text: "AWS Trusted Advisor", correct: false }
+  - type: boolean
+    prompt: "AWS Cost Explorer only shows the costs of the current month."
+    answer: false
+    explanation: "Cost Explorer shows historical data and the current month, and it also forecasts future costs."
+    theoryUrl: https://docs.aws.amazon.com/cost-management/latest/userguide/ce-what-is.html
+  - type: single
+    prompt: "A finance team wants an email alert when forecasted monthly spend is going to exceed a set amount. Which service should it configure?"
+    explanation: "AWS Budgets lets you set cost or usage thresholds and notify you by email or Amazon SNS when actual or forecasted values cross them."
+    theoryUrl: https://docs.aws.amazon.com/cost-management/latest/userguide/budgets-managing-costs.html
+    options:
+      - { text: "AWS Cost Explorer", correct: false }
+      - { text: "AWS Budgets", correct: true }
+      - { text: "AWS Pricing Calculator", correct: false }
+      - { text: "AWS Artifact", correct: false }
+  - type: single
+    prompt: "Which AWS offering delivers the most comprehensive cost and usage data, as report files in an Amazon S3 bucket that you own?"
+    explanation: "The AWS Cost and Usage Report contains the most detailed cost and usage data available, broken down by hour, day or month, and it is delivered to S3."
+    theoryUrl: https://docs.aws.amazon.com/cur/latest/userguide/what-is-cur.html
+    options:
+      - { text: "AWS Budgets", correct: false }
+      - { text: "AWS Pricing Calculator", correct: false }
+      - { text: "AWS Cost Explorer", correct: false }
+      - { text: "AWS Cost and Usage Report", correct: true }
+  - type: single
+    prompt: "A company tagged its resources with a CostCenter tag but does not see it in Cost Explorer. What must it do?"
+    explanation: "Both AWS-generated and user-defined tags must be activated as cost allocation tags in the Billing and Cost Management console before they show up in Cost Explorer or cost reports."
+    theoryUrl: https://docs.aws.amazon.com/awsaccountbilling/latest/aboutv2/cost-alloc-tags.html
+    options:
+      - { text: "Enable AWS CloudTrail", correct: false }
+      - { text: "Buy a Business Support plan", correct: false }
+      - { text: "Activate the tag as a cost allocation tag", correct: true }
+      - { text: "Create a new AWS account", correct: false }
+  - type: multi
+    prompt: "Which tools help you monitor and manage AWS costs? (Select THREE.)"
+    explanation: "Budgets, Cost Explorer and the Cost and Usage Report are cost management tools. AWS Artifact provides compliance reports and AWS Config tracks resource configuration, so neither manages costs."
+    theoryUrl: https://docs.aws.amazon.com/cost-management/latest/userguide/budgets-managing-costs.html
+    options:
+      - { text: "AWS Budgets", correct: true }
+      - { text: "AWS Artifact", correct: false }
+      - { text: "AWS Cost Explorer", correct: true }
+      - { text: "AWS Config", correct: false }
+      - { text: "AWS Cost and Usage Report", correct: true }
+  - type: single
+    prompt: "A company has several AWS accounts in AWS Organizations. What is a benefit of consolidated billing?"
+    explanation: "Consolidated billing combines usage across accounts, so volume pricing, Reserved Instance and Savings Plans discounts are shared. It gives one bill and has no extra fee."
+    theoryUrl: https://docs.aws.amazon.com/awsaccountbilling/latest/aboutv2/consolidated-billing.html
+    options:
+      - { text: "It merges the IAM users of all accounts into one", correct: false }
+      - { text: "It makes every account's Support plan free", correct: false }
+      - { text: "It stops member accounts from creating resources", correct: false }
+      - { text: "It combines usage across accounts so volume discounts are shared", correct: true }
+  - type: boolean
+    prompt: "Consolidated billing in AWS Organizations is offered at no additional cost."
+    answer: true
+    explanation: "There is no extra fee for consolidated billing. You get one bill for all member accounts and can combine their usage for discounts."
+    theoryUrl: https://docs.aws.amazon.com/awsaccountbilling/latest/aboutv2/consolidated-billing.html
+  - type: multi
+    prompt: "Which statements about consolidated billing in AWS Organizations are true? (Select TWO.)"
+    explanation: "The management account pays for all member accounts and gets a single bill. Usage is combined, so volume discounts and Reserved Instance or Savings Plans discounts are shared."
+    theoryUrl: https://docs.aws.amazon.com/awsaccountbilling/latest/aboutv2/consolidated-billing.html
+    options:
+      - {
+          text: "The management account receives one bill covering the member accounts",
+          correct: true,
+        }
+      - { text: "Each member account must pay a fee to join", correct: false }
+      - {
+          text: "Reserved Instance and Savings Plans discounts can be shared across the accounts",
+          correct: true,
+        }
+      - { text: "It gives all accounts access to each other's S3 buckets", correct: false }
+  - type: single
+    prompt: "Which current AWS Support plan is the lowest tier to include a designated Technical Account Manager (TAM)?"
+    explanation: "A designated TAM comes with AWS Enterprise Support, and AWS Unified Operations adds more on top. Business Support+ gives 24x7 access to Cloud Support Engineers but no designated TAM."
+    theoryUrl: https://docs.aws.amazon.com/awssupport/latest/user/aws-support-plans.html
+    options:
+      - { text: "Basic Support", correct: false }
+      - { text: "AWS Business Support+", correct: false }
+      - { text: "AWS Enterprise Support", correct: true }
+      - { text: "AWS Developer Support", correct: false }
+  - type: single
+    prompt: "A company needs 24x7 phone, web and chat access to Cloud Support Engineers and the full set of Trusted Advisor checks, but does not need a TAM. Which current plan is the lowest-tier fit?"
+    explanation: "AWS Business Support+ includes 24x7 access to Cloud Support Engineers, the full Trusted Advisor checks and the Support API. Basic Support only includes a limited set of Trusted Advisor checks."
+    theoryUrl: https://docs.aws.amazon.com/awssupport/latest/user/aws-support-plans.html
+    options:
+      - { text: "AWS Business Support+", correct: true }
+      - { text: "Basic Support", correct: false }
+      - { text: "AWS Enterprise Support", correct: false }
+      - { text: "AWS Unified Operations", correct: false }
+  - type: single
+    prompt: "What can a customer on the Basic Support plan do?"
+    explanation: "Basic Support gives 24x7 access to account and billing questions, support forums, service health checks and documentation. Technical support cases, a TAM and the full Trusted Advisor checks need a paid plan."
+    theoryUrl: https://docs.aws.amazon.com/awssupport/latest/user/aws-support-plans.html
+    options:
+      - { text: "Open technical support cases with Cloud Support Engineers", correct: false }
+      - { text: "Get a designated Technical Account Manager", correct: false }
+      - { text: "Use every Trusted Advisor check", correct: false }
+      - { text: "Get one-on-one responses to account and billing questions", correct: true }
+  - type: multi
+    prompt: "Which are included in the Basic Support plan? (Select TWO.)"
+    explanation: "Basic Support includes responses to account and billing questions, support forums, service health checks and documentation. A TAM and third-party software support come with paid plans."
+    theoryUrl: https://docs.aws.amazon.com/awssupport/latest/user/aws-support-plans.html
+    options:
+      - { text: "A designated Technical Account Manager", correct: false }
+      - { text: "Access to support forums and documentation", correct: true }
+      - { text: "Third-party software support", correct: false }
+      - { text: "One-on-one responses to account and billing questions", correct: true }
+  - type: multi
+    prompt: "Which benefits does AWS Enterprise Support add on top of AWS Business Support+? (Select THREE.)"
+    explanation: "Enterprise Support adds a designated TAM, up to 15-minute response for production-critical cases and strategic business reviews. A Domain Specialist Engineer is part of AWS Unified Operations."
+    theoryUrl: https://docs.aws.amazon.com/awssupport/latest/user/aws-support-plans.html
+    options:
+      - { text: "A designated Technical Account Manager", correct: true }
+      - { text: "A designated Domain Specialist Engineer for your applications", correct: false }
+      - { text: "Up to 15-minute response for production-critical cases", correct: true }
+      - { text: "Only the core Trusted Advisor checks", correct: false }
+      - { text: "Strategic business reviews with AWS experts", correct: true }
+  - type: boolean
+    prompt: "AWS has announced that Enterprise On-Ramp will be discontinued on January 1, 2027, with its customers being moved to AWS Enterprise Support."
+    answer: true
+    explanation: "Developer Support and Business Support are also scheduled to be discontinued on January 1, 2027, with Business Support+ as the upgrade path. Current plans are Basic, Business Support+, Enterprise Support and Unified Operations."
+    theoryUrl: https://docs.aws.amazon.com/awssupport/latest/user/support-plans-eos.html
+  - type: single
+    prompt: "A company wants to find, buy and deploy third-party software, with the charges appearing on its AWS bill. Which service should it use?"
+    explanation: "AWS Marketplace is a curated digital catalog of third-party software, data and services. Purchases are billed through your AWS account."
+    theoryUrl: https://docs.aws.amazon.com/marketplace/latest/buyerguide/what-is-marketplace.html
+    options:
+      - { text: "AWS Artifact", correct: false }
+      - { text: "AWS Service Catalog", correct: false }
+      - { text: "AWS CodeArtifact", correct: false }
+      - { text: "AWS Marketplace", correct: true }
+  - type: single
+    prompt: "A workload is fault-tolerant, can be interrupted at any time and is flexible about when it runs. Which EC2 purchasing option is the most cost-effective choice?"
+    explanation: "Spot Instances use unused EC2 capacity at a big discount, but they can be interrupted. Reserved Instances and Savings Plans need a commitment, and On-Demand is the most flexible but not the cheapest."
+    theoryUrl: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/instance-purchasing-options.html
+    options:
+      - { text: "Dedicated Hosts", correct: false }
+      - { text: "Spot Instances", correct: true }
+      - { text: "Standard Reserved Instances", correct: false }
+      - { text: "On-Demand Instances", correct: false }
+  - type: single
+    prompt: "Which resource is a community Q&A site where you can ask AWS technical questions and read answers from other users and AWS experts?"
+    explanation: "AWS re:Post is the community Q&A resource named in the exam guide, alongside the AWS Knowledge Center. AWS Artifact is for compliance documents, not for community answers."
+    theoryUrl: https://docs.aws.amazon.com/aws-certification/latest/cloud-practitioner-02/cloud-practitioner-02-domain4.html
+    options:
+      - { text: "AWS Artifact", correct: false }
+      - { text: "AWS Health Dashboard", correct: false }
+      - { text: "AWS re:Post", correct: true }
+      - { text: "AWS Config", correct: false }
+  - type: boolean
+    prompt: "AWS Professional Services is AWS's own consulting team. It helps organizations design, build and migrate workloads on AWS."
+    answer: true
+    explanation: "Professional Services is an AWS consulting offering. AWS Partners, in the AWS Partner Network, are separate third-party companies that complement it."
+    theoryUrl: https://aws.amazon.com/professional-services/

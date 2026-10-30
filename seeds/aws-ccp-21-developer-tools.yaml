@@ -1,0 +1,179 @@
+version: 1
+title: "AWS Cloud Practitioner 21: Developer tools"
+description: "The AWS developer toolchain for CLF-C02: CI/CD services, infrastructure as code, shells and IDEs, tracing, and the CLI and SDKs."
+language: en
+tags: [aws, cloud-practitioner, devops, developer-tools]
+run:
+  questionsPerRun: 10
+  maxErrors: 3
+  timePerQuestionSec: 45
+questions:
+  - type: single
+    prompt: "A team wants to model, visualize and automate the stages of its software release process, from source to deployment. Which AWS service should it use?"
+    explanation: "AWS CodePipeline is the continuous delivery service that orchestrates the release stages. CodeBuild and CodeDeploy are steps that a pipeline calls, not the orchestrator."
+    theoryUrl: https://docs.aws.amazon.com/codepipeline/latest/userguide/welcome.html
+    options:
+      - { text: "AWS CodeDeploy", correct: false }
+      - { text: "AWS CodeBuild", correct: false }
+      - { text: "AWS CodePipeline", correct: true }
+      - { text: "AWS CodeArtifact", correct: false }
+  - type: single
+    prompt: "Which AWS service compiles source code, runs unit tests and produces deployable artifacts without you managing any build servers?"
+    explanation: "AWS CodeBuild is a fully managed build service. You pay only for the build minutes you use."
+    theoryUrl: https://docs.aws.amazon.com/codebuild/latest/userguide/welcome.html
+    options:
+      - { text: "AWS CodeBuild", correct: true }
+      - { text: "AWS CodePipeline", correct: false }
+      - { text: "AWS Elastic Beanstalk", correct: false }
+      - { text: "AWS CloudFormation", correct: false }
+  - type: boolean
+    prompt: "AWS CodeDeploy can use an in-place deployment type for AWS Lambda functions."
+    answer: false
+    explanation: "In-place deployments are only available on the EC2/On-Premises compute platform. Lambda and Amazon ECS deployments are always blue/green."
+    theoryUrl: https://docs.aws.amazon.com/codedeploy/latest/userguide/welcome.html
+  - type: single
+    prompt: "Which AWS service automates application deployments to Amazon EC2 instances, on-premises servers, Lambda functions and Amazon ECS services?"
+    explanation: "AWS CodeDeploy handles the deployment step for all of those targets. Elastic Beanstalk also deploys apps, but it does not target on-premises servers or ECS services the way CodeDeploy does."
+    theoryUrl: https://docs.aws.amazon.com/codedeploy/latest/userguide/welcome.html
+    options:
+      - { text: "AWS CodeBuild", correct: false }
+      - { text: "AWS Elastic Beanstalk", correct: false }
+      - { text: "AWS CloudFormation", correct: false }
+      - { text: "AWS CodeDeploy", correct: true }
+  - type: single
+    prompt: "A company wants a private place to store and share its own npm, Maven and Python packages, and also to cache packages pulled from public repositories. Which service fits?"
+    explanation: "AWS CodeArtifact is a managed artifact repository. It can connect to public repositories such as npmjs.com and Maven Central and fetch packages on demand."
+    theoryUrl: https://docs.aws.amazon.com/codeartifact/latest/ug/welcome.html
+    options:
+      - { text: "Amazon ECR", correct: false }
+      - { text: "AWS CodeArtifact", correct: true }
+      - { text: "Amazon S3 Glacier", correct: false }
+      - { text: "AWS CodeBuild", correct: false }
+  - type: multi
+    prompt: "Which of the following are compute platforms that AWS CodeDeploy can deploy to? (Select THREE.)"
+    explanation: "CodeDeploy supports EC2/On-Premises, AWS Lambda and Amazon ECS. It is a deployment service, not a data-processing one."
+    theoryUrl: https://docs.aws.amazon.com/codedeploy/latest/userguide/welcome.html
+    options:
+      - { text: "Amazon EC2 and on-premises servers", correct: true }
+      - { text: "AWS Lambda", correct: true }
+      - { text: "Amazon Redshift", correct: false }
+      - { text: "Amazon ECS", correct: true }
+      - { text: "AWS Glue", correct: false }
+  - type: single
+    prompt: "Which AWS service hosts private Git repositories as a managed source control service?"
+    explanation: "AWS CodeCommit is the managed Git service. Do not confuse it with CodeArtifact (packages) or Amazon ECR (container images)."
+    theoryUrl: https://docs.aws.amazon.com/codecommit/latest/userguide/welcome.html
+    options:
+      - { text: "AWS CodeArtifact", correct: false }
+      - { text: "Amazon ECR", correct: false }
+      - { text: "AWS CodeCommit", correct: true }
+      - { text: "Amazon S3", correct: false }
+  - type: single
+    prompt: "A developer wants a browser-based, pre-authenticated shell with the AWS CLI already installed, launched straight from the AWS Management Console. What should they use?"
+    explanation: "AWS CloudShell uses the credentials you signed in to the console with, so there is nothing to install or configure."
+    theoryUrl: https://docs.aws.amazon.com/cloudshell/latest/userguide/welcome.html
+    options:
+      - { text: "AWS CloudShell", correct: true }
+      - { text: "AWS Systems Manager Session Manager", correct: false }
+      - { text: "AWS CodeBuild", correct: false }
+      - { text: "Amazon EC2 Instance Connect", correct: false }
+  - type: single
+    prompt: "Which service lets you define cloud infrastructure in languages such as TypeScript, Python or Java and deploys it through AWS CloudFormation?"
+    explanation: "The AWS Cloud Development Kit (AWS CDK) synthesizes your code into CloudFormation templates. SAM is similar in spirit but uses a declarative template, not a programming language."
+    theoryUrl: https://docs.aws.amazon.com/cdk/v2/guide/home.html
+    options:
+      - { text: "AWS Serverless Application Model (AWS SAM)", correct: false }
+      - { text: "AWS Elastic Beanstalk", correct: false }
+      - { text: "AWS Service Catalog", correct: false }
+      - { text: "AWS Cloud Development Kit (AWS CDK)", correct: true }
+  - type: boolean
+    prompt: "AWS SAM templates are an extension of AWS CloudFormation, so serverless applications defined with SAM are deployed through CloudFormation."
+    answer: true
+    explanation: "SAM provides shorthand syntax for serverless resources such as Lambda functions, API Gateway APIs and DynamoDB tables, and it is transformed into CloudFormation at deployment."
+    theoryUrl: https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/what-is-sam.html
+  - type: single
+    prompt: "A company runs a microservices application and needs to trace individual requests across services to find latency bottlenecks. Which AWS service should it use?"
+    explanation: "AWS X-Ray collects trace data and builds a service map of how requests flow. CloudWatch gives metrics and logs, and CloudTrail records API calls, so neither traces a request end to end."
+    theoryUrl: https://docs.aws.amazon.com/xray/latest/devguide/aws-xray.html
+    options:
+      - { text: "AWS CloudTrail", correct: false }
+      - { text: "Amazon CloudWatch Logs", correct: false }
+      - { text: "AWS X-Ray", correct: true }
+      - { text: "AWS Config", correct: false }
+  - type: single
+    prompt: "Which service is a generative AI-powered assistant that helps developers understand, build and operate AWS applications, including in the console and in the IDE?"
+    explanation: "Amazon Q Developer answers questions about AWS and helps with code. Lex, Rekognition and Comprehend are AI services for building apps, not assistants for developers."
+    theoryUrl: https://docs.aws.amazon.com/amazonq/latest/qdeveloper-ug/what-is.html
+    options:
+      - { text: "Amazon Q Developer", correct: true }
+      - { text: "Amazon Lex", correct: false }
+      - { text: "Amazon Rekognition", correct: false }
+      - { text: "Amazon Comprehend", correct: false }
+  - type: multi
+    prompt: "Which statements about AWS CodeBuild are true? (Select TWO.)"
+    explanation: "CodeBuild is fully managed and billed on the build minutes consumed. You do not provision build servers, and it is not limited to one language."
+    theoryUrl: https://docs.aws.amazon.com/codebuild/latest/userguide/welcome.html
+    options:
+      - { text: "You must provision and patch your own build servers", correct: false }
+      - { text: "It scales on demand to meet your build needs", correct: true }
+      - { text: "It only supports Java projects", correct: false }
+      - { text: "You pay for the build minutes you consume", correct: true }
+  - type: single
+    prompt: "A Python application running on an EC2 instance needs to upload files to Amazon S3 from its code. What is the right tool?"
+    explanation: "An AWS SDK (for Python it is Boto3) gives you language-specific APIs to call AWS services from application code. The CLI is for shell commands, and the console is for humans."
+    theoryUrl: https://docs.aws.amazon.com/cli/latest/userguide/cli-chap-welcome.html
+    options:
+      - { text: "AWS Management Console", correct: false }
+      - { text: "AWS CloudShell", correct: false }
+      - { text: "AWS CLI", correct: false }
+      - { text: "An AWS SDK", correct: true }
+  - type: multi
+    prompt: "Which of the following can be used to define and provision AWS infrastructure as code? (Select THREE.)"
+    explanation: "CloudFormation, the CDK and SAM all produce CloudFormation-managed infrastructure. X-Ray traces requests and CodeArtifact stores packages, so neither provisions resources."
+    theoryUrl: https://docs.aws.amazon.com/cdk/v2/guide/home.html
+    options:
+      - { text: "AWS CloudFormation", correct: true }
+      - { text: "AWS X-Ray", correct: false }
+      - { text: "AWS Cloud Development Kit (AWS CDK)", correct: true }
+      - { text: "AWS CodeArtifact", correct: false }
+      - { text: "AWS Serverless Application Model (AWS SAM)", correct: true }
+  - type: single
+    prompt: "Which AWS service is a cloud-based integrated development environment (IDE) that you access through a web browser?"
+    explanation: "AWS Cloud9 is a browser-based IDE with an editor, debugger and terminal. Note that it is no longer available to new customers, but existing customers can keep using it."
+    theoryUrl: https://docs.aws.amazon.com/cloud9/latest/user-guide/welcome.html
+    options:
+      - { text: "AWS CloudShell", correct: false }
+      - { text: "AWS Cloud9", correct: true }
+      - { text: "AWS CodeBuild", correct: false }
+      - { text: "AWS Amplify", correct: false }
+  - type: boolean
+    prompt: "AWS CloudShell has no additional charge, but you pay for the other AWS resources you run from it."
+    answer: true
+    explanation: "CloudShell itself is free of charge. Resources you create with it, and standard data transfer, are billed as usual."
+    theoryUrl: https://docs.aws.amazon.com/cloudshell/latest/userguide/welcome.html
+  - type: multi
+    prompt: "Which statements about AWS CloudShell are true? (Select TWO.)"
+    explanation: "CloudShell is launched from the console, inherits your console credentials and has the AWS CLI pre-installed. You do not install anything locally and it is not billed per session."
+    theoryUrl: https://docs.aws.amazon.com/cloudshell/latest/userguide/welcome.html
+    options:
+      - { text: "It requires you to install the AWS CLI on your laptop first", correct: false }
+      - { text: "The AWS CLI is pre-installed in the shell environment", correct: true }
+      - { text: "You are billed per hour for every shell session", correct: false }
+      - {
+          text: "It is pre-authenticated with the credentials you used to sign in to the console",
+          correct: true,
+        }
+  - type: boolean
+    prompt: "AWS CodeArtifact can fetch and store packages on demand from public repositories such as npmjs.com or Maven Central."
+    answer: true
+    explanation: "You connect a CodeArtifact repository to a public one through an external connection. Packages are then fetched when a package manager requests them."
+    theoryUrl: https://docs.aws.amazon.com/codeartifact/latest/ug/welcome.html
+  - type: single
+    prompt: "A developer wants a command-line tool to build, locally test and deploy serverless applications defined as an extension of CloudFormation. Which tool is it?"
+    explanation: "The AWS SAM CLI works with SAM templates and can test Lambda functions locally before you deploy. X-Ray and CodeDeploy do not build or test your code locally."
+    theoryUrl: https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/what-is-sam.html
+    options:
+      - { text: "AWS X-Ray daemon", correct: false }
+      - { text: "AWS CodeDeploy agent", correct: false }
+      - { text: "AWS SAM CLI", correct: true }
+      - { text: "AWS Copilot CLI", correct: false }

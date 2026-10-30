@@ -1,0 +1,193 @@
+version: 1
+title: "AWS Cloud Practitioner 12: APIs with API Gateway and AppSync"
+description: "Amazon API Gateway API types, throttling, stages and authorizers, plus AWS AppSync and GraphQL basics."
+language: en
+tags: [aws, cloud-practitioner, api-gateway, appsync]
+run:
+  questionsPerRun: 10
+  maxErrors: 3
+  timePerQuestionSec: 45
+questions:
+  - type: single
+    prompt: "What is Amazon API Gateway?"
+    explanation: "API Gateway is a managed service for creating, publishing, maintaining, monitoring and securing APIs at any scale. It acts as the front door to your backend services."
+    theoryUrl: https://docs.aws.amazon.com/apigateway/latest/developerguide/welcome.html
+    options:
+      - {
+          text: "A managed service to create, publish and secure REST, HTTP and WebSocket APIs",
+          correct: true,
+        }
+      - { text: "A relational database service", correct: false }
+      - { text: "A service that stores container images", correct: false }
+      - { text: "A message queue for decoupling microservices", correct: false }
+  - type: single
+    prompt: "You are building a chat application that needs stateful, two-way communication between clients and the server. Which API Gateway API type fits?"
+    explanation: "WebSocket APIs support stateful, full-duplex communication. REST and HTTP APIs are stateless request and response."
+    theoryUrl: https://docs.aws.amazon.com/apigateway/latest/developerguide/welcome.html
+    options:
+      - { text: "REST API", correct: false }
+      - { text: "HTTP API", correct: false }
+      - { text: "Private API only", correct: false }
+      - { text: "WebSocket API", correct: true }
+  - type: single
+    prompt: "A client sends more requests than the configured limits allow, and API Gateway starts throttling. What error might the client receive?"
+    explanation: "When requests exceed the steady-state rate and burst limits, clients may get 429 Too Many Requests. The client can retry in a rate-limited way."
+    theoryUrl: https://docs.aws.amazon.com/apigateway/latest/developerguide/api-gateway-request-throttling.html
+    options:
+      - { text: "404 Not Found", correct: false }
+      - { text: "403 Forbidden because the account is suspended", correct: false }
+      - { text: "429 Too Many Requests", correct: true }
+      - { text: "301 Moved Permanently", correct: false }
+  - type: single
+    prompt: "In API Gateway, what is a stage?"
+    explanation: "A stage is a named reference to a deployment, which is a snapshot of the API. Typical stage names are dev, test and prod, each with its own settings."
+    theoryUrl: https://docs.aws.amazon.com/apigateway/latest/developerguide/set-up-stages.html
+    options:
+      - {
+          text: "A named reference to a deployment of your API, such as dev or prod",
+          correct: true,
+        }
+      - { text: "A Lambda function that authorizes requests", correct: false }
+      - { text: "A physical data center that hosts the API", correct: false }
+      - { text: "A billing plan for API consumers", correct: false }
+  - type: single
+    prompt: "You need a simple proxy to Lambda and want the lowest cost, and you do not need advanced features such as API keys or request validation. Which API Gateway option is designed for that?"
+    explanation: "HTTP APIs are designed with minimal features so they can be offered at a lower price. Choose REST APIs only if you need features such as API keys, per-client throttling or request validation."
+    theoryUrl: https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-vs-rest.html
+    options:
+      - { text: "REST API", correct: false }
+      - { text: "HTTP API", correct: true }
+      - { text: "WebSocket API", correct: false }
+      - { text: "AWS AppSync", correct: false }
+  - type: single
+    prompt: "Which AWS service is a managed, serverless GraphQL API service?"
+    explanation: "AWS AppSync lets you access data from one or more sources through a single GraphQL endpoint. API Gateway does not create GraphQL APIs."
+    theoryUrl: https://docs.aws.amazon.com/appsync/latest/devguide/what-is-appsync.html
+    options:
+      - { text: "Amazon API Gateway", correct: false }
+      - { text: "AWS AppSync", correct: true }
+      - { text: "Amazon SNS", correct: false }
+      - { text: "AWS Step Functions", correct: false }
+  - type: single
+    prompt: "How does AWS AppSync deliver real-time updates to connected clients?"
+    explanation: "AppSync provides serverless WebSockets for GraphQL subscriptions, so clients are pushed updates when data changes."
+    theoryUrl: https://docs.aws.amazon.com/appsync/latest/devguide/what-is-appsync.html
+    options:
+      - { text: "Clients must poll the API every second", correct: false }
+      - { text: "Through GraphQL subscriptions over WebSockets", correct: true }
+      - { text: "Through scheduled emails", correct: false }
+      - { text: "Through an SQS dead-letter queue", correct: false }
+  - type: single
+    prompt: "You need to issue API keys to customers and enforce a per-customer request quota on your API. Which API Gateway feature do you use?"
+    explanation: "Usage plans let you give customers API keys and track and limit usage per key. API keys and per-client throttling are REST API features, not HTTP API features."
+    theoryUrl: https://docs.aws.amazon.com/apigateway/latest/developerguide/apigateway-control-access-to-api.html
+    options:
+      - { text: "Canary deployments", correct: false }
+      - { text: "Custom domain names", correct: false }
+      - { text: "Stage variables", correct: false }
+      - { text: "Usage plans with API keys", correct: true }
+  - type: single
+    prompt: "You want to run your own custom code to decide whether each request to API Gateway is allowed, based on a bearer token. What do you use?"
+    explanation: "A Lambda authorizer is a Lambda function that controls access to API methods using bearer tokens or request parameters."
+    theoryUrl: https://docs.aws.amazon.com/apigateway/latest/developerguide/apigateway-control-access-to-api.html
+    options:
+      - { text: "An S3 bucket policy", correct: false }
+      - { text: "A security group", correct: false }
+      - { text: "A Lambda authorizer", correct: true }
+      - { text: "An AWS Config rule", correct: false }
+  - type: single
+    prompt: "Your mobile app users sign in through Amazon Cognito. Which API Gateway mechanism lets you allow only signed-in users to call your REST API?"
+    explanation: "A Cognito user pool can be used as an authorizer to control who can invoke REST API methods."
+    theoryUrl: https://docs.aws.amazon.com/apigateway/latest/developerguide/apigateway-control-access-to-api.html
+    options:
+      - { text: "A Cognito user pools authorizer", correct: true }
+      - { text: "AWS Shield Standard", correct: false }
+      - { text: "An EBS snapshot policy", correct: false }
+      - { text: "A CloudFront origin access identity", correct: false }
+  - type: single
+    prompt: "What is a key advantage of a GraphQL API such as one built with AppSync, compared with calling several separate REST endpoints?"
+    explanation: "AppSync lets clients access data from one or more data sources through a single GraphQL endpoint, instead of calling many different endpoints."
+    theoryUrl: https://docs.aws.amazon.com/appsync/latest/devguide/what-is-appsync.html
+    options:
+      - { text: "GraphQL APIs cannot be secured", correct: false }
+      - { text: "GraphQL only works with relational databases", correct: false }
+      - {
+          text: "Clients can reach multiple data sources through a single GraphQL endpoint",
+          correct: true,
+        }
+      - { text: "GraphQL requires one endpoint per database table", correct: false }
+  - type: single
+    prompt: "Which statement best describes how API Gateway and Lambda are commonly used together?"
+    explanation: "API Gateway exposes Lambda functions as API methods, and together they form the app-facing part of the AWS serverless infrastructure."
+    theoryUrl: https://docs.aws.amazon.com/apigateway/latest/developerguide/welcome.html
+    options:
+      - { text: "Lambda stores the API definitions that API Gateway reads", correct: false }
+      - { text: "API Gateway replaces Lambda by running your code itself", correct: false }
+      - {
+          text: "API Gateway exposes Lambda functions as API methods, with no servers to manage",
+          correct: true,
+        }
+      - { text: "They cannot be used together", correct: false }
+  - type: multi
+    prompt: "Which API types can you create with Amazon API Gateway? (Select three)"
+    explanation: "API Gateway supports REST, HTTP and WebSocket APIs. GraphQL is the job of AppSync, and FTP is not an API type here."
+    theoryUrl: https://docs.aws.amazon.com/apigateway/latest/developerguide/welcome.html
+    options:
+      - { text: "REST APIs", correct: true }
+      - { text: "GraphQL APIs", correct: false }
+      - { text: "HTTP APIs", correct: true }
+      - { text: "WebSocket APIs", correct: true }
+      - { text: "FTP APIs", correct: false }
+  - type: multi
+    prompt: "Which mechanisms can control access to your API Gateway APIs? (Select three)"
+    explanation: "IAM policies, Lambda authorizers and Cognito user pools are all supported. Macie and Inspector are not access control mechanisms for APIs."
+    theoryUrl: https://docs.aws.amazon.com/apigateway/latest/developerguide/apigateway-control-access-to-api.html
+    options:
+      - { text: "IAM roles and policies", correct: true }
+      - { text: "Amazon Macie", correct: false }
+      - { text: "Lambda authorizers", correct: true }
+      - { text: "Amazon Inspector", correct: false }
+      - { text: "Amazon Cognito user pools", correct: true }
+  - type: multi
+    prompt: "Which authorization options does AWS AppSync support for GraphQL APIs? (Select three)"
+    explanation: "AppSync supports API keys, IAM, Amazon Cognito, OpenID Connect and Lambda authorization. SSH key pairs and Kerberos tickets are not options."
+    theoryUrl: https://docs.aws.amazon.com/appsync/latest/devguide/what-is-appsync.html
+    options:
+      - { text: "SSH key pairs", correct: false }
+      - { text: "API keys", correct: true }
+      - { text: "Amazon Cognito", correct: true }
+      - { text: "AWS IAM", correct: true }
+      - { text: "Kerberos tickets", correct: false }
+  - type: multi
+    prompt: "Which are capabilities of AWS AppSync? (Select three)"
+    explanation: "AppSync gives a single GraphQL endpoint over multiple data sources, publishes real-time updates and offers optional server-side caching. You do not manage servers, and it is built for GraphQL rather than REST only."
+    theoryUrl: https://docs.aws.amazon.com/appsync/latest/devguide/what-is-appsync.html
+    options:
+      - {
+          text: "Access data from one or more data sources via a single GraphQL endpoint",
+          correct: true,
+        }
+      - { text: "Publish real-time data updates to applications", correct: true }
+      - { text: "Optional server-side caching for low latency", correct: true }
+      - { text: "You must patch and manage the servers that run it", correct: false }
+      - { text: "It can only expose REST APIs", correct: false }
+  - type: boolean
+    prompt: "API Gateway and AWS Lambda together form the app-facing part of the AWS serverless infrastructure."
+    answer: true
+    explanation: "API Gateway acts as the front door, and Lambda runs the backend code without servers to manage."
+    theoryUrl: https://docs.aws.amazon.com/apigateway/latest/developerguide/welcome.html
+  - type: boolean
+    prompt: "API Gateway throttling limits are hard limits that you can rely on to strictly control costs."
+    answer: false
+    explanation: "Throttles and quotas are applied on a best-effort basis and are targets, not guaranteed ceilings. AWS suggests AWS Budgets for costs and AWS WAF for managing requests."
+    theoryUrl: https://docs.aws.amazon.com/apigateway/latest/developerguide/set-up-stages.html
+  - type: boolean
+    prompt: "API Gateway can only integrate with AWS Lambda; it cannot front workloads running on Amazon EC2."
+    answer: false
+    explanation: "API Gateway is a front door for backends such as EC2 workloads, Lambda code, or any web application."
+    theoryUrl: https://docs.aws.amazon.com/apigateway/latest/developerguide/welcome.html
+  - type: boolean
+    prompt: "You can use stages such as dev and prod to run different deployments of the same API Gateway API."
+    answer: true
+    explanation: "Each stage references a deployment and has its own settings, for example caching, throttling and logging."
+    theoryUrl: https://docs.aws.amazon.com/apigateway/latest/developerguide/set-up-stages.html

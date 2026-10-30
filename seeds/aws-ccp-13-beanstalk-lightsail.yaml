@@ -1,0 +1,181 @@
+version: 1
+title: "AWS Cloud Practitioner 13: Deploying with Elastic Beanstalk, Lightsail and more"
+description: "Elastic Beanstalk, Lightsail, Amplify Hosting and CloudFormation, and when to use each way of deploying applications."
+language: en
+tags: [aws, cloud-practitioner, deployment, beanstalk]
+run:
+  questionsPerRun: 10
+  maxErrors: 3
+  timePerQuestionSec: 45
+questions:
+  - type: single
+    prompt: "A developer wants to upload a Node.js application and have AWS create and configure the instances, load balancing and scaling. Which service fits?"
+    explanation: "With Elastic Beanstalk you upload your application and it provisions the resources, configures load balancing, sets up health monitoring and scales the environment."
+    theoryUrl: https://docs.aws.amazon.com/elasticbeanstalk/latest/dg/Welcome.html
+    options:
+      - { text: "AWS Elastic Beanstalk", correct: true }
+      - { text: "AWS CloudTrail", correct: false }
+      - { text: "Amazon ECR", correct: false }
+      - { text: "AWS Config", correct: false }
+  - type: single
+    prompt: "How is AWS Elastic Beanstalk itself charged?"
+    explanation: "There is no additional charge for Elastic Beanstalk. You pay only for the underlying AWS resources your application uses, such as EC2 instances and load balancers."
+    theoryUrl: https://docs.aws.amazon.com/elasticbeanstalk/latest/dg/Welcome.html
+    options:
+      - { text: "A fixed monthly fee per application", correct: false }
+      - { text: "A fee per deployment", correct: false }
+      - { text: "No additional charge, you pay for the underlying resources", correct: true }
+      - { text: "A percentage of your EC2 bill", correct: false }
+  - type: single
+    prompt: "Where do the resources that Elastic Beanstalk creates run?"
+    explanation: "Beanstalk builds the selected platform and provisions one or more AWS resources in your own AWS account to run your application."
+    theoryUrl: https://docs.aws.amazon.com/elasticbeanstalk/latest/dg/Welcome.html
+    options:
+      - { text: "In a hidden AWS-owned account you cannot see", correct: false }
+      - { text: "In your own AWS account", correct: true }
+      - { text: "On your on-premises servers only", correct: false }
+      - { text: "Only inside AWS Lambda", correct: false }
+  - type: single
+    prompt: "Which service gives you virtual private servers, databases, load balancers and more for a low, predictable monthly price, aimed at simple projects?"
+    explanation: "Amazon Lightsail is the easiest way to get started with AWS for websites and web apps, bundling instances, containers, managed databases, load balancers and more at a predictable monthly price."
+    theoryUrl: https://docs.aws.amazon.com/lightsail/latest/userguide/what-is-amazon-lightsail.html
+    options:
+      - { text: "Amazon Redshift", correct: false }
+      - { text: "AWS Outposts", correct: false }
+      - { text: "Amazon Lightsail", correct: true }
+      - { text: "AWS Batch", correct: false }
+  - type: single
+    prompt: "A hobbyist wants to launch a WordPress blog quickly without learning VPCs, Auto Scaling or load balancer configuration. What is the best fit?"
+    explanation: "Lightsail offers pre-configured images such as WordPress and is aimed at individual developers and simple projects. Beanstalk and CloudFormation assume more AWS knowledge."
+    theoryUrl: https://docs.aws.amazon.com/lightsail/latest/userguide/what-is-amazon-lightsail.html
+    options:
+      - { text: "AWS CloudFormation with a hand-written template", correct: false }
+      - { text: "Amazon Lightsail with the WordPress image", correct: true }
+      - { text: "An Amazon EKS cluster", correct: false }
+      - { text: "AWS Step Functions", correct: false }
+  - type: single
+    prompt: "Which service provides a Git-based workflow to host full-stack serverless web applications with continuous deployment?"
+    explanation: "AWS Amplify Hosting connects a Git repository and deploys your frontend or full-stack app to the AWS global CDN with continuous deployment."
+    theoryUrl: https://docs.aws.amazon.com/amplify/latest/userguide/welcome.html
+    options:
+      - { text: "Amazon SQS", correct: false }
+      - { text: "AWS Amplify Hosting", correct: true }
+      - { text: "AWS Direct Connect", correct: false }
+      - { text: "Amazon RDS", correct: false }
+  - type: single
+    prompt: "What is AWS CloudFormation?"
+    explanation: "CloudFormation provisions and configures AWS resources from a template that describes them, which is infrastructure as code. A stack is the resulting collection of resources."
+    theoryUrl: https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/Welcome.html
+    options:
+      - { text: "A service that monitors API activity in your account", correct: false }
+      - { text: "A content delivery network", correct: false }
+      - { text: "A service that models and provisions AWS resources from templates", correct: true }
+      - { text: "A managed Kubernetes service", correct: false }
+  - type: single
+    prompt: "You need to define a whole environment (Auto Scaling group, load balancer and database) in a template and recreate it identically in several Regions. Which service fits best?"
+    explanation: "CloudFormation lets you describe many types of resources once in a template and provision them repeatedly in a consistent way. Beanstalk focuses on deploying and running an application."
+    theoryUrl: https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/Welcome.html
+    options:
+      - { text: "AWS CloudFormation", correct: true }
+      - { text: "Amazon Lightsail", correct: false }
+      - { text: "Amazon Route 53", correct: false }
+      - { text: "AWS Health Dashboard", correct: false }
+  - type: single
+    prompt: "Besides instances, which of the following can Amazon Lightsail provide?"
+    explanation: "Lightsail includes managed MySQL and PostgreSQL databases, among other components such as container services, load balancers and CDN distributions."
+    theoryUrl: https://docs.aws.amazon.com/lightsail/latest/userguide/what-is-amazon-lightsail.html
+    options:
+      - { text: "Dedicated mainframe hardware", correct: false }
+      - { text: "Managed MySQL or PostgreSQL databases", correct: true }
+      - { text: "Quantum computers", correct: false }
+      - { text: "AWS Outposts racks", correct: false }
+  - type: single
+    prompt: "You want pull request previews and password-protected feature branches for a React app, deployed automatically from Git. Which service offers this?"
+    explanation: "Amplify Hosting has feature branches, pull request previews, password protected branches and atomic deployments."
+    theoryUrl: https://docs.aws.amazon.com/amplify/latest/userguide/welcome.html
+    options:
+      - { text: "Amazon Lightsail load balancers", correct: false }
+      - { text: "AWS CloudFormation stacks", correct: false }
+      - { text: "Amazon SNS", correct: false }
+      - { text: "AWS Amplify Hosting", correct: true }
+  - type: single
+    prompt: "In Elastic Beanstalk, which kind of environment fits background processing rather than serving web requests?"
+    explanation: "Beanstalk supports web server environments and worker environments. The worker environment is meant for background tasks."
+    theoryUrl: https://docs.aws.amazon.com/elasticbeanstalk/latest/dg/Welcome.html
+    options:
+      - { text: "A worker environment", correct: true }
+      - { text: "A CDN environment", correct: false }
+      - { text: "A DNS environment", correct: false }
+      - { text: "A billing environment", correct: false }
+  - type: single
+    prompt: "How do you define a backend with AWS Amplify Gen 2?"
+    explanation: "Amplify Gen 2 introduces a TypeScript-based, code-first developer experience for defining backends."
+    theoryUrl: https://docs.aws.amazon.com/amplify/latest/userguide/welcome.html
+    options:
+      - { text: "By editing XML files on an EC2 instance", correct: false }
+      - { text: "With a code-first approach in TypeScript", correct: true }
+      - { text: "By calling AWS Support", correct: false }
+      - { text: "With a physical console in an AWS data center", correct: false }
+  - type: multi
+    prompt: "Which statements about AWS Elastic Beanstalk are true? (Select three)"
+    explanation: "Beanstalk has no extra charge, supports Docker containers among other platforms, and you start by uploading your application source bundle. It provisions resources for you, and supports more than Java."
+    theoryUrl: https://docs.aws.amazon.com/elasticbeanstalk/latest/dg/Welcome.html
+    options:
+      - { text: "There is no additional charge for Beanstalk itself", correct: true }
+      - { text: "It supports Docker containers", correct: true }
+      - { text: "You must launch every instance manually", correct: false }
+      - { text: "You upload your application source bundle", correct: true }
+      - { text: "It only supports Java applications", correct: false }
+  - type: multi
+    prompt: "Which of these are offered by Amazon Lightsail? (Select three)"
+    explanation: "Lightsail includes instances, load balancers and managed databases. Redshift clusters and Outposts racks are separate AWS offerings."
+    theoryUrl: https://docs.aws.amazon.com/lightsail/latest/userguide/what-is-amazon-lightsail.html
+    options:
+      - { text: "Virtual private server instances", correct: true }
+      - { text: "Amazon Redshift clusters", correct: false }
+      - { text: "Load balancers", correct: true }
+      - { text: "AWS Outposts racks", correct: false }
+      - { text: "Managed databases", correct: true }
+  - type: multi
+    prompt: "Which are features of AWS Amplify Hosting? (Select three)"
+    explanation: "Amplify Hosting offers feature branches, custom domains and pull request previews. It is serverless, so there are no web servers to manage, and it supports SPA and SSR frameworks, not only static pages."
+    theoryUrl: https://docs.aws.amazon.com/amplify/latest/userguide/welcome.html
+    options:
+      - { text: "Feature branches", correct: true }
+      - { text: "Custom domains", correct: true }
+      - { text: "You must manage EC2 web servers", correct: false }
+      - { text: "Pull request previews", correct: true }
+      - { text: "It can only host plain static HTML", correct: false }
+  - type: multi
+    prompt: "Which are benefits of provisioning infrastructure with AWS CloudFormation? (Select three)"
+    explanation: "Templates are text files you can version, you can replicate the same stack in multiple Regions, and deleting a stack deletes its resources. CloudFormation is not limited to one Region."
+    theoryUrl: https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/Welcome.html
+    options:
+      - { text: "Templates can be tracked in version control", correct: true }
+      - { text: "It only works in a single Region", correct: false }
+      - {
+          text: "The same resources can be recreated consistently in multiple Regions",
+          correct: true,
+        }
+      - { text: "There are no templates, everything is done by clicking", correct: false }
+      - { text: "Deleting a stack deletes the resources in it", correct: true }
+  - type: boolean
+    prompt: "Elastic Beanstalk adds an hourly fee on top of the cost of the underlying AWS resources."
+    answer: false
+    explanation: "There is no additional charge for Elastic Beanstalk, you pay only for the resources your application consumes."
+    theoryUrl: https://docs.aws.amazon.com/elasticbeanstalk/latest/dg/Welcome.html
+  - type: boolean
+    prompt: "Amazon Lightsail is designed to offer a low, predictable monthly price for simple web projects."
+    answer: true
+    explanation: "Lightsail bundles instances, storage, databases and more for a low, predictable monthly price."
+    theoryUrl: https://docs.aws.amazon.com/lightsail/latest/userguide/what-is-amazon-lightsail.html
+  - type: boolean
+    prompt: "A CloudFormation template describes the resources you want, and a stack is the set of resources CloudFormation creates from it."
+    answer: true
+    explanation: "You create a template describing the resources, and CloudFormation provisions them as a stack that you can delete as a single unit."
+    theoryUrl: https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/Welcome.html
+  - type: boolean
+    prompt: "AWS Amplify Hosting can only host static sites and does not support server-side rendered frameworks."
+    answer: false
+    explanation: "Amplify Hosting supports SSR frameworks such as Next.js and Nuxt, SPA frameworks such as React and Angular, and static site generators."
+    theoryUrl: https://docs.aws.amazon.com/amplify/latest/userguide/welcome.html

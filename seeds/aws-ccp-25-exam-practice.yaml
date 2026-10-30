@@ -1,0 +1,169 @@
+version: 1
+title: "AWS Cloud Practitioner 25: Practice exam"
+description: "A mixed CLF-C02 practice exam across cloud concepts, security and compliance, cloud technology and services, and billing, pricing and support."
+language: en
+tags: [aws, cloud-practitioner, practice-exam]
+run:
+  questionsPerRun: 15
+  maxErrors: 5
+  timePerQuestionSec: 60
+questions:
+  - type: single
+    prompt: "A startup wants to avoid a large upfront investment in data centers and instead pay only for the computing resources it uses. Which cloud benefit does this describe?"
+    explanation: "Moving from fixed costs (data centers) to variable expense is a core benefit of cloud computing. You pay for what you consume instead of buying capacity in advance."
+    options:
+      - { text: "Trade fixed expense for variable expense", correct: true }
+      - { text: "Increase the cost of capacity planning", correct: false }
+      - { text: "Take over responsibility for physical security", correct: false }
+      - { text: "Lock in a three-year commitment", correct: false }
+  - type: single
+    prompt: "An online retailer expects traffic to spike during a holiday sale and drop afterwards. It wants resources to grow and shrink automatically with demand. Which cloud concept is this?"
+    explanation: "Elasticity is the ability to acquire resources as you need them and release them when you no longer do. High availability is about staying up, not about matching capacity to demand."
+    options:
+      - { text: "High availability", correct: false }
+      - { text: "Elasticity", correct: true }
+      - { text: "Fault tolerance", correct: false }
+      - { text: "Data sovereignty", correct: false }
+  - type: multi
+    prompt: "Which of the following are advantages of cloud computing? (Select THREE.)"
+    explanation: "Stopping capacity guessing, benefiting from economies of scale and increasing speed and agility are core cloud advantages. Running your own data centers is what the cloud lets you stop doing."
+    options:
+      - { text: "Stop guessing capacity", correct: true }
+      - { text: "Benefit from massive economies of scale", correct: true }
+      - { text: "Spend money running and maintaining data centers", correct: false }
+      - { text: "Increase speed and agility", correct: true }
+      - { text: "Fix capacity months before you need it", correct: false }
+  - type: single
+    prompt: "A company wants to review its workloads against AWS best practices and get guidance on improving them. Which AWS offering is designed for this?"
+    explanation: "The AWS Well-Architected Tool reviews workloads against the Well-Architected Framework. Trusted Advisor inspects an AWS environment, but the Well-Architected Tool is the framework review itself."
+    theoryUrl: https://docs.aws.amazon.com/aws-certification/latest/cloud-practitioner-02/clf-02-in-scope-services.html
+    options:
+      - { text: "AWS Artifact", correct: false }
+      - { text: "AWS Cost Explorer", correct: false }
+      - { text: "AWS Well-Architected Tool", correct: true }
+      - { text: "AWS CloudTrail", correct: false }
+  - type: boolean
+    prompt: "An AWS Availability Zone consists of one or more discrete data centers with redundant power, networking and connectivity."
+    answer: true
+    explanation: "Availability Zones are housed in separate facilities within a Region. Running across several of them improves availability."
+    theoryUrl: https://docs.aws.amazon.com/whitepapers/latest/aws-overview/global-infrastructure.html
+  - type: single
+    prompt: "Under the AWS shared responsibility model, who is responsible for patching the guest operating system on an Amazon EC2 instance?"
+    explanation: "EC2 is infrastructure as a service. AWS secures the hardware and virtualization layer, and the customer manages and patches the guest OS and the applications on it."
+    theoryUrl: https://aws.amazon.com/compliance/shared-responsibility-model/
+    options:
+      - { text: "AWS", correct: false }
+      - { text: "The customer", correct: true }
+      - { text: "The operating system vendor", correct: false }
+      - { text: "AWS and the customer must each patch half", correct: false }
+  - type: single
+    prompt: "What is a security best practice for the AWS account root user?"
+    explanation: "Protect the root user credentials and require MFA on it, then use IAM roles or IAM Identity Center users for everyday work. Sharing or creating access keys for the root user is the opposite."
+    theoryUrl: https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html
+    options:
+      - { text: "Use it for everyday administration", correct: false }
+      - { text: "Share its password with the whole team", correct: false }
+      - { text: "Protect its credentials and enable multi-factor authentication", correct: true }
+      - { text: "Create access keys for it and store them in code", correct: false }
+  - type: single
+    prompt: "An auditor asks a company for AWS's SOC and ISO compliance reports. Where can the company download them on demand?"
+    explanation: "AWS Artifact provides on-demand downloads of AWS security and compliance documents, free of charge. Config and Inspector assess your own resources."
+    theoryUrl: https://docs.aws.amazon.com/artifact/latest/ug/what-is-aws-artifact.html
+    options:
+      - { text: "AWS Config", correct: false }
+      - { text: "Amazon Inspector", correct: false }
+      - { text: "AWS Trusted Advisor", correct: false }
+      - { text: "AWS Artifact", correct: true }
+  - type: multi
+    prompt: "A security team wants to detect compromised credentials and unusual activity in its account, and then investigate the root cause. Which TWO services should it use?"
+    explanation: "Amazon GuardDuty detects threats, and Amazon Detective helps analyze and find the root cause of findings. AWS Artifact is for compliance documents and AWS Shield protects against DDoS."
+    theoryUrl: https://docs.aws.amazon.com/guardduty/latest/ug/what-is-guardduty.html
+    options:
+      - { text: "Amazon GuardDuty", correct: true }
+      - { text: "AWS Artifact", correct: false }
+      - { text: "Amazon Detective", correct: true }
+      - { text: "AWS Shield", correct: false }
+  - type: multi
+    prompt: "Which TWO statements describe IAM best practices? (Select TWO.)"
+    explanation: "Workloads on compute services should use IAM roles that deliver temporary credentials, and permissions should follow least privilege. Sharing or hardcoding long-term access keys are practices to avoid."
+    theoryUrl: https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html
+    options:
+      - { text: "Embed long-term access keys in application code", correct: false }
+      - { text: "Use IAM roles so workloads on EC2 get temporary credentials", correct: true }
+      - { text: "Share one IAM user's access keys across the team", correct: false }
+      - { text: "Grant only the permissions required to perform a task", correct: true }
+  - type: boolean
+    prompt: "AWS CloudTrail records actions taken by users, roles and AWS services in your account, including actions made through the console, the CLI and the SDKs."
+    answer: true
+    explanation: "CloudTrail records account activity as events, which supports auditing, governance and compliance."
+    theoryUrl: https://docs.aws.amazon.com/awscloudtrail/latest/userguide/cloudtrail-user-guide.html
+  - type: single
+    prompt: "A developer wants to run code in response to events without provisioning or managing any servers. Which service should they use?"
+    explanation: "AWS Lambda is a serverless compute service. You only provide the code, and you pay for the compute time it uses."
+    theoryUrl: https://docs.aws.amazon.com/lambda/latest/dg/welcome.html
+    options:
+      - { text: "Amazon EC2", correct: false }
+      - { text: "AWS Lambda", correct: true }
+      - { text: "AWS Elastic Beanstalk", correct: false }
+      - { text: "Amazon Lightsail", correct: false }
+  - type: single
+    prompt: "A hospital must keep medical archives for years. The data is accessed less than once a year, and retrieval can take hours. Which S3 storage class is the most appropriate?"
+    explanation: "S3 Glacier Deep Archive is designed for long-lived archives accessed less than once a year, with retrieval in hours. S3 Standard would work but cost far more for rarely used data."
+    theoryUrl: https://docs.aws.amazon.com/AmazonS3/latest/userguide/storage-class-intro.html
+    options:
+      - { text: "S3 Standard", correct: false }
+      - { text: "S3 Standard-IA", correct: false }
+      - { text: "S3 Intelligent-Tiering", correct: false }
+      - { text: "S3 Glacier Deep Archive", correct: true }
+  - type: single
+    prompt: "A company wants a managed relational database and does not want to handle patching or backups itself. Which service should it choose?"
+    explanation: "Amazon RDS is a managed relational database service. DynamoDB is a NoSQL key-value database, and running a database on EC2 leaves you to manage it."
+    options:
+      - { text: "A database installed on Amazon EC2", correct: false }
+      - { text: "Amazon DynamoDB", correct: false }
+      - { text: "Amazon ElastiCache", correct: false }
+      - { text: "Amazon RDS", correct: true }
+  - type: single
+    prompt: "A company serves static web content to users around the world and wants to reduce latency by caching content close to them. Which service should it use?"
+    explanation: "Amazon CloudFront is a content delivery network that caches content at edge locations close to users. Route 53 is DNS and does not cache content."
+    options:
+      - { text: "Amazon CloudFront", correct: true }
+      - { text: "Amazon Route 53", correct: false }
+      - { text: "AWS Direct Connect", correct: false }
+      - { text: "Amazon VPC", correct: false }
+  - type: single
+    prompt: "A company wants a dedicated private network connection from its data center to AWS instead of using the public internet. Which service provides this?"
+    explanation: "AWS Direct Connect is a dedicated network connection to AWS. Site-to-Site VPN is also private, but it runs over the public internet."
+    options:
+      - { text: "AWS Site-to-Site VPN", correct: false }
+      - { text: "Amazon CloudFront", correct: false }
+      - { text: "AWS Direct Connect", correct: true }
+      - { text: "AWS Global Accelerator", correct: false }
+  - type: multi
+    prompt: "Which of the following services can be used to run containers? (Select THREE.)"
+    explanation: "Amazon ECS, Amazon EKS and AWS Fargate all run containers. Athena and Glue are analytics services."
+    options:
+      - { text: "Amazon ECS", correct: true }
+      - { text: "Amazon Athena", correct: false }
+      - { text: "Amazon EKS", correct: true }
+      - { text: "AWS Fargate", correct: true }
+      - { text: "AWS Glue", correct: false }
+  - type: boolean
+    prompt: "Amazon CloudWatch can collect metrics from your AWS resources and trigger alarms when a metric crosses a threshold."
+    answer: true
+    explanation: "CloudWatch alarms watch metrics against thresholds you define, and they can notify you or trigger automated actions."
+    theoryUrl: https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/WhatIsCloudWatch.html
+  - type: single
+    prompt: "A company needs a designated Technical Account Manager and up to 15-minute response for production-critical cases. Which AWS Support plan fits?"
+    explanation: "AWS Enterprise Support includes a designated TAM and up to 15-minute response for production-critical cases. Business Support+ has no designated TAM, and Basic has no technical support cases."
+    theoryUrl: https://docs.aws.amazon.com/awssupport/latest/user/aws-support-plans.html
+    options:
+      - { text: "Basic Support", correct: false }
+      - { text: "AWS Business Support+", correct: false }
+      - { text: "AWS Enterprise Support", correct: true }
+      - { text: "AWS Free Tier", correct: false }
+  - type: boolean
+    prompt: "Spot Instances are a good fit for critical workloads that cannot tolerate being interrupted."
+    answer: false
+    explanation: "Spot Instances use spare capacity at a discount, but they can be interrupted. They suit flexible, fault-tolerant workloads."
+    theoryUrl: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/instance-purchasing-options.html

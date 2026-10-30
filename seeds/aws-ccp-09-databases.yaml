@@ -1,0 +1,178 @@
+version: 1
+title: "AWS Cloud Practitioner 09: Databases (RDS, Aurora, ElastiCache, DynamoDB)"
+description: "Managed relational and NoSQL databases on AWS: RDS, Aurora, ElastiCache, DynamoDB and the purpose-built database names."
+language: en
+tags: [aws, cloud-practitioner, databases, rds, dynamodb]
+run:
+  questionsPerRun: 10
+  maxErrors: 3
+  timePerQuestionSec: 45
+questions:
+  - type: single
+    prompt: "Which task is handled by AWS with Amazon RDS, but is your responsibility when you run the same database on an EC2 instance?"
+    explanation: "With RDS, AWS manages OS and database software installation and patching, backups and high availability. On EC2 those are the customer's job. Application optimization (such as query tuning) stays with you in both cases."
+    theoryUrl: https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Welcome.html
+    options:
+      - { text: "Writing and tuning the SQL queries of your application", correct: false }
+      - { text: "Designing the database schema", correct: false }
+      - { text: "Patching the database software and the operating system", correct: true }
+      - { text: "Deciding who in your company has access to the data", correct: false }
+  - type: single
+    prompt: "Which of these database engines is supported by Amazon RDS?"
+    explanation: "RDS supports IBM Db2, MariaDB, Microsoft SQL Server, MySQL, Oracle Database and PostgreSQL. MongoDB-compatible workloads use Amazon DocumentDB instead, and Redis-style caching uses ElastiCache."
+    theoryUrl: https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Welcome.html
+    options:
+      - { text: "MongoDB", correct: false }
+      - { text: "Microsoft SQL Server", correct: true }
+      - { text: "Apache Cassandra", correct: false }
+      - { text: "Redis", correct: false }
+  - type: single
+    prompt: "What is the main purpose of an RDS Multi-AZ DB instance deployment?"
+    explanation: "Multi-AZ keeps a synchronous standby in another Availability Zone for high availability and automatic failover. The standby does not serve read traffic, so it does not scale reads."
+    theoryUrl: https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Concepts.MultiAZ.html
+    options:
+      - { text: "Scaling read-heavy workloads", correct: false }
+      - { text: "Lowering the storage cost of the database", correct: false }
+      - { text: "Running the database in several AWS Regions at once", correct: false }
+      - { text: "High availability and failover support", correct: true }
+  - type: single
+    prompt: "A reporting application is overloading your primary RDS database with read queries. What is the right fix?"
+    explanation: "Read replicas are read-only copies updated asynchronously, designed to scale out read-heavy workloads. Multi-AZ is for availability and its standby does not serve reads."
+    theoryUrl: https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_ReadRepl.html
+    options:
+      - {
+          text: "Create one or more RDS read replicas and send the read queries to them",
+          correct: true,
+        }
+      - { text: "Enable Multi-AZ and read from the standby instance", correct: false }
+      - { text: "Move the database to an EC2 instance store", correct: false }
+      - { text: "Disable automated backups", correct: false }
+  - type: single
+    prompt: "Amazon Aurora is compatible with which database engines?"
+    explanation: "Aurora is a fully managed relational engine compatible with MySQL and PostgreSQL, so existing code, tools and applications can be used with it."
+    theoryUrl: https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/CHAP_AuroraOverview.html
+    options:
+      - { text: "Oracle and Microsoft SQL Server", correct: false }
+      - { text: "MongoDB and Cassandra", correct: false }
+      - { text: "MySQL and PostgreSQL", correct: true }
+      - { text: "Redis and Memcached", correct: false }
+  - type: single
+    prompt: "Which Aurora option automatically adjusts database capacity to match application demand, which suits spiky or unpredictable workloads?"
+    explanation: "Aurora Serverless is an on-demand, autoscaling configuration for Aurora. Capacity follows demand and you are charged for what the cluster consumes."
+    theoryUrl: https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/aurora-serverless-v2.html
+    options:
+      - { text: "Aurora Global Database with a fixed instance size", correct: false }
+      - { text: "Aurora Serverless", correct: true }
+      - { text: "RDS Multi-AZ standby", correct: false }
+      - { text: "ElastiCache for Memcached", correct: false }
+  - type: single
+    prompt: "Your application repeatedly runs the same expensive database queries and users need very fast responses. Which service provides an in-memory cache to put in front of the database?"
+    explanation: "Amazon ElastiCache is a managed in-memory data store and cache (Valkey, Redis OSS and Memcached engines) that reduces load on the database and speeds up reads."
+    theoryUrl: https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/WhatIs.html
+    options:
+      - { text: "Amazon Redshift", correct: false }
+      - { text: "Amazon Neptune", correct: false }
+      - { text: "AWS Backup", correct: false }
+      - { text: "Amazon ElastiCache", correct: true }
+  - type: single
+    prompt: "Which service is a serverless, fully managed NoSQL database with single-digit millisecond performance at any scale?"
+    explanation: "Amazon DynamoDB is serverless and fully managed, and supports key-value and document data models. It does not support JOINs like a relational database."
+    theoryUrl: https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Introduction.html
+    options:
+      - { text: "Amazon DynamoDB", correct: true }
+      - { text: "Amazon RDS for MySQL", correct: false }
+      - { text: "Amazon Redshift", correct: false }
+      - { text: "Amazon Aurora", correct: false }
+  - type: single
+    prompt: "Which service is an in-memory cache built specifically for DynamoDB, taking read response times from milliseconds to microseconds?"
+    explanation: "DynamoDB Accelerator (DAX) is a DynamoDB-compatible caching service. It needs only minimal changes to an existing DynamoDB application."
+    theoryUrl: https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/DAX.html
+    options:
+      - { text: "Amazon ElastiCache for Memcached", correct: false }
+      - { text: "Amazon CloudFront", correct: false }
+      - { text: "DynamoDB Accelerator (DAX)", correct: true }
+      - { text: "Amazon RDS read replica", correct: false }
+  - type: single
+    prompt: "A company needs a petabyte-scale data warehouse to run analytics queries with SQL and BI tools. Which AWS service fits?"
+    explanation: "Amazon Redshift is a fully managed, petabyte-scale data warehouse service. RDS and Aurora target transactional workloads."
+    theoryUrl: https://docs.aws.amazon.com/redshift/latest/mgmt/welcome.html
+    options:
+      - { text: "Amazon DynamoDB", correct: false }
+      - { text: "Amazon Redshift", correct: true }
+      - { text: "Amazon ElastiCache", correct: false }
+      - { text: "Amazon Neptune", correct: false }
+  - type: single
+    prompt: "An application stores JSON-like documents and its developers want to keep using their existing MongoDB drivers and tools. Which AWS database should they pick?"
+    explanation: "Amazon DocumentDB (with MongoDB compatibility) lets you run the same application code and use the same drivers and tools as MongoDB."
+    theoryUrl: https://docs.aws.amazon.com/documentdb/latest/developerguide/what-is.html
+    options:
+      - { text: "Amazon DocumentDB", correct: true }
+      - { text: "Amazon Neptune", correct: false }
+      - { text: "Amazon RDS for PostgreSQL", correct: false }
+      - { text: "Amazon Redshift", correct: false }
+  - type: single
+    prompt: "An application needs complex SQL queries with JOINs across structured, related tables. Which option is the most natural fit?"
+    explanation: "Relational engines on RDS or Aurora are built for structured data and JOINs. DynamoDB, a NoSQL database, does not support a JOIN operator."
+    theoryUrl: https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Introduction.html
+    options:
+      - { text: "Amazon DynamoDB", correct: false }
+      - { text: "Amazon ElastiCache", correct: false }
+      - { text: "Amazon RDS or Amazon Aurora", correct: true }
+      - { text: "DynamoDB Accelerator (DAX)", correct: false }
+  - type: multi
+    prompt: "Which of these are database engines supported by Amazon RDS?"
+    explanation: "RDS supports MariaDB, Oracle Database and PostgreSQL (plus MySQL, SQL Server and Db2). DynamoDB and Neptune are separate AWS database services."
+    theoryUrl: https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Welcome.html
+    options:
+      - { text: "MariaDB", correct: true }
+      - { text: "Amazon DynamoDB", correct: false }
+      - { text: "Oracle Database", correct: true }
+      - { text: "Amazon Neptune", correct: false }
+      - { text: "PostgreSQL", correct: true }
+  - type: multi
+    prompt: "Which statements about RDS read replicas are true?"
+    explanation: "Read replicas are read-only copies fed by asynchronous replication, and they can live in a different Region. They help scale reads. The synchronous copy used for failover is the Multi-AZ standby, a different thing."
+    theoryUrl: https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_ReadRepl.html
+    options:
+      - { text: "They receive updates from the primary asynchronously", correct: true }
+      - { text: "They can be created in a different AWS Region", correct: true }
+      - { text: "They replicate synchronously and exist only for failover", correct: false }
+      - { text: "They let you scale out read-heavy workloads", correct: true }
+  - type: multi
+    prompt: "Which of these services are in-memory caching services?"
+    explanation: "ElastiCache and DAX keep data in memory to speed up reads. RDS and Redshift are databases and data warehouses that store data on disk-based storage."
+    theoryUrl: https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/WhatIs.html
+    options:
+      - { text: "Amazon RDS", correct: false }
+      - { text: "Amazon ElastiCache", correct: true }
+      - { text: "Amazon Redshift", correct: false }
+      - { text: "DynamoDB Accelerator (DAX)", correct: true }
+  - type: multi
+    prompt: "Which are advantages of Amazon RDS over running a database yourself on EC2?"
+    explanation: "RDS manages backups, software patching, and automatic failure detection and recovery. OS patching is also handled by AWS in RDS, so having to do it yourself is a drawback of self-managed EC2, not an advantage."
+    theoryUrl: https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Welcome.html
+    options:
+      - { text: "Automated backups and snapshots", correct: true }
+      - { text: "Automatic failure detection and recovery", correct: true }
+      - { text: "You must patch the operating system yourself", correct: false }
+      - { text: "Managed database software patching", correct: true }
+  - type: boolean
+    prompt: "In an RDS Multi-AZ DB instance deployment, the standby instance can serve read traffic."
+    answer: false
+    explanation: "A Multi-AZ DB instance deployment has one standby for failover support that does not serve read traffic. Use read replicas to scale reads."
+    theoryUrl: https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Concepts.MultiAZ.html
+  - type: boolean
+    prompt: "Amazon Aurora stores copies of your data across three Availability Zones in a Region."
+    answer: true
+    explanation: "An Aurora cluster volume holds copies of the data across three AZs, which makes data highly durable and speeds up failover."
+    theoryUrl: https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/Aurora.Overview.StorageReliability.html
+  - type: boolean
+    prompt: "DynamoDB global tables replicate a table across multiple AWS Regions, and every replica can serve both reads and writes."
+    answer: true
+    explanation: "Global tables are a fully managed, multi-Region, multi-active feature. Any replica can serve reads and writes."
+    theoryUrl: https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/GlobalTables.html
+  - type: boolean
+    prompt: "DynamoDB supports the JOIN operator, just like a relational database."
+    answer: false
+    explanation: "DynamoDB does not support JOINs. Data is typically denormalized to cut round trips and processing cost."
+    theoryUrl: https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Introduction.html
