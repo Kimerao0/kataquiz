@@ -40,6 +40,10 @@ Closed items: `docs/roadmap-archive-2026-10.md`.
   `attempt_answers` cascades from `questions`, so the M2 editor will silently erase the per-answer history of finished runs while `attempts.score` keeps the old totals. Decide before the editor ships.
   _`src/db/schema.ts`_
 
+- [ ] KQ40: Mark a quiz the player has already passed
+  Asked for by the first real study use (the 25-section AWS course): a learner repeats each section quiz until it sticks, and the catalog gives no hint which ones are done. Every finished run is already in `attempts`, so this is a read plus a badge, not new tracking. Open decisions: "passed" is presumably a finished run (`finishedAt` set) with `errors <= run.maxErrors`, but `maxErrors` lives on the quiz, so a run must be judged against the limit it was played under; and whether guests (by `guestId`) see it or only signed-in players. Done when the catalog card and the quiz page both show it for the current player.
+  _`src/db/schema.ts` (`attempts`), `src/app/(app)/page.tsx`, `src/app/(app)/q/[slug]/`_
+
 ## The biggest gap between the product and its own pitch
 
 - [ ] KQ37: Resume a challenge run after a refresh
