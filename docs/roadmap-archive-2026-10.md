@@ -8,6 +8,15 @@ must still resolve.
 
 ## Closed
 
+- [x] KQ05: Per-question error rate for authors
+  Closed by `ce2c0f4`, live on production the same day. `/q/[slug]/stats` lists every question
+  hardest first with its answer count, % wrong (timeouts count as wrong) and the wrong option picked
+  most; under 5 answers the rate reads "not enough data", the top pick still shows (user's call).
+  Visible to the quiz's author and to accounts in `OPERATOR_USER_IDS` (env, set to the owner's id in
+  production); everyone else gets the not-found page. An env list rather than a role system, decided
+  2026-10-30: revisit at KQ06, where Better Auth's admin plugin is the candidate. Review caught a
+  forged selection repeating one option id inflating the top-pick count, fixed with
+  `count(distinct …)`; five mutations each turned the tests red.
 - [x] KQ40: Mark a quiz the player has already passed
   Closed by `dc72c13`, live on production the same day. Signed-in players see a gold / silver /
   bronze ribbon for their best finished run, on the catalog row and the quiz page ("Your best:").

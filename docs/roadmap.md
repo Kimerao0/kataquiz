@@ -23,16 +23,14 @@ Closed items: `docs/roadmap-archive-2026-10.md`.
   _`src/lib/rate-limit.ts`_
 - [ ] KQ38: `attempts` has no index
   Declared with no table callback, so there is no index on it at all, while two reads on the run page's render path filter it by `quiz_id` + the owner column and sort by `started_at` — `findResumableRun` and `lastNicknameFor`, now issued together. KQ10 also raised the start limit to 120/hour, so the table grows four times faster than when both reads were written. One composite index on `(quiz_id, guest_id, started_at)` serves both; it needs a migration. Not measured — nothing is deployed and the dev database is too small for `EXPLAIN` to prove anything, so this is a pre-launch item and not a bug.
-  _`src/db/schema.ts:157`, `src/lib/run/service.ts`_
+  KQ05's stats page adds a third reader, on `attempt_answers`: both its queries filter by `question_id`, and the only index there is `unique(attempt_id, question_id)`, which leads with `attempt_id`, so every stats view scans the table. An index on `attempt_answers(question_id)` belongs in the same migration.
+  _`src/db/schema.ts:157`, `src/lib/run/service.ts`_, `src/lib/quizzes/stats.ts`
 
 ## Milestone 2 — the planned next slice
 
 - [ ] KQ04: In-app quiz editor
   Decided for v1, deferred to M2. The zod schema is the contract; the editor is a UI that produces the same JSON. It must validate `imageUrl` and `theoryUrl` with that same `httpUrl` schema at the point the author can still fix them: KQ15 made the player drop a bad image URL silently, which is right for a stranger mid-quiz but useless as feedback to whoever typed it.
   _`src/lib/quiz-schema/`_
-- [ ] KQ05: Per-question error rate for authors
-  The one stat that makes a quiz better: which questions everyone gets wrong. Every answer is already stored.
-  _`attemptAnswers`_
 - [ ] KQ06: Report button + admin hide
   All quizzes are public and anyone can upload. `isHidden` exists and is honoured everywhere; nothing sets it.
   _`src/db/schema.ts`_
