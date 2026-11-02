@@ -23,3 +23,18 @@ must still resolve.
   `lastNicknameFor` becomes an index scan backward with no sort. Plain `CREATE INDEX` inside
   drizzle's migration transaction, so it blocks inserts while it builds: fine on a young table,
   revisit for a future index on a large one.
+- [x] KQ37: Resume a challenge run after a refresh
+  Closed by `0b1cf7b`. `findResumableRun` takes an optional `challengeOfAttemptId`: without it the
+  quiz page keeps excluding challenge runs, with it `/c/[attemptId]` finds only the player's own
+  unfinished, answered run on that challenge. The invite panel mirrors KQ09's offer (Resume / Start
+  over, cross-guarded handlers) and reuses `resumeRunAction`, whose `resumeRun` already scopes the
+  attempt to the quiz and owner. Verified end to end on a production build with Playwright: answer
+  one question, refresh, Resume lands on question 2 still framed as a challenge, and the quiz page
+  offers nothing. A run that finished between render and click is treated as gone; the lost-result
+  case behind that is KQ41.
+
+## Dropped
+
+- [-] KQ19: Drop the dead `ChallengeInvite.quizId`
+  Dropped 2026-11-02: no longer dead. KQ37 (`0b1cf7b`) reads it on the challenge page to scope the
+  resumable-run lookup to the quiz.

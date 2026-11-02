@@ -34,9 +34,9 @@ Closed items: `docs/roadmap-archive-2026-10.md`, `docs/roadmap-archive-2026-11.m
 
 ## The biggest gap between the product and its own pitch
 
-- [ ] KQ37: Resume a challenge run after a refresh
-  KQ09 gave the quiz's run page a resume offer, but `RunPlayer` is mounted from two places and the other one got nothing, so refreshing a challenge at question 20 still orphans it. `findResumableRun` excludes challenge runs on purpose — resumed from the plain quiz page they would lose their head-to-head framing — but `/c/[attemptId]` _is_ that framing, and `resumeRun` already has no challenge filter. What is missing is a challenge-scoped lookup and an offer on the invite panel.
-  _`src/components/run/challenge-invite-panel.tsx:74`, `src/lib/run/service.ts`_
+- [ ] KQ41: A refresh between a challenge's last answer and the comparison loses the result
+  KQ37 resumes an unfinished challenge run, but the last answer marks the run finished, so a refresh while "Comparing your scores…" is on screen (or a resume that lands on an already-finished run, which KQ37 treats as gone) shows the invite again with no way back to the head-to-head result. Needs a finished-run lookup on `/c/[attemptId]` that renders the summary and the comparison.
+  _`src/app/c/[attemptId]/page.tsx`, `src/components/run/challenge-invite-panel.tsx`_
 - [ ] KQ11: Tell the challenger's sender what happened
   The person who shared a link never learns whether anyone played it. The growth loop has no return path.
 
@@ -60,9 +60,6 @@ Closed items: `docs/roadmap-archive-2026-10.md`, `docs/roadmap-archive-2026-11.m
 - [ ] KQ18: Cap `selectedOptionIds` length
   Validated element-wise but unbounded in count. Pick a cap alongside `MAX_NICKNAME_LENGTH`.
   _`src/app/(app)/q/[slug]/actions.ts`_
-- [ ] KQ19: Drop the dead `ChallengeInvite.quizId`
-  No consumer outside a test fixture, on the one type whose job is defining what is safe to show a challenger.
-  _`src/lib/run/challenge.ts:11`_
 
 ## Accessibility and interaction
 
