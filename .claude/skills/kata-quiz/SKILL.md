@@ -30,8 +30,9 @@ From the repo root:
 ## 4. Ship
 
 1. `git status` must show only the new seed files.
-2. Commit on `main`, matching the history: `feat: add N <Series> quizzes, ...`. Push to `main`. The push is the deploy, so only do it once the user has asked for the quizzes on prod.
-3. Watch the build: `vercel ls --prod`, then `vercel inspect <url>` until it reports Ready. Confirm the import with `vercel inspect --logs <url> | grep "file(s)"`. That line should show `N imported`.
+2. Commit on `main`, matching the history: `feat: add N <Series> quizzes, ...`.
+3. **Stop and ask before pushing.** A push to `main` is a production deploy, and the user decides every prod push themselves, even when they've already asked for "the quizzes on prod". Say what's ready (commits, how many quizzes) and wait for an explicit go.
+4. After they approve, push and watch the build: `vercel ls --prod`, then `vercel inspect <url>` until it reports Ready. Confirm the import with `vercel inspect --logs <url> | grep "file(s)"`. That line should show `N imported`.
 
 ## Report
 

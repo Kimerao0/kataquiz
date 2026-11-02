@@ -57,3 +57,7 @@ Two remain, and neither is the tool's to fix:
 - **The dev server serves stale CSS (KQ35): verify design work against `pnpm build`.**
 - It points at `localhost`, never `127.0.0.1`. Next only hydrates on the origin it was started for,
   and a `127.0.0.1` shot is a convincing picture of a page where React never attached.
+
+## Production
+
+A push to `main` is a production deploy (Vercel builds and runs `pnpm release`: migrations + seed import). Commit and merge freely, but **never push without the owner's explicit approval for that push**.
