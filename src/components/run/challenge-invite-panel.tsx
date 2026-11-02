@@ -3,15 +3,25 @@
 import Link from 'next/link'
 import { useTranslations } from 'next-intl'
 import { type FormEvent, useState } from 'react'
+import { resumeRunAction } from '@/app/(app)/q/[slug]/actions'
 import { type StartChallengeResult, startChallengeRunAction } from '@/app/c/[attemptId]/actions'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import type { RunStart } from '@/lib/run/service'
+import type { ResumableRun, RunStart } from '@/lib/run/service'
 import { RunPlayer } from './run-player'
+import type { Reviewed } from './run-review'
 
-type StartErrorCode = Extract<StartChallengeResult, { ok: false }>['error'] | 'unexpected'
+type StartErrorCode =
+  | Extract<StartChallengeResult, { ok: false }>['error']
+  | 'unexpected'
+  | 'resumeGone'
+  | 'resumeLimited'
+
+// One state for what took this panel's place, so a resume and a fresh start can
+// never disagree about which run is being played.
+type Started = { run: RunStart; resumed?: { answered: number; history: Reviewed[] } }
 
 type ChallengeInvitePanelProps = {
   attemptId: string
@@ -22,6 +32,8 @@ type ChallengeInvitePanelProps = {
   questionCount: number
   /** Signed-out players name themselves; a signed-in one already has a name. */
   askNickname: boolean
+  /** An unfinished run on this challenge, which the player is offered back. */
+  resumable: ResumableRun | null
 }
 
 // The same shape as RunStartPanel, and for the same reason: the run starts from
@@ -36,19 +48,27 @@ export function ChallengeInvitePanel({
   opponentName,
   questionCount,
   askNickname,
+  resumable,
 }: ChallengeInvitePanelProps) {
   const t = useTranslations('challenge')
   const tRun = useTranslations('run')
   const tCommon = useTranslations('common')
 
-  const [run, setRun] = useState<RunStart | null>(null)
+  const [started, setStarted] = useState<Started | null>(null)
   const [starting, setStarting] = useState(false)
   const [error, setError] = useState<StartErrorCode | null>(null)
   const [nickname, setNickname] = useState('')
+  // Seeded from the prop rather than read from it, so a resume the server
+  // refuses can take the offer off the screen.
+  const [offer, setOffer] = useState(resumable)
+  const [resuming, setResuming] = useState(false)
 
+  // Each handler guards on both flags and both buttons are disabled by both,
+  // as in RunStartPanel: with one request ever in flight, no second response
+  // can land after a run has already taken this panel's place.
   async function begin(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (starting) return
+    if (starting || resuming) return
 
     setStarting(true)
     setError(null)
@@ -60,7 +80,7 @@ export function ChallengeInvitePanel({
       if (result.ok) {
         // Left mounted and starting stays true: the panel is about to be
         // replaced by the run, so the button must not flicker back to idle.
-        setRun(result.run)
+        setStarted({ run: result.run })
         return
       }
       setError(result.error)
@@ -70,8 +90,54 @@ export function ChallengeInvitePanel({
     setStarting(false)
   }
 
-  if (run !== null) {
-    return <RunPlayer run={run} quizSlug={quizSlug} challenge={{ opponentName }} />
+  async function resume() {
+    if (offer === null || starting || resuming) return
+
+    setResuming(true)
+    setError(null)
+    try {
+      // resumeRun is scoped to the quiz and the owner, not to plain runs, so the
+      // quiz page's action opens a challenge attempt just as well.
+      const result = await resumeRunAction({ slug: quizSlug, attemptId: offer.attemptId })
+      if (result.ok && result.run.status === 'playing') {
+        const { attemptId, question, total, timePerQuestionSec, answered, history } = result.run
+        // Left mounted and resuming stays true: the run is about to take this
+        // panel's place, so the button must not flicker back to idle.
+        setStarted({
+          run: { attemptId, question, total, timePerQuestionSec },
+          resumed: { answered, history },
+        })
+        return
+      }
+      if (!result.ok && result.error === 'rateLimited') {
+        // Only this request was refused: the run is still there to pick up, so
+        // the offer stays and the message says to come back to it.
+        setError('resumeLimited')
+      } else {
+        // Nothing to pick up any more. A run that finished between the render
+        // and the click lands here too: its comparison lives inside RunPlayer,
+        // out of reach from this panel, and the window is only a race.
+        setOffer(null)
+        setError('resumeGone')
+      }
+    } catch {
+      setError('unexpected')
+    }
+    setResuming(false)
+  }
+
+  if (started !== null) {
+    return (
+      // Keyed on the attempt so a later replay remounts instead of landing inside
+      // the previous run; see the reconciliation hazard in run-start-panel.tsx.
+      <RunPlayer
+        key={started.run.attemptId}
+        run={started.run}
+        quizSlug={quizSlug}
+        challenge={{ opponentName }}
+        resumed={started.resumed}
+      />
+    )
   }
 
   // Every question of the original set has since been deleted. Offering a
@@ -98,6 +164,10 @@ export function ChallengeInvitePanel({
     )
   }
 
+  // Starting over leaves the unfinished run behind, which is already what
+  // happens to every run somebody walks away from.
+  const beginLabel = offer === null ? t('begin') : tRun('startOver')
+
   return (
     <form
       onSubmit={begin}
@@ -113,6 +183,23 @@ export function ChallengeInvitePanel({
         </p>
         <p className="font-reading text-prose">{t('intro')}</p>
       </div>
+
+      {offer !== null && (
+        <div className="flex flex-col items-start gap-3">
+          <p className="text-ink-quiet text-meta">
+            {tRun('resumeBody', { answered: offer.answered, total: offer.total })}
+          </p>
+          <Button
+            type="button"
+            size="lg"
+            disabled={starting || resuming}
+            onClick={() => resume()}
+            className="h-12 w-full rounded-md text-base sm:w-fit sm:px-10"
+          >
+            {resuming ? tRun('resuming') : tRun('resume')}
+          </Button>
+        </div>
+      )}
 
       {askNickname && (
         <div className="flex flex-col gap-2">
@@ -144,10 +231,10 @@ export function ChallengeInvitePanel({
       <Button
         type="submit"
         size="lg"
-        disabled={starting}
+        disabled={starting || resuming}
         className="h-12 w-full rounded-md text-base sm:w-fit sm:px-10"
       >
-        {starting ? tRun('starting') : t('begin')}
+        {starting ? tRun('starting') : beginLabel}
       </Button>
     </form>
   )

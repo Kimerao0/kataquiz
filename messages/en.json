@@ -149,6 +149,8 @@
       "notFound": "That challenge is no longer available.",
       "empty": "Every question from that run has since been removed from the quiz.",
       "rateLimited": "You have started a lot of runs recently. Try again in a little while.",
+      "resumeGone": "That run is no longer available. Take the challenge again.",
+      "resumeLimited": "You have resumed runs a lot recently. Try again in a little while.",
       "unexpected": "The server did not answer. Check your connection and try again."
     },
     "headToHead": "Head to head",

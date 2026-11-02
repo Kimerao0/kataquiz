@@ -893,6 +893,102 @@ describe('findResumableRun', () => {
     })
   })
 
+  it('finds the run answering the challenge it is asked about', async () => {
+    await withTestDb(async (tx) => {
+      const seed = await seedQuiz(tx, { questionCount: 2 })
+      const opponent: Player = { kind: 'guest', guestId: crypto.randomUUID(), nickname: 'Rival' }
+      const original = await startRun({ quizId: seed.quizId, player: opponent, executor: tx })
+      const challenge = await startRun({
+        quizId: seed.quizId,
+        player: seed.player,
+        challengeOfAttemptId: original.attemptId,
+        executor: tx,
+      })
+      await answer(tx, seed, challenge.attemptId, challenge.question.id)
+
+      const found = await findResumableRun({
+        quizId: seed.quizId,
+        player: seed.player,
+        challengeOfAttemptId: original.attemptId,
+        executor: tx,
+      })
+
+      expect(found).toEqual({ attemptId: challenge.attemptId, answered: 1, total: challenge.total })
+    })
+  })
+
+  it('ignores a run answering a different challenge of the same quiz', async () => {
+    await withTestDb(async (tx) => {
+      const seed = await seedQuiz(tx, { questionCount: 2 })
+      const opponent: Player = { kind: 'guest', guestId: crypto.randomUUID(), nickname: 'Rival' }
+      const asked = await startRun({ quizId: seed.quizId, player: opponent, executor: tx })
+      const other = await startRun({ quizId: seed.quizId, player: opponent, executor: tx })
+      const challenge = await startRun({
+        quizId: seed.quizId,
+        player: seed.player,
+        challengeOfAttemptId: other.attemptId,
+        executor: tx,
+      })
+      await answer(tx, seed, challenge.attemptId, challenge.question.id)
+
+      const found = await findResumableRun({
+        quizId: seed.quizId,
+        player: seed.player,
+        challengeOfAttemptId: asked.attemptId,
+        executor: tx,
+      })
+
+      // Resumed here it would be compared against the wrong opponent's run.
+      expect(found).toBeNull()
+    })
+  })
+
+  it("ignores another player's run on the same challenge", async () => {
+    await withTestDb(async (tx) => {
+      const seed = await seedQuiz(tx, { questionCount: 2 })
+      const opponent: Player = { kind: 'guest', guestId: crypto.randomUUID(), nickname: 'Rival' }
+      const original = await startRun({ quizId: seed.quizId, player: opponent, executor: tx })
+      const playerB: Player = { kind: 'guest', guestId: crypto.randomUUID(), nickname: 'Other' }
+      const theirs = await startRun({
+        quizId: seed.quizId,
+        player: playerB,
+        challengeOfAttemptId: original.attemptId,
+        executor: tx,
+      })
+      await answer(tx, { ...seed, player: playerB }, theirs.attemptId, theirs.question.id)
+
+      const found = await findResumableRun({
+        quizId: seed.quizId,
+        player: seed.player,
+        challengeOfAttemptId: original.attemptId,
+        executor: tx,
+      })
+
+      // The ownership guard again, on the challenge path: resumeRun would refuse it.
+      expect(found).toBeNull()
+    })
+  })
+
+  it("ignores the player's plain run when asked about a challenge", async () => {
+    await withTestDb(async (tx) => {
+      const seed = await seedQuiz(tx, { questionCount: 2 })
+      const opponent: Player = { kind: 'guest', guestId: crypto.randomUUID(), nickname: 'Rival' }
+      const original = await startRun({ quizId: seed.quizId, player: opponent, executor: tx })
+      const plain = await startRun({ quizId: seed.quizId, player: seed.player, executor: tx })
+      await answer(tx, seed, plain.attemptId, plain.question.id)
+
+      const found = await findResumableRun({
+        quizId: seed.quizId,
+        player: seed.player,
+        challengeOfAttemptId: original.attemptId,
+        executor: tx,
+      })
+
+      // A plain run has no opponent, so the challenge page has nothing to frame.
+      expect(found).toBeNull()
+    })
+  })
+
   it('takes the most recent of two runs', async () => {
     await withTestDb(async (tx) => {
       const seed = await seedQuiz(tx, { questionCount: 2 })

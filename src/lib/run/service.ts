@@ -255,12 +255,22 @@ export async function submitAnswer(params: {
 // The run this player walked away from on this quiz, if there is one. A refresh
 // orphans the attempt rather than ending it: the row says which questions, and
 // attempt_answers says how far they got.
+//
+// Two scopes, chosen by challengeOfAttemptId. Without it this is the quiz page
+// asking, which must never offer a challenge run: resumed there it would drop
+// the head-to-head framing it was started with. With it this is a challenge
+// page asking, which offers only a run answering that exact challenge.
 export async function findResumableRun(params: {
   quizId: string
   player: Player
+  challengeOfAttemptId?: string
   executor?: Executor
 }): Promise<ResumableRun | null> {
-  const { quizId, player, executor = db } = params
+  const { quizId, player, challengeOfAttemptId, executor = db } = params
+  const challengeScope =
+    challengeOfAttemptId === undefined
+      ? isNull(attempts.challengeOfAttemptId)
+      : eq(attempts.challengeOfAttemptId, challengeOfAttemptId)
 
   const [row] = await executor
     .select({
@@ -275,9 +285,7 @@ export async function findResumableRun(params: {
       and(
         eq(attempts.quizId, quizId),
         isNull(attempts.finishedAt),
-        // A challenge run is excluded on purpose: resuming it from the plain
-        // quiz page would drop the head-to-head framing it was started with.
-        isNull(attempts.challengeOfAttemptId),
+        challengeScope,
         ownedBy(player),
       ),
     )

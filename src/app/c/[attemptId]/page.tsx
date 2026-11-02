@@ -5,7 +5,8 @@ import { useTranslations } from 'next-intl'
 import { cache, Suspense } from 'react'
 import { ChallengeInvitePanel } from '@/components/run/challenge-invite-panel'
 import { getChallenge } from '@/lib/run/challenge'
-import { getCurrentUser } from '@/lib/session'
+import { readPlayer } from '@/lib/run/identity'
+import { findResumableRun } from '@/lib/run/service'
 import { isUuid } from '@/lib/uuid'
 
 type ChallengeParams = Promise<{ attemptId: string }>
@@ -54,9 +55,19 @@ async function ChallengeSetup({ params }: { params: ChallengeParams }) {
   const invite = await loadChallenge(attemptId)
   if (!invite) notFound()
 
-  // Who is playing is settled again inside startChallengeRunAction; this only
-  // decides whether to ask for a nickname.
-  const user = await getCurrentUser()
+  // Read-only, because this is a render: a visitor with no guest cookie yet has
+  // played nothing, so there is nothing to look up and no cookie to mint. Who is
+  // playing is settled again inside startChallengeRunAction; here it decides
+  // only whether to ask for a nickname and whether there is a run to pick back
+  // up — one answering this challenge, and no other run on the quiz.
+  const player = await readPlayer()
+  const resumable = player
+    ? await findResumableRun({
+        quizId: invite.quizId,
+        player,
+        challengeOfAttemptId: invite.attemptId,
+      })
+    : null
 
   return (
     <>
@@ -80,7 +91,8 @@ async function ChallengeSetup({ params }: { params: ChallengeParams }) {
         quizSlug={invite.quizSlug}
         opponentName={invite.opponentName}
         questionCount={invite.questionCount}
-        askNickname={user === null}
+        askNickname={player?.kind !== 'user'}
+        resumable={resumable}
       />
     </>
   )
