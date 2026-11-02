@@ -7,7 +7,7 @@ commits and reviews cite them. **Closing an item requires evidence**: a commit s
 showing the fixed state. **Dropping one requires a recorded reason**, or the next audit raises it again.
 
 Created 2026-10-28 from the Milestone 1 close-out, two code reviews, a UX flow review and a design pass.
-Closed items: `docs/roadmap-archive-2026-10.md`.
+Closed items: `docs/roadmap-archive-2026-10.md`, `docs/roadmap-archive-2026-11.md`.
 
 ---
 
@@ -18,13 +18,6 @@ Closed items: `docs/roadmap-archive-2026-10.md`.
   _Vercel env, `src/lib/auth.ts`_
 - [ ] KQ02: Decide the custom domain
   Deployed: production runs on Vercel, and every push to `main` builds and runs `pnpm release`. What is left is the domain: `kataquiz` is free on npm and GitHub; `.com` is parked, `.app`/`.io`/`.dev`/`.study`/`.org`/`.co` were open when last checked.
-- [ ] KQ03: Prune `rate_limits`
-  The table has no TTL and no cleanup job, so it grows without bound. One scheduled `DELETE` before launch.
-  _`src/lib/rate-limit.ts`_
-- [ ] KQ38: `attempts` has no index
-  Declared with no table callback, so there is no index on it at all, while two reads on the run page's render path filter it by `quiz_id` + the owner column and sort by `started_at` — `findResumableRun` and `lastNicknameFor`, now issued together. KQ10 also raised the start limit to 120/hour, so the table grows four times faster than when both reads were written. One composite index on `(quiz_id, guest_id, started_at)` serves both; it needs a migration. Not measured — the dev database is too small for `EXPLAIN` to prove anything, and production is now live and growing, so it is due.
-  KQ05's stats page adds a third reader, on `attempt_answers`: both its queries filter by `question_id`, and the only index there is `unique(attempt_id, question_id)`, which leads with `attempt_id`, so every stats view scans the table. An index on `attempt_answers(question_id)` belongs in the same migration.
-  _`src/db/schema.ts:157`, `src/lib/run/service.ts`_, `src/lib/quizzes/stats.ts`
 
 ## Milestone 2 — the planned next slice
 
