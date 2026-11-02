@@ -154,23 +154,37 @@ export const options = pgTable(
   (table) => [unique().on(table.questionId, table.position)],
 )
 
-export const attempts = pgTable('attempts', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  quizId: uuid('quiz_id')
-    .notNull()
-    .references(() => quizzes.id, { onDelete: 'cascade' }),
-  // Deleting an account anonymises what it authored and what it played, never destroys either.
-  userId: text('user_id').references(() => user.id, { onDelete: 'set null' }),
-  guestId: text('guest_id'),
-  nickname: text('nickname'),
-  questionIds: uuid('question_ids').array().notNull(),
-  // The explicit return type breaks the circular inference of the self-reference.
-  challengeOfAttemptId: uuid('challenge_of_attempt_id').references((): AnyPgColumn => attempts.id),
-  score: integer('score').notNull().default(0),
-  errors: integer('errors').notNull().default(0),
-  startedAt: timestamp('started_at', { withTimezone: true }).notNull().defaultNow(),
-  finishedAt: timestamp('finished_at', { withTimezone: true }),
-})
+export const attempts = pgTable(
+  'attempts',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    quizId: uuid('quiz_id')
+      .notNull()
+      .references(() => quizzes.id, { onDelete: 'cascade' }),
+    // Deleting an account anonymises what it authored and what it played, never destroys either.
+    userId: text('user_id').references(() => user.id, { onDelete: 'set null' }),
+    guestId: text('guest_id'),
+    nickname: text('nickname'),
+    questionIds: uuid('question_ids').array().notNull(),
+    // The explicit return type breaks the circular inference of the self-reference.
+    challengeOfAttemptId: uuid('challenge_of_attempt_id').references(
+      (): AnyPgColumn => attempts.id,
+    ),
+    score: integer('score').notNull().default(0),
+    errors: integer('errors').notNull().default(0),
+    startedAt: timestamp('started_at', { withTimezone: true }).notNull().defaultNow(),
+    finishedAt: timestamp('finished_at', { withTimezone: true }),
+  },
+  // `findResumableRun` and `lastNicknameFor` (src/lib/run/service.ts) filter by
+  // `quiz_id` plus the owner column (`ownedBy` picks `user_id` for a signed-in
+  // player, `guest_id` for a guest) and sort by `started_at` desc. One index per
+  // owner column serves both kinds of player; a btree scans backwards, so no
+  // DESC is needed.
+  (table) => [
+    index().on(table.quizId, table.userId, table.startedAt),
+    index().on(table.quizId, table.guestId, table.startedAt),
+  ],
+)
 
 export const attemptAnswers = pgTable(
   'attempt_answers',
@@ -189,8 +203,10 @@ export const attemptAnswers = pgTable(
     answeredAt: timestamp('answered_at', { withTimezone: true }).notNull().defaultNow(),
   },
   // One row per question per attempt: this is what makes a double-submitted
-  // answer impossible, whatever the application layer does.
-  (table) => [unique().on(table.attemptId, table.questionId)],
+  // answer impossible, whatever the application layer does. The stats queries in
+  // src/lib/quizzes/stats.ts filter by `question_id`, which the unique index
+  // cannot serve because it leads with `attempt_id`.
+  (table) => [unique().on(table.attemptId, table.questionId), index().on(table.questionId)],
 )
 
 export const rateLimits = pgTable('rate_limits', {

@@ -36,6 +36,13 @@
       "when": 1793187659442,
       "tag": "0004_sloppy_starjammers",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1793632651867,
+      "tag": "0005_red_valkyrie",
+      "breakpoints": true
     }
   ]
 }

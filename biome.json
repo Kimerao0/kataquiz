@@ -7,7 +7,14 @@
   },
   "files": {
     "ignoreUnknown": true,
-    "includes": ["**", "!drizzle", "!.next", "!src/components/ui", "!pnpm-lock.yaml", "!.claude/skills/**/*.md"]
+    "includes": [
+      "**",
+      "!drizzle",
+      "!.next",
+      "!src/components/ui",
+      "!pnpm-lock.yaml",
+      "!.claude/skills/**/*.md"
+    ]
   },
   "formatter": {
     "enabled": true,

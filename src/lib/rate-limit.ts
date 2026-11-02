@@ -29,6 +29,15 @@ export const UPLOAD_WINDOW_SEC = 3600
 export const RESUME_LIMIT = 60
 export const RESUME_WINDOW_SEC = 3600
 
+// Longer than every window above, so any row it deletes is one whose window has
+// expired, and an expired row already resets to a count of 1 on its next hit:
+// deleting it changes no limiter decision.
+export const RATE_LIMIT_RETENTION_SEC = 24 * 3600
+
+// A DELETE on every call would double the writes of a hot path; one in a
+// hundred keeps the table bounded to roughly a day of keys.
+export const PRUNE_PROBABILITY = 0.01
+
 // The base class of both `db` and a transaction, so tests can run the limiter
 // inside the rollback harness.
 type Executor = PgDatabase<NodePgQueryResultHKT, Db['_']['fullSchema']>
@@ -56,5 +65,29 @@ export async function checkRateLimit(
     })
     .returning({ count: rateLimits.count })
 
+  await maybePrune(executor)
+
   return row.count <= limit
+}
+
+export async function pruneRateLimits(
+  executor: Executor = db,
+  retentionSec = RATE_LIMIT_RETENTION_SEC,
+): Promise<number> {
+  const result = await executor
+    .delete(rateLimits)
+    .where(sql`${rateLimits.windowStart} < now() - make_interval(secs => ${retentionSec})`)
+
+  return result.rowCount ?? 0
+}
+
+async function maybePrune(executor: Executor): Promise<void> {
+  if (Math.random() >= PRUNE_PROBABILITY) return
+
+  // Housekeeping must never fail the request that happened to trigger it.
+  try {
+    await pruneRateLimits(executor)
+  } catch (error) {
+    console.error('rate_limits prune failed', error)
+  }
 }
