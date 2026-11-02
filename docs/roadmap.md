@@ -14,15 +14,15 @@ Closed items: `docs/roadmap-archive-2026-10.md`.
 ## Blocks a public launch
 
 - [ ] KQ01: Register the Google OAuth app
-  Only GitHub is configured. The sign-in page shows one provider; that is correct behaviour, not a bug, but it narrows who can sign up.
-  _`.env.local`, `src/lib/auth.ts`_
-- [ ] KQ02: Decide the domain and deploy
-  `kataquiz` is free on npm and GitHub; `.com` is parked, `.app`/`.io`/`.dev`/`.study`/`.org`/`.co` are open. Nothing is deployed.
+  The code already supports Google (`src/lib/auth.ts:20` reads `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET`), but production only has the `GITHUB_*` vars (checked 2026-11-02 with `vercel env ls production`), so the sign-in page shows one provider. No code work: register the app in the Google console and add the two vars to Vercel production.
+  _Vercel env, `src/lib/auth.ts`_
+- [ ] KQ02: Decide the custom domain
+  Deployed: production runs on Vercel, and every push to `main` builds and runs `pnpm release`. What is left is the domain: `kataquiz` is free on npm and GitHub; `.com` is parked, `.app`/`.io`/`.dev`/`.study`/`.org`/`.co` were open when last checked.
 - [ ] KQ03: Prune `rate_limits`
   The table has no TTL and no cleanup job, so it grows without bound. One scheduled `DELETE` before launch.
   _`src/lib/rate-limit.ts`_
 - [ ] KQ38: `attempts` has no index
-  Declared with no table callback, so there is no index on it at all, while two reads on the run page's render path filter it by `quiz_id` + the owner column and sort by `started_at` — `findResumableRun` and `lastNicknameFor`, now issued together. KQ10 also raised the start limit to 120/hour, so the table grows four times faster than when both reads were written. One composite index on `(quiz_id, guest_id, started_at)` serves both; it needs a migration. Not measured — nothing is deployed and the dev database is too small for `EXPLAIN` to prove anything, so this is a pre-launch item and not a bug.
+  Declared with no table callback, so there is no index on it at all, while two reads on the run page's render path filter it by `quiz_id` + the owner column and sort by `started_at` — `findResumableRun` and `lastNicknameFor`, now issued together. KQ10 also raised the start limit to 120/hour, so the table grows four times faster than when both reads were written. One composite index on `(quiz_id, guest_id, started_at)` serves both; it needs a migration. Not measured — the dev database is too small for `EXPLAIN` to prove anything, and production is now live and growing, so it is due.
   KQ05's stats page adds a third reader, on `attempt_answers`: both its queries filter by `question_id`, and the only index there is `unique(attempt_id, question_id)`, which leads with `attempt_id`, so every stats view scans the table. An index on `attempt_answers(question_id)` belongs in the same migration.
   _`src/db/schema.ts:157`, `src/lib/run/service.ts`_, `src/lib/quizzes/stats.ts`
 
