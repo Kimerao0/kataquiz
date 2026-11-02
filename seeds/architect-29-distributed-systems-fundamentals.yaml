@@ -1,0 +1,337 @@
+version: 1
+title: "Architect Roadmap 29: Distributed systems fundamentals"
+description: CAP and PACELC, consistency models, replication and sharding, consensus concepts from Raft, distributed tracing, and the trade-off between scalability and complexity.
+language: en
+tags: [architect-roadmap, architecture, distributed-systems, cap, consensus]
+run:
+  questionsPerRun: 10
+  maxErrors: 3
+  timePerQuestionSec: 60
+questions:
+  - type: single
+    prompt: "During a network partition between two data centres, a CP system behaves in which way?"
+    explanation: "A CP system preserves consistency and gives up availability for the side that cannot reach a quorum: it rejects or blocks requests rather than serve possibly stale or divergent data. An AP system would keep answering on both sides and reconcile later."
+    theoryUrl: https://en.wikipedia.org/wiki/CAP_theorem
+    options:
+      - {
+          text: "It keeps accepting writes on both sides and merges them afterwards",
+          correct: false,
+        }
+      - {
+          text: "It refuses or delays requests on the side without a quorum, to avoid inconsistent data",
+          correct: true,
+        }
+      - {
+          text: "It silently drops the partition by retrying until the network heals, serving cached data meanwhile",
+          correct: false,
+        }
+      - {
+          text: "It is unaffected, since partitions only matter for single-node databases",
+          correct: false,
+        }
+  - type: boolean
+    prompt: "True or false: the CAP theorem means that a distributed system must always choose between consistency and availability, even when there is no partition."
+    explanation: "False. CAP describes the trade-off during a network partition. Without a partition you can have both, though PACELC points out that you still trade latency against consistency in normal operation."
+    theoryUrl: https://en.wikipedia.org/wiki/PACELC_theorem
+    answer: false
+  - type: single
+    prompt: "What does the 'ELC' part of PACELC add to the CAP discussion?"
+    explanation: "PACELC says: if Partition, choose Availability or Consistency; Else, choose Latency or Consistency. Even with no partition, stronger consistency (for example synchronous replication) costs latency."
+    theoryUrl: https://en.wikipedia.org/wiki/PACELC_theorem
+    options:
+      - {
+          text: "Even without a partition, there is a latency versus consistency trade-off",
+          correct: true,
+        }
+      - { text: "Even without a partition, nodes must elect a leader per request", correct: false }
+      - {
+          text: "Every distributed system must be eventually consistent in the end, so strong consistency is never offered",
+          correct: false,
+        }
+      - { text: "Partitions can only be tolerated if latency is below a threshold", correct: false }
+  - type: single
+    prompt: "A shopping cart is replicated across three regions. A user in Europe adds an item, then immediately refreshes and sees the cart without it, because the read hit a replica that was not yet updated. Which guarantee would fix this for that user?"
+    explanation: "Read-your-writes (session) consistency guarantees that a client sees its own writes, for example by routing the client to the leader or tracking the write's version. It is weaker than linearizability and cheaper. Eventual consistency alone permits this anomaly."
+    theoryUrl: https://jepsen.io/consistency
+    options:
+      - { text: "Eventual consistency", correct: false }
+      - { text: "Read-your-writes consistency", correct: true }
+      - { text: "Serializability across all tables", correct: false }
+      - { text: "Atomic durability", correct: false }
+  - type: single
+    prompt: "Which statement best describes linearizability?"
+    explanation: "A linearizable system behaves as if there is a single copy of the data and every operation takes effect atomically at a point between its start and end, so reads see the latest completed write. It is about single-object recency, whereas serializability is about transactions."
+    theoryUrl: https://jepsen.io/consistency/models/linearizable
+    options:
+      - {
+          text: "Operations on any set of objects appear to run one transaction at a time, with no real-time ordering required",
+          correct: false,
+        }
+      - { text: "Replicas converge if updates stop, with no ordering guarantees", correct: false }
+      - {
+          text: "Operations behave as if on one copy, and a read sees the latest completed write",
+          correct: true,
+        }
+      - { text: "Each client sees monotonically increasing timestamps", correct: false }
+  - type: single
+    prompt: "With N=3 replicas, which read and write quorum sizes guarantee that a read overlaps the latest successful write?"
+    explanation: "The overlap condition is R + W > N. With W=2 and R=2, 4 > 3, so any read set shares at least one replica with the write set. W=1, R=1 gives 2 which is not greater than 3, so reads can miss the latest write."
+    theoryUrl: https://docs.aws.amazon.com/whitepapers/latest/availability-and-beyond-improving-resilience/quorum.html
+    options:
+      - { text: "W=1, R=1", correct: false }
+      - { text: "W=2, R=2", correct: true }
+      - { text: "W=1, R=2 with writes asynchronous", correct: false }
+      - { text: "W=3, R=0", correct: false }
+  - type: single
+    prompt: "What does this print?"
+    code: |
+      const quorum = (n, w, r) => w + r > n;
+      console.log(quorum(3, 2, 2), quorum(5, 2, 2), quorum(5, 3, 3), quorum(3, 1, 1));
+    codeLanguage: javascript
+    explanation: "The overlap rule is w + r > n. For (3,2,2) 4 > 3 is true, for (5,2,2) 4 > 5 is false, for (5,3,3) 6 > 5 is true and for (3,1,1) 2 > 3 is false."
+    theoryUrl: https://docs.aws.amazon.com/whitepapers/latest/availability-and-beyond-improving-resilience/quorum.html
+    options:
+      - { text: "true false true false", correct: true }
+      - { text: "true true true false", correct: false }
+      - { text: "false false true false", correct: false }
+      - { text: "true false true true", correct: false }
+  - type: single
+    prompt: "A leader-based replicated database uses asynchronous replication. The leader fails right after acknowledging a write and a follower is promoted. What is the risk?"
+    explanation: "With asynchronous replication the leader can acknowledge before followers have the write, so the promoted follower may lack acknowledged writes, which are then lost (or conflict if the old leader returns). Synchronous or semi-synchronous replication reduces this at the cost of latency and availability."
+    theoryUrl: https://www.postgresql.org/docs/current/warm-standby.html#SYNCHRONOUS-REPLICATION
+    options:
+      - { text: "Acknowledged writes may be missing on the new leader", correct: true }
+      - { text: "All followers will refuse to elect a new leader", correct: false }
+      - { text: "Reads from followers become strongly consistent automatically", correct: false }
+      - { text: "No risk, since followers always have every acknowledged write", correct: false }
+  - type: single
+    prompt: "Two replicas accept writes to the same key concurrently during a partition. With last-write-wins by wall-clock timestamp, what is the main danger?"
+    explanation: "LWW silently discards one of the concurrent updates, and clock skew between nodes can make the older write appear newer, so data is lost without any signal. Version vectors or CRDTs detect or merge concurrent updates instead."
+    theoryUrl: https://jepsen.io/consistency
+    options:
+      - {
+          text: "Both writes are always preserved as siblings, but the order in which readers see them is random",
+          correct: false,
+        }
+      - {
+          text: "One write is silently dropped, and clock skew can pick the wrong winner",
+          correct: true,
+        }
+      - { text: "The system returns an error to both writers", correct: false }
+      - { text: "LWW requires a global lock that stalls reads", correct: false }
+  - type: single
+    prompt: "What does this print for the vector clock comparisons?"
+    code: |
+      function cmp(a, b) {
+        let lt = false, gt = false;
+        for (const k of new Set([...Object.keys(a), ...Object.keys(b)])) {
+          const x = a[k] || 0, y = b[k] || 0;
+          if (x < y) lt = true;
+          if (x > y) gt = true;
+        }
+        return lt && gt ? 'concurrent' : lt ? 'before' : gt ? 'after' : 'equal';
+      }
+      console.log(cmp({ A: 2, B: 1 }, { A: 1, B: 2 }), cmp({ A: 1, B: 1 }, { A: 2, B: 1 }));
+    codeLanguage: javascript
+    explanation: "In the first pair A is ahead in one clock and B in the other, so neither happened before the other: concurrent. In the second pair every counter is less than or equal and one is smaller: the first event happened before the second."
+    theoryUrl: https://en.wikipedia.org/wiki/Vector_clock
+    options:
+      - { text: "before before", correct: false }
+      - { text: "concurrent after", correct: false }
+      - { text: "concurrent before", correct: true }
+      - { text: "after before", correct: false }
+  - type: single
+    prompt: "You shard a user table across 4 database nodes by hashing the user id modulo 4. Adding a 5th node changes the formula to modulo 5. What is the consequence?"
+    explanation: "Changing the modulus remaps most keys (roughly 80% moving from 4 to 5 nodes), so almost all data must be relocated. Consistent hashing, or a directory with virtual shards, limits movement to roughly 1/N of the keys."
+    theoryUrl: https://en.wikipedia.org/wiki/Consistent_hashing
+    options:
+      - { text: "Only the keys of the new node move", correct: false }
+      - {
+          text: "Nothing moves, since the hash of each id is stable and modulo only affects new keys",
+          correct: false,
+        }
+      - { text: "Most keys map to a different node and must move", correct: true }
+      - { text: "All keys stay but reads get slower", correct: false }
+  - type: single
+    prompt: "A multi-tenant SaaS shards by tenant id. One tenant produces 40% of the traffic. What problem does this illustrate and what is a reasonable response?"
+    explanation: "It is a hot shard (skew): one shard receives disproportionate load. Typical responses are to give the large tenant a dedicated shard, or to split it by a secondary key. Adding more nodes alone does not help because the hot tenant stays on one node."
+    theoryUrl: https://aws.amazon.com/builders-library/workload-isolation-using-shuffle-sharding/
+    options:
+      - {
+          text: "A split-brain between replicas of that tenant, solved by increasing the quorum size and electing a new leader",
+          correct: false,
+        }
+      - {
+          text: "A hot shard, fixed by moving the tenant to a dedicated shard or splitting by a secondary key",
+          correct: true,
+        }
+      - { text: "A stale read, solved by synchronous replication", correct: false }
+      - { text: "A cache stampede, solved by adding jitter to TTLs", correct: false }
+  - type: single
+    prompt: "In Raft, what is the role of the leader?"
+    explanation: "The leader receives client writes, appends them to its log and replicates them to followers; an entry is committed once a majority has stored it. Followers do not accept client writes independently, and the leader is elected, not fixed."
+    theoryUrl: https://raft.github.io/
+    options:
+      - {
+          text: "Every node can accept writes and the leader only resolves conflicts when replicas disagree afterwards",
+          correct: false,
+        }
+      - { text: "It only stores the cluster's membership list", correct: false }
+      - {
+          text: "It accepts writes, replicates entries to followers and commits once a majority has them",
+          correct: true,
+        }
+      - { text: "It is chosen permanently when the cluster is first created", correct: false }
+  - type: single
+    prompt: "A Raft cluster has 5 nodes. How many node failures can it tolerate while still being able to commit writes?"
+    explanation: "Commit needs a majority: floor(5/2)+1 = 3 nodes. So up to 2 can fail. A 4-node cluster needs 3 as well and tolerates only 1, which is why odd cluster sizes are preferred."
+    theoryUrl: https://raft.github.io/
+    options:
+      - { text: "1", correct: false }
+      - { text: "2", correct: true }
+      - { text: "3", correct: false }
+      - { text: "4", correct: false }
+  - type: single
+    prompt: "In Raft, why must a candidate collect votes from a majority to become leader?"
+    explanation: "Any two majorities overlap in at least one node, so two leaders cannot be elected in the same term. This prevents split-brain, where two leaders accept conflicting writes. Without a majority a candidate retries after a randomized timeout."
+    theoryUrl: https://raft.github.io/
+    options:
+      - { text: "To make elections faster, since majorities respond first", correct: false }
+      - { text: "Because only a majority of nodes is allowed to run a log", correct: false }
+      - { text: "To keep the log compact by deleting minority entries", correct: false }
+      - {
+          text: "Because two majorities always overlap, so two leaders cannot win the same term",
+          correct: true,
+        }
+  - type: single
+    prompt: "A 3-node etcd cluster is split by a partition into one node and two nodes. A client connected to the single node tries to write. What happens?"
+    explanation: "The isolated node cannot reach a majority, so it cannot commit writes and the write fails or times out (the majority side elects a leader and continues). This is CP behaviour: consistency over availability for the minority side."
+    theoryUrl: https://raft.github.io/
+    options:
+      - { text: "The write succeeds locally and is merged later", correct: false }
+      - {
+          text: "The write is committed because every node is the leader of its own partition",
+          correct: false,
+        }
+      - { text: "The write fails because the node cannot reach a quorum", correct: true }
+      - {
+          text: "The write succeeds and reads of it are guaranteed on the other side",
+          correct: false,
+        }
+  - type: single
+    prompt: "A request passes through an API gateway, three services and a database. Latency is high but each service's own logs look fine. Which tool answers 'where did the time go for this request'?"
+    explanation: "Distributed tracing propagates a trace context across service calls and records spans with timing, so you see the whole request path and where the time is spent. Metrics show aggregates and logs show events, but neither links one request across services by themselves."
+    theoryUrl: https://opentelemetry.io/docs/concepts/signals/traces/
+    options:
+      - { text: "Distributed tracing with context propagation across services", correct: true }
+      - { text: "CPU metrics of each service", correct: false }
+      - { text: "Increasing the log level to debug in all services", correct: false }
+      - { text: "A load test against only the database", correct: false }
+  - type: single
+    prompt: "Traces for a request show disconnected spans: the gateway and the Orders service appear as separate traces. What is the most likely cause?"
+    explanation: "Trace context (such as the W3C `traceparent` header) is not being propagated on the outgoing call, so the downstream service starts a new trace. Sampling affects whether traces exist, not whether they join."
+    theoryUrl: https://www.w3.org/TR/trace-context/
+    options:
+      - { text: "The database is too slow to record spans", correct: false }
+      - {
+          text: "The `traceparent` header is not forwarded on the outgoing HTTP call",
+          correct: true,
+        }
+      - {
+          text: "Spans can only be linked when both services use the same language",
+          correct: false,
+        }
+      - { text: "The sampling rate is above 50%", correct: false }
+  - type: single
+    prompt: "A team wants to serve users in three continents with local reads and writes and 'strong consistency everywhere'. What is the honest trade-off to explain?"
+    explanation: "Strong consistency across continents requires coordination over long round trips on every write (consensus or synchronous replication), so write latency rises to the slowest quorum path. The alternatives are relaxing consistency, partitioning data by region, or accepting higher latency."
+    theoryUrl: https://en.wikipedia.org/wiki/PACELC_theorem
+    options:
+      - { text: "Strong consistency is free if you use enough replicas", correct: false }
+      - {
+          text: "Writes pay cross-continent round trips for coordination, unless you relax consistency or partition data by region",
+          correct: true,
+        }
+      - {
+          text: "Strong consistency is impossible in any distributed system, so every global product must simply choose eventual consistency and accept stale reads",
+          correct: false,
+        }
+      - { text: "Latency does not depend on distance when using HTTP/3", correct: false }
+  - type: multi
+    prompt: "Which of the following are consequences of moving from a single database to a sharded, replicated architecture? Select all that apply."
+    explanation: "Cross-shard transactions and joins become hard or expensive, operational work grows (rebalancing, failover, monitoring), and replication lag can produce stale reads. Sharding does not make your schema simpler or remove the need for backups."
+    theoryUrl: https://martinfowler.com/articles/microservices.html
+    options:
+      - { text: "Cross-shard joins and transactions become harder", correct: true }
+      - { text: "Replication lag can cause stale reads", correct: true }
+      - { text: "Operations such as rebalancing and failover need to be managed", correct: true }
+      - { text: "Backups are no longer needed because data is replicated", correct: false }
+  - type: single
+    prompt: "A service calls a payment provider and the call times out. What can the caller conclude?"
+    explanation: "A timeout is ambiguous: the request may have been lost, or processed with the response lost. The caller cannot tell, which is why operations must be idempotent or queryable by key before retrying. This is one of the fundamental problems of distributed systems (the two generals problem)."
+    theoryUrl: https://aws.amazon.com/builders-library/timeouts-retries-and-backoff-with-jitter/
+    options:
+      - {
+          text: "The payment definitely failed because no response arrived, so it can be retried safely",
+          correct: false,
+        }
+      - { text: "The payment definitely succeeded", correct: false }
+      - {
+          text: "Unknown: it may have been processed, so retry only with an idempotency key",
+          correct: true,
+        }
+      - { text: "The provider is permanently down", correct: false }
+  - type: single
+    prompt: "Which scenario best illustrates eventual consistency being an acceptable choice?"
+    explanation: "A social feed's like counter tolerates being a few seconds stale, and gains availability and latency. Bank transfers, inventory for the last item and unique username claims need stronger guarantees to avoid conflicts."
+    theoryUrl: https://jepsen.io/consistency
+    options:
+      - { text: "A like counter on a social post", correct: true }
+      - { text: "Debiting a bank account balance", correct: false }
+      - { text: "Selling the last seat on a flight", correct: false }
+      - { text: "Enforcing unique usernames at sign-up", correct: false }
+  - type: single
+    prompt: "A team replaces a monolith with 40 microservices and finds that incidents are harder to debug and releases need cross-team coordination. Which principle explains the surprise?"
+    explanation: "Distribution adds essential complexity: partial failure, network latency, versioned contracts and observability needs. Scalability by decomposition is paid for in operational and cognitive complexity, so the split should be justified by a real need. It does not eliminate coupling by itself."
+    theoryUrl: https://martinfowler.com/articles/microservices.html
+    options:
+      - {
+          text: "Microservices remove coupling between teams and modules, so incidents should become easier to diagnose over time",
+          correct: false,
+        }
+      - {
+          text: "Every new service adds network failure modes and coordination cost that need a real justification",
+          correct: true,
+        }
+      - {
+          text: "Debugging difficulty depends only on the language of the services",
+          correct: false,
+        }
+      - { text: "Coordination costs vanish when each service has its own database", correct: false }
+  - type: single
+    prompt: "Which technique lets a replicated counter accept concurrent increments on different replicas and converge without losing any increment?"
+    explanation: "A CRDT counter (for example a G-Counter, with one slot per replica merged by max/sum) is designed to merge concurrent updates deterministically. LWW would drop an increment, and a plain integer overwrite loses concurrent updates."
+    theoryUrl: https://crdt.tech/
+    options:
+      - { text: "Last-write-wins on a single integer value", correct: false }
+      - { text: "A CRDT counter that keeps per-replica counts and merges them", correct: true }
+      - { text: "Random selection between the two values", correct: false }
+      - {
+          text: "Reading the counter before and after each increment with no coordination",
+          correct: false,
+        }
+  - type: single
+    prompt: "A leader node pauses for 30 seconds in a long garbage collection while a new leader is elected. When it resumes, it still believes it is leader and writes to storage. How is this classically prevented?"
+    explanation: "Fencing tokens: each leadership term gets a monotonically increasing token that the storage checks, rejecting writes with an older token. Relying on the old leader checking its own clock is unsafe because it cannot know it was paused."
+    theoryUrl: https://martin.kleppmann.com/2016/02/08/how-to-do-distributed-locking.html
+    options:
+      - {
+          text: "Ask the old leader to check its local clock before every write, trusting that the pause did not skip its lease",
+          correct: false,
+        }
+      - {
+          text: "Fencing tokens that the storage uses to reject writes from older terms",
+          correct: true,
+        }
+      - { text: "Lengthen the leader election timeout to 5 minutes", correct: false }
+      - { text: "Disable garbage collection on leader nodes", correct: false }

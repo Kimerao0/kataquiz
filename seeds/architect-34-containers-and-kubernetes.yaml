@@ -1,0 +1,375 @@
+version: 1
+title: "Architect Roadmap 34: Containers and Kubernetes"
+description: Pods, Deployments, Services, Ingress, autoscaling, health probes, image hygiene, and when Kubernetes is overkill compared with ECS or serverless.
+language: en
+tags: [architect-roadmap, infrastructure, kubernetes, containers, ecs]
+run:
+  questionsPerRun: 10
+  maxErrors: 3
+  timePerQuestionSec: 60
+questions:
+  - type: multi
+    prompt: "Two containers run in the same Pod, for example an app and a log-shipping sidecar. What do they share by default? Select all that apply."
+    explanation: "Containers in a Pod share the network namespace (same IP, reachable over localhost) and can mount the same volumes. They do not share a root filesystem or process memory: each container has its own image filesystem and its own resource limits."
+    theoryUrl: https://kubernetes.io/docs/concepts/workloads/pods/
+    options:
+      - {
+          text: "The Pod IP address and port space, so they can talk over localhost",
+          correct: true,
+        }
+      - { text: "The container root filesystem from each other's image", correct: false }
+      - { text: "Any volumes declared in the Pod spec and mounted by both", correct: true }
+      - { text: "The memory limit, which is enforced as a single combined cap", correct: false }
+  - type: single
+    prompt: "An engineer runs `kubectl exec` into a Pod and edits a config file to fix an incident. An hour later the Pod is rescheduled to another node and the fix is gone. What principle does this illustrate?"
+    explanation: "Pods are ephemeral and their container filesystem is disposable; anything that must survive belongs in the image, in a ConfigMap or Secret, or on a persistent volume. Pods are not 'unstable' bugs, and a restart does not copy edits back to the image."
+    theoryUrl: https://kubernetes.io/docs/concepts/workloads/pods/
+    options:
+      - {
+          text: "Pods are replaceable, so changes must go through declared config, not live edits",
+          correct: true,
+        }
+      - {
+          text: "Kubernetes reverts any change made through `kubectl exec` after 60 minutes, by reconciling files with the manifest",
+          correct: false,
+        }
+      - {
+          text: "Config files can only be edited on the node, not inside a container",
+          correct: false,
+        }
+      - { text: "Edits persist only if the Pod runs as root", correct: false }
+  - type: single
+    prompt: "A Deployment has 4 replicas with the strategy below. During a rolling update, what is the maximum number of Pods that can exist, and how many must stay available?"
+    code: |
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: api
+      spec:
+        replicas: 4
+        strategy:
+          type: RollingUpdate
+          rollingUpdate:
+            maxSurge: 1
+            maxUnavailable: 0
+        selector:
+          matchLabels: { app: api }
+        template:
+          metadata:
+            labels: { app: api }
+          spec:
+            containers:
+              - name: api
+                image: acme/api:2.0.0
+    codeLanguage: yaml
+    explanation: "maxSurge 1 allows one extra Pod above the desired count (5 total), and maxUnavailable 0 means all 4 must stay available, so a new Pod must become Ready before an old one is removed. This is the safest but slowest setting and needs spare capacity."
+    theoryUrl: https://kubernetes.io/docs/concepts/workloads/controllers/deployment/
+    options:
+      - { text: "At most 4 Pods in total; 3 must stay available", correct: false }
+      - { text: "At most 5 Pods in total; all 4 must stay available", correct: true }
+      - { text: "At most 5 Pods in total; 3 must stay available", correct: false }
+      - { text: "At most 8 Pods in total; none are required to stay available", correct: false }
+  - type: single
+    prompt: "After a bad rollout you run `kubectl rollout undo deployment/api`. What does Kubernetes do under the hood?"
+    explanation: "A Deployment manages versions through ReplicaSets, one per Pod template revision. Undo scales the previous ReplicaSet back up and the current one down, following the same rolling-update strategy. It does not restore data, and it does not rebuild images."
+    theoryUrl: https://kubernetes.io/docs/concepts/workloads/controllers/deployment/
+    options:
+      - { text: "It rebuilds the previous image from the Git commit", correct: false }
+      - { text: "It restores the database to the state of the earlier release", correct: false }
+      - {
+          text: "It deletes the Deployment and recreates it from the last applied manifest on disk",
+          correct: false,
+        }
+      - {
+          text: "It scales the previous ReplicaSet back up and the current one down",
+          correct: true,
+        }
+  - type: single
+    prompt: "Pods of `app: web` are running and Ready, but requests to the Service time out and `kubectl get endpoints web` is empty. What is the most likely cause?"
+    code: |
+      apiVersion: v1
+      kind: Service
+      metadata:
+        name: web
+      spec:
+        selector:
+          app: web-frontend
+        ports:
+          - port: 80
+            targetPort: 8080
+    codeLanguage: yaml
+    explanation: "A Service routes to Pods whose labels match its selector. The Pods are labelled `app: web`, but the selector asks for `web-frontend`, so no endpoints exist. Readiness, the port numbers or the Service type could cause other symptoms, but an empty endpoints list points to the selector."
+    theoryUrl: https://kubernetes.io/docs/concepts/services-networking/service/
+    options:
+      - {
+          text: "The Service type must be NodePort for endpoints to appear, since ClusterIP never selects Pods",
+          correct: false,
+        }
+      - { text: "`targetPort` must equal `port` or the Service is rejected", correct: false }
+      - {
+          text: "The selector does not match the Pod labels, so no endpoints are selected",
+          correct: true,
+        }
+      - { text: "Pods must be restarted whenever a Service is created", correct: false }
+  - type: single
+    prompt: "You expose 12 HTTP microservices on AWS. Each has `type: LoadBalancer`, and the bill shows twelve cloud load balancers. What is the usual architectural improvement?"
+    explanation: "An Ingress (or Gateway API) with a controller lets one load balancer route by host and path to many ClusterIP Services, and centralises TLS. Merging services into one Pod defeats independent scaling. NodePort would remove the load balancers but exposes node ports with no routing layer."
+    theoryUrl: https://kubernetes.io/docs/concepts/services-networking/ingress/
+    options:
+      - {
+          text: "Use NodePort for every Service and give clients the node IPs and ports of each service",
+          correct: false,
+        }
+      - { text: "Run all twelve services as containers in one Pod", correct: false }
+      - {
+          text: "Put one Ingress with a controller in front and route by host and path",
+          correct: true,
+        }
+      - { text: "Replace the Services with a single headless Service", correct: false }
+  - type: boolean
+    prompt: "Creating an Ingress resource is enough to route external HTTP traffic to a Service, even if no ingress controller is installed in the cluster."
+    answer: false
+    explanation: "An Ingress is only a declaration of routing rules. A controller (NGINX, Traefik, a cloud controller and so on) must be running to watch Ingress objects and implement them."
+    theoryUrl: https://kubernetes.io/docs/concepts/services-networking/ingress/
+  - type: single
+    prompt: "Given this Ingress, to which backend does a request for `/api/v1/users` go?"
+    code: |
+      apiVersion: networking.k8s.io/v1
+      kind: Ingress
+      metadata:
+        name: shop
+      spec:
+        rules:
+          - host: shop.example.com
+            http:
+              paths:
+                - path: /
+                  pathType: Prefix
+                  backend:
+                    service: { name: web, port: { number: 80 } }
+                - path: /api
+                  pathType: Prefix
+                  backend:
+                    service: { name: api, port: { number: 8080 } }
+    codeLanguage: yaml
+    explanation: "When several paths match, the longest matching path wins, so `/api` takes precedence over `/` and the request goes to the `api` Service. Ordering in the list does not decide the winner, and Prefix matching works on path segments, so `/api` does match `/api/v1/users`."
+    theoryUrl: https://kubernetes.io/docs/concepts/services-networking/ingress/
+    options:
+      - { text: "`web`, because it is declared first in the list", correct: false }
+      - { text: "`api`, because the longest matching prefix wins", correct: true }
+      - { text: "Both Services, which receive the request in turn", correct: false }
+      - { text: "Neither; the request gets a 404 because the paths overlap", correct: false }
+  - type: single
+    prompt: "A HorizontalPodAutoscaler targets 70% CPU utilization but the Deployment's containers define no CPU requests. What happens?"
+    explanation: "Utilization is calculated as a percentage of the container's resource request. Without requests the HPA has no denominator, reports it cannot compute the metric and does not scale. Limits are not a substitute, and the HPA does not guess defaults."
+    theoryUrl: https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/
+    options:
+      - { text: "It uses the node's total CPU as the denominator instead", correct: false }
+      - { text: "It scales on the CPU limit, which acts as an implicit request", correct: false }
+      - { text: "It cannot compute utilization and does not scale on that metric", correct: true }
+      - { text: "It scales using a default request of 100m per container", correct: false }
+  - type: single
+    prompt: "An HPA scales a Deployment from 4 to 10 replicas under load, but 6 Pods stay Pending with the event 'Insufficient cpu'. Which component should add capacity?"
+    explanation: "The HPA only changes the number of Pods. When Pods cannot be scheduled for lack of node capacity, a node autoscaler (Cluster Autoscaler or Karpenter) must add nodes. The VPA adjusts Pod requests, not node counts, and the scheduler only places Pods onto existing nodes."
+    theoryUrl: https://kubernetes.io/docs/concepts/cluster-administration/node-autoscaling/
+    options:
+      - {
+          text: "The Vertical Pod Autoscaler, by shrinking the requests of running Pods",
+          correct: false,
+        }
+      - { text: "The kube-scheduler, which provisions new nodes on demand", correct: false }
+      - { text: "The Ingress controller, by rerouting traffic to other clusters", correct: false }
+      - { text: "A node autoscaler such as Cluster Autoscaler or Karpenter", correct: true }
+  - type: single
+    prompt: "An HPA targets 60% average CPU. There are 4 replicas running at an average of 90% CPU. By the documented algorithm, what is the desired replica count?"
+    explanation: "desiredReplicas = ceil(currentReplicas * currentMetric / targetMetric) = ceil(4 * 90 / 60) = ceil(6) = 6. It is proportional, not additive, and it is bounded by min and max replicas."
+    theoryUrl: https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/
+    options:
+      - { text: "5", correct: false }
+      - { text: "7", correct: false }
+      - { text: "6", correct: true }
+      - { text: "8", correct: false }
+  - type: single
+    prompt: "A team adds a liveness probe on `/health` that queries the database. The database has a 2-minute outage and the whole API fleet starts restarting in a loop. What was the design mistake?"
+    explanation: "A liveness probe should answer 'is this process stuck and beyond recovery?', not 'are my dependencies up?'. Restarting healthy Pods cannot fix the database and amplifies the outage. Dependency checks belong, with care, in readiness so Pods are taken out of rotation instead of killed."
+    theoryUrl: https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/
+    options:
+      - { text: "The probe should have used TCP instead of HTTP", correct: false }
+      - {
+          text: "Liveness should check only the process itself, not external dependencies",
+          correct: true,
+        }
+      - { text: "Probes should be removed entirely in production clusters", correct: false }
+      - {
+          text: "The probe interval should be exactly equal to the DB timeout, so restarts happen once the outage ends",
+          correct: false,
+        }
+  - type: single
+    prompt: "A Pod's readiness probe starts failing while its liveness probe still passes. What does Kubernetes do?"
+    explanation: "Failing readiness removes the Pod from the endpoints of its Services, so it stops receiving traffic, but the container keeps running and is not restarted. Restarting is the effect of liveness (or startup) failure. The Pod is also not deleted or rescheduled."
+    theoryUrl: https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/
+    options:
+      - { text: "It restarts the container immediately", correct: false }
+      - { text: "It removes the Pod from Service endpoints but leaves it running", correct: true }
+      - {
+          text: "It deletes the Pod and lets the ReplicaSet create a new one, since a Pod that is not Ready is unhealthy",
+          correct: false,
+        }
+      - { text: "It evicts the Pod to another node", correct: false }
+  - type: single
+    prompt: "A JVM service needs up to 90 seconds to warm up. With the probe below, the Pod is killed again and again before it ever serves traffic. What is the best fix?"
+    code: |
+      livenessProbe:
+        httpGet: { path: /healthz, port: 8080 }
+        initialDelaySeconds: 10
+        periodSeconds: 5
+        failureThreshold: 3
+    codeLanguage: yaml
+    explanation: "A startupProbe holds off liveness and readiness checks until the app has started, with a generous failureThreshold * periodSeconds budget, while keeping fast liveness detection afterwards. Raising initialDelaySeconds hardcodes a worst case for every restart, and removing the probe loses recovery from deadlocks."
+    theoryUrl: https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/
+    options:
+      - { text: "Remove the liveness probe and rely on the Service for health", correct: false }
+      - { text: "Switch the probe to TCP so the JVM answers faster", correct: false }
+      - { text: "Add a startupProbe with a long enough budget for warm-up", correct: true }
+      - { text: "Set `failureThreshold` to 1 so the verdict is quicker", correct: false }
+  - type: single
+    prompt: "During every rolling update, a few clients see connection resets. Pods exit instantly on SIGTERM, and the Service still routes to terminating Pods for a couple of seconds. What is a sound mitigation?"
+    explanation: "Endpoint removal and SIGTERM are propagated concurrently, so in-flight and newly routed requests can hit a dying Pod. Handle SIGTERM by draining (stop accepting, finish in-flight requests) and, if needed, add a short preStop sleep within terminationGracePeriodSeconds. Raising replicas or lowering the grace period does not address the race."
+    theoryUrl: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#pod-termination
+    options:
+      - {
+          text: "Set `terminationGracePeriodSeconds` to 0 to finish the rollout faster",
+          correct: false,
+        }
+      - {
+          text: "Handle SIGTERM by draining in-flight requests, with a short preStop delay",
+          correct: true,
+        }
+      - {
+          text: "Increase `replicas` so that dropped requests are statistically rare",
+          correct: false,
+        }
+      - { text: "Switch the Service to `NodePort` to bypass endpoint propagation", correct: false }
+  - type: single
+    prompt: "A container with a 512Mi memory limit and a 500m CPU limit starts using more of each under load. What is the difference in what Kubernetes does?"
+    explanation: "Memory is incompressible: exceeding the limit gets the container OOM-killed. CPU is compressible: exceeding the limit only throttles the container. That is why CPU limits often show up as latency, while memory limits show up as restarts."
+    theoryUrl: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+    options:
+      - {
+          text: "Memory overuse is throttled and CPU overuse gets the container killed",
+          correct: false,
+        }
+      - {
+          text: "Both are throttled; the container is never killed for resource use",
+          correct: false,
+        }
+      - { text: "Both lead to eviction of the Pod from its node immediately", correct: false }
+      - { text: "Memory overuse gets it OOM-killed; CPU overuse is only throttled", correct: true }
+  - type: single
+    prompt: "During a node upgrade, `kubectl drain` evicts Pods and all 3 replicas of a service happen to be on nodes drained in quick succession, causing an outage. Which object prevents this?"
+    explanation: "A PodDisruptionBudget limits how many replicas of an application can be voluntarily evicted at once (for example minAvailable: 2), so drains wait for replacements to become Ready. HPA, ResourceQuota and NetworkPolicy do not govern voluntary disruptions."
+    theoryUrl: https://kubernetes.io/docs/concepts/workloads/pods/disruptions/
+    options:
+      - { text: "HorizontalPodAutoscaler with a minimum of three replicas", correct: false }
+      - { text: "ResourceQuota on the namespace", correct: false }
+      - { text: "NetworkPolicy allowing traffic from the Ingress", correct: false }
+      - { text: "PodDisruptionBudget with a suitable `minAvailable`", correct: true }
+  - type: single
+    prompt: "You must run a three-node database cluster on Kubernetes where each member needs a stable network identity and its own persistent volume that follows it across reschedules. Which workload resource fits?"
+    explanation: "A StatefulSet gives Pods stable ordinal names and DNS identities, and per-replica PersistentVolumeClaims via volumeClaimTemplates. A Deployment's Pods are interchangeable and share the same template, and a DaemonSet runs one Pod per node, which is a different goal."
+    theoryUrl: https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/
+    options:
+      - { text: "Deployment with `replicas: 3` and a shared PersistentVolumeClaim", correct: false }
+      - { text: "DaemonSet, so each node hosts exactly one database member", correct: false }
+      - { text: "StatefulSet with `volumeClaimTemplates`", correct: true }
+      - { text: "Job with `completions: 3`", correct: false }
+  - type: boolean
+    prompt: "Kubernetes Secrets are encrypted at rest by default, so base64 values in a manifest are safe to commit to Git."
+    answer: false
+    explanation: "Secret values are only base64-encoded, which is an encoding, not encryption. At-rest encryption in etcd has to be configured, and manifests in Git need a separate tool (sealed secrets, SOPS or an external secrets operator) to stay confidential."
+    theoryUrl: https://kubernetes.io/docs/concepts/configuration/secret/
+  - type: single
+    prompt: "This Dockerfile reinstalls all dependencies on every code change, making builds slow. What is the cause?"
+    code: |
+      FROM node:22-slim
+      WORKDIR /app
+      COPY . .
+      RUN npm ci
+      CMD ["node", "server.js"]
+    codeLanguage: dockerfile
+    explanation: "`COPY . .` comes before `npm ci`, so any source change invalidates the layer cache from that line on, and dependencies are reinstalled. Copy `package*.json` first, run `npm ci`, then copy the rest. The base image tag and CMD do not affect caching of this step."
+    theoryUrl: https://docs.docker.com/build/cache/
+    options:
+      - {
+          text: "`node:22-slim` is not cacheable because it is a moving tag, so every build re-pulls the base layers",
+          correct: false,
+        }
+      - { text: "`WORKDIR` resets the build cache for all following steps", correct: false }
+      - {
+          text: "Source is copied before install, so each change busts the dependency layer",
+          correct: true,
+        }
+      - { text: "`CMD` must come before `RUN` for layers to be reused", correct: false }
+  - type: single
+    prompt: "A team of four runs five services on AWS with steady, predictable traffic and nobody has Kubernetes experience. They want rolling deployments, autoscaling and no servers to patch. What is the most pragmatic choice?"
+    explanation: "ECS on Fargate gives container scheduling, rolling deploys, autoscaling and no node management with far less operational surface than Kubernetes. Self-managed Kubernetes would add control-plane, upgrade and networking work the team cannot absorb. Plain EC2 with scripts gives up the orchestration they asked for."
+    theoryUrl: https://docs.aws.amazon.com/AmazonECS/latest/developerguide/AWS_Fargate.html
+    options:
+      - { text: "Self-managed Kubernetes on EC2 for maximum flexibility", correct: false }
+      - { text: "ECS on Fargate", correct: true }
+      - { text: "Docker Compose on a single large EC2 instance", correct: false }
+      - { text: "A multi-cluster Kubernetes setup with a service mesh", correct: false }
+  - type: single
+    prompt: "A webhook processor receives bursts of events for a few minutes a day and is idle the rest of the time. Latency of a few hundred milliseconds on a cold start is acceptable. What fits best?"
+    explanation: "Spiky, event-driven and mostly idle work suits functions or scale-to-zero containers: you pay per invocation and avoid idle nodes. A dedicated Kubernetes cluster or always-on instances would cost money 23 hours a day for no benefit. Cold-start latency is explicitly acceptable here."
+    theoryUrl: https://docs.aws.amazon.com/lambda/latest/dg/welcome.html
+    options:
+      - { text: "An always-on Kubernetes cluster sized for the peak", correct: false }
+      - {
+          text: "A fleet of reserved EC2 instances sized for the peak, to avoid cold starts during bursts",
+          correct: false,
+        }
+      - { text: "A function-based service that scales to zero and per invocation", correct: true }
+      - { text: "A StatefulSet with a Pod per customer", correct: false }
+  - type: multi
+    prompt: "Which of these are good reasons to choose Kubernetes over ECS or serverless? Select all that apply."
+    explanation: "Portability across clouds or on-prem, custom controllers and CRDs, and a platform team serving many teams are solid reasons. 'It is the industry standard' and 'we want fewer moving parts' are not: the second is actually an argument against Kubernetes."
+    theoryUrl: https://kubernetes.io/docs/concepts/overview/
+    options:
+      - {
+          text: "The workload must run on several clouds and on-premises with one API",
+          correct: true,
+        }
+      - { text: "The team wants to minimise the number of moving parts to operate", correct: false }
+      - {
+          text: "You need custom controllers or CRDs to automate domain-specific operations",
+          correct: true,
+        }
+      - {
+          text: "A platform team serves dozens of teams with shared policies and tooling",
+          correct: true,
+        }
+  - type: single
+    prompt: "A startup moves two stateless services onto a self-managed Kubernetes cluster. Six months later what is typically the largest ongoing cost?"
+    explanation: "The dominant cost is operational: upgrades, networking, ingress, observability, security patching and on-call knowledge, which are paid by people rather than by the infrastructure bill. Node costs and licences are usually smaller, and the API surface is not a recurring fee."
+    theoryUrl: https://kubernetes.io/docs/concepts/overview/
+    options:
+      - {
+          text: "Licence fees for the Kubernetes control plane software, charged per node once a cluster passes ten nodes",
+          correct: false,
+        }
+      - { text: "Per-request fees charged by the Kubernetes API server", correct: false }
+      - {
+          text: "The operational burden: upgrades, networking, observability and expertise",
+          correct: true,
+        }
+      - { text: "Storage costs for the container images in the registry", correct: false }
+  - type: single
+    prompt: "A Deployment references `image: acme/api:latest`. After a node restart some Pods run a different build than others. What is the right practice?"
+    explanation: "Mutable tags such as `latest` can point to different content over time, and nodes cache images independently. Deploy immutable version tags or digests so every replica runs the same, reproducible artifact and rollbacks are meaningful."
+    theoryUrl: https://kubernetes.io/docs/concepts/containers/images/
+    options:
+      - { text: "Set `imagePullPolicy: Never` so nodes keep what they have", correct: false }
+      - { text: "Reference immutable version tags or digests for every deploy", correct: true }
+      - { text: "Use `latest` but restart all Pods nightly to resynchronise", correct: false }
+      - { text: "Pull from several registries so that one always has the newest", correct: false }

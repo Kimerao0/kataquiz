@@ -1,0 +1,337 @@
+version: 1
+title: "Architect Roadmap 40: Organization and teams"
+description: Conway's law and the inverse Conway maneuver, Team Topologies, platform engineering, managing technical debt, and governance that does not block teams.
+language: en
+tags:
+  [
+    architect-roadmap,
+    architect-role,
+    conways-law,
+    team-topologies,
+    platform-engineering,
+    technical-debt,
+  ]
+run:
+  questionsPerRun: 10
+  maxErrors: 3
+  timePerQuestionSec: 60
+questions:
+  - type: single
+    prompt: "What does Conway's law state?"
+    explanation: "Organisations that design systems produce designs that copy their own communication structure. It is an observation about the link between team boundaries and system boundaries, not a rule about team size or hierarchy depth."
+    theoryUrl: https://martinfowler.com/bliki/ConwaysLaw.html
+    options:
+      - {
+          text: "Adding people to a late project makes it later, because communication paths multiply",
+          correct: false,
+        }
+      - {
+          text: "A system's design mirrors the organisation's communication structure",
+          correct: true,
+        }
+      - { text: "Teams should never exceed the size that two pizzas can feed", correct: false }
+      - { text: "Every module must be owned by exactly one person", correct: false }
+  - type: single
+    prompt: "A company has separate front-end, back-end, DBA and QA teams. Almost every feature needs work from all four, handoffs are slow, and the codebase has rigid layers. What does Conway's law predict, and what is the structural fix?"
+    explanation: "The layered teams produce a layered system and every feature crosses all team boundaries. The inverse Conway maneuver reorganises into cross-functional teams aligned to business streams so the desired architecture and the flow of change match. Adding a coordinator or more tools leaves the boundaries in place."
+    theoryUrl: https://www.thoughtworks.com/radar/techniques/inverse-conway-maneuver
+    options:
+      - {
+          text: "Hire a delivery manager to coordinate the four teams' handoffs and track dependencies centrally",
+          correct: false,
+        }
+      - { text: "Adopt a stricter ticket workflow with SLAs between the teams", correct: false }
+      - { text: "Introduce a shared chat channel so the layers talk more often", correct: false }
+      - {
+          text: "Form cross-functional teams aligned to business streams so boundaries match",
+          correct: true,
+        }
+  - type: single
+    prompt: "What is the 'inverse Conway maneuver'?"
+    explanation: "Instead of letting the architecture follow the org chart by accident, you deliberately shape teams and communication paths to promote the architecture you want. It does not mean ignoring Conway's law or reversing the reporting lines."
+    theoryUrl: https://www.thoughtworks.com/radar/techniques/inverse-conway-maneuver
+    options:
+      - {
+          text: "Shaping team structure on purpose to encourage the target architecture",
+          correct: true,
+        }
+      - {
+          text: "Designing the system so that it ignores the team structure entirely, relying on strict interfaces",
+          correct: false,
+        }
+      - { text: "Reversing every reporting line when a project is late", correct: false }
+      - {
+          text: "Merging all teams into one so communication is as short as possible",
+          correct: false,
+        }
+  - type: boolean
+    prompt: "Conway's law only concerns formal reporting lines in the org chart."
+    answer: false
+    explanation: "It is about how people actually communicate and coordinate, formal or informal. Two teams in different reporting lines who talk daily will produce tightly integrated parts, and two teams in the same department who never talk will produce a seam."
+    theoryUrl: https://www.melconway.com/Home/Conways_Law.html
+  - type: single
+    prompt: "Two teams own separate microservices, but both read and write the same database tables. Every schema change needs a cross-team meeting and a coordinated release. What is the most coherent fix in the spirit of Conway's law?"
+    explanation: "Coupling through a shared schema is a coupling between the teams. Giving each service private data ownership and exposing it through an API or events aligns the technical boundary with the team boundary, so each team can change independently. A shared-data coordination meeting only manages the pain."
+    theoryUrl: https://martinfowler.com/articles/microservices.html
+    options:
+      - {
+          text: "Make each team own its data and expose it through an API or events",
+          correct: true,
+        }
+      - { text: "Create a weekly schema committee and keep the shared tables", correct: false }
+      - { text: "Merge the two services but keep the two teams separate", correct: false }
+      - { text: "Add database triggers so each team is notified of schema changes", correct: false }
+  - type: single
+    prompt: "Which are the four fundamental team types in Team Topologies?"
+    explanation: "Stream-aligned, enabling, complicated-subsystem and platform teams. Stream-aligned teams deliver the main flow of work; the other three exist to reduce their load. Names like 'feature team' or 'DevOps team' are not part of the model."
+    theoryUrl: https://teamtopologies.com/key-concepts
+    options:
+      - { text: "Stream-aligned, enabling, complicated-subsystem and platform", correct: true }
+      - { text: "Feature, component, DevOps and QA", correct: false }
+      - { text: "Product, engineering, operations and support", correct: false }
+      - { text: "Core, platform, research and innovation", correct: false }
+  - type: single
+    prompt: "Which three interaction modes does Team Topologies define between teams?"
+    explanation: "Collaboration (work closely together for a time), X-as-a-Service (consume with minimal interaction) and facilitating (one team helps another to learn or unblock). Anything like 'ticketing' or 'escalation' is not a mode of the model."
+    theoryUrl: https://teamtopologies.com/key-concepts
+    options:
+      - { text: "Ticketing, escalation and approval", correct: false }
+      - { text: "Pairing, mentoring and reporting", correct: false }
+      - { text: "Collaboration, X-as-a-Service and facilitating", correct: true }
+      - { text: "Synchronous, asynchronous and batch", correct: false }
+  - type: single
+    prompt: "Product teams spend about 40% of their time on Kubernetes manifests, CI pipelines and observability plumbing, and release speed has dropped. Which Team Topologies move addresses this best?"
+    explanation: "A platform team offers self-service capabilities as a product (deploy, observe, provision), taking that cognitive load off the stream-aligned teams. An enabling team only coaches for a time, and a complicated-subsystem team is for deep specialist domains, not general plumbing."
+    theoryUrl: https://teamtopologies.com/key-concepts
+    options:
+      - { text: "Create a complicated-subsystem team that owns all deployments", correct: false }
+      - {
+          text: "Create a platform team offering self-service deploys and observability",
+          correct: true,
+        }
+      - {
+          text: "Tell each product team to hire a dedicated DevOps engineer and own its own pipelines",
+          correct: false,
+        }
+      - { text: "Ask an enabling team to run the pipelines for them permanently", correct: false }
+  - type: single
+    prompt: "What is the proper role of an enabling team?"
+    explanation: "Enabling teams are specialists who temporarily coach stream-aligned teams in a skill or technology (testing, security, accessibility) and then step away. If they do the work themselves or stay forever, they become a bottleneck or a hidden dependency."
+    theoryUrl: https://teamtopologies.com/key-concepts
+    options:
+      - {
+          text: "Do the specialist work for the stream-aligned teams on request, as a long-term service",
+          correct: false,
+        }
+      - { text: "Approve every release in the organisation", correct: false }
+      - {
+          text: "Temporarily coach other teams to build a capability, then step away",
+          correct: true,
+        }
+      - { text: "Operate the production infrastructure around the clock", correct: false }
+  - type: single
+    prompt: "When does it make sense to create a complicated-subsystem team?"
+    explanation: "When a part of the system needs deep specialist knowledge (a video codec, a pricing or ML engine, a payment fraud model) that would overload stream-aligned teams, so isolating it reduces their cognitive load. Ordinary shared code does not qualify."
+    theoryUrl: https://teamtopologies.com/key-concepts
+    options:
+      - { text: "For any module that more than two teams depend on", correct: false }
+      - { text: "For code written in a language the other teams do not use", correct: false }
+      - {
+          text: "For the shared UI component library, whatever its complexity, since many teams use it",
+          correct: false,
+        }
+      - {
+          text: "For a component that needs rare expertise, such as a codec or a pricing engine",
+          correct: true,
+        }
+  - type: multi
+    prompt: "Which of these are warning signs that a team's cognitive load is too high? Select all that apply."
+    explanation: "Long onboarding, constant context switching between unrelated services and permanent fire-fighting all show the team owns more than it can hold in its head. A high deployment frequency is a sign of healthy flow, not overload."
+    theoryUrl: https://teamtopologies.com/key-concepts
+    options:
+      - { text: "New members take months before they can ship safely", correct: true }
+      - { text: "The team deploys to production several times a day", correct: false }
+      - { text: "The team constantly switches between many unrelated services", correct: true }
+      - { text: "On-call incidents consume most of the sprint", correct: true }
+  - type: single
+    prompt: "What does 'platform as a product' mean for an internal platform team?"
+    explanation: "Developers are customers: the team does user research, builds what removes real friction, measures adoption and satisfaction, and earns usage instead of mandating it. A platform built without customers tends to become a bottleneck or shelfware."
+    theoryUrl: https://martinfowler.com/articles/talk-about-platforms.html
+    options:
+      - {
+          text: "It sells its infrastructure to external customers for a fee, funding the platform team",
+          correct: false,
+        }
+      - {
+          text: "It treats internal developers as customers, tracking adoption and satisfaction",
+          correct: true,
+        }
+      - { text: "It mandates tools by policy and measures compliance", correct: false }
+      - { text: "It publishes a quarterly roadmap but accepts no feature requests", correct: false }
+  - type: single
+    prompt: "Developers must file a ticket to get a new database, and the platform team's SLA is two weeks. Teams work around the platform. What is the best change?"
+    explanation: "Provisioning through tickets turns the platform team into a bottleneck. Self-service through an API, CLI or portal with sensible defaults and guardrails gives autonomy and lets the platform team scale. A faster SLA or an approval board keeps the human in the loop."
+    theoryUrl: https://tag-app-delivery.cncf.io/whitepapers/platforms/
+    options:
+      - { text: "Reduce the SLA to three days and add more ticket categories", correct: false }
+      - { text: "Add an approval board so requests are triaged by urgency", correct: false }
+      - {
+          text: "Offer self-service provisioning with guardrails through an API or portal",
+          correct: true,
+        }
+      - {
+          text: "Forbid direct cloud access and route everything through a single admin team with a one-day SLA",
+          correct: false,
+        }
+  - type: single
+    prompt: "What is a 'golden path' in platform engineering?"
+    explanation: "A golden path is a supported, opinionated, well-documented route for a common task (create a service, deploy, observe). It should be the easiest option, but teams with special needs may deviate on their own responsibility. It is not a mandatory single way."
+    theoryUrl: https://tag-app-delivery.cncf.io/whitepapers/platforms/
+    options:
+      - { text: "A compliance checklist that every release must pass", correct: false }
+      - {
+          text: "A paved, supported route for a common task, easy to follow but not compulsory",
+          correct: true,
+        }
+      - { text: "The one technology stack that the company allows", correct: false }
+      - {
+          text: "A premium tier of infrastructure reserved for senior teams with proven operational maturity",
+          correct: false,
+        }
+  - type: single
+    prompt: "The platform team built a feature-rich internal developer portal, but product teams barely use it. What is the most likely root cause and the right next step?"
+    explanation: "Low adoption of an optional internal product usually means it does not solve a real pain or is hard to use. Talk to users, find the friction, and measure adoption and time saved. Mandating usage hides the problem, and adding features is how the situation arose."
+    theoryUrl: https://martinfowler.com/articles/talk-about-platforms.html
+    options:
+      - { text: "Mandate usage by policy until teams get used to it", correct: false }
+      - { text: "Add more features until it covers every request", correct: false }
+      - {
+          text: "It was built without user research; interview users and fix their top friction",
+          correct: true,
+        }
+      - {
+          text: "Teams are not capable enough, so run training sessions on the portal's advanced features",
+          correct: false,
+        }
+  - type: single
+    prompt: "In Team Topologies, what is a 'thinnest viable platform'?"
+    explanation: "It is the smallest set of APIs, documentation and tooling that actually accelerates the teams building on it, which can be as thin as a wiki page at first. It avoids building a huge platform before knowing what users need."
+    theoryUrl: https://teamtopologies.com/key-concepts
+    options:
+      - { text: "A platform that only runs on the smallest cloud instances", correct: false }
+      - {
+          text: "The smallest set of APIs, docs and tooling that speeds up the teams using it",
+          correct: true,
+        }
+      - { text: "A platform with at most one engineer working on it", correct: false }
+      - {
+          text: "A facade that hides the cloud provider from every team, so migrations never affect them",
+          correct: false,
+        }
+  - type: single
+    prompt: "In the technical debt metaphor, what is the 'interest'?"
+    explanation: "The interest is the extra effort every future change costs because of the shortcut or outdated design. Debt that sits in code nobody touches costs almost nothing, while debt in a hot area compounds. The principal is the work needed to fix it."
+    theoryUrl: https://martinfowler.com/bliki/TechnicalDebt.html
+    options:
+      - { text: "The extra effort each future change costs because of the shortcut", correct: true }
+      - { text: "The number of bugs found in production per release", correct: false }
+      - { text: "The time needed to rewrite the code correctly", correct: false }
+      - { text: "The cost of the licences for the legacy tools", correct: false }
+  - type: single
+    prompt: "In Martin Fowler's technical debt quadrant, which case is 'prudent and inadvertent'?"
+    explanation: "After delivering, the team learns how the design should have been done. That is prudent (they did their best) and inadvertent (they did not know). 'No time for design' is reckless and deliberate, and shipping now knowing the cost is prudent and deliberate."
+    theoryUrl: https://martinfowler.com/bliki/TechnicalDebtQuadrant.html
+    options:
+      - { text: "'We don't have time for design', shipped knowingly", correct: false }
+      - {
+          text: "'We must ship now and we will deal with the consequences', decided knowingly",
+          correct: false,
+        }
+      - { text: "'Now we know how we should have built it', learnt after delivery", correct: true }
+      - { text: "'What is layering?', from a team that does not know the practice", correct: false }
+  - type: single
+    prompt: "You have capacity to pay down one item of debt. Module A is messy but has not been touched in two years. Module B is moderately messy and changes every week. Which first?"
+    explanation: "Interest is paid on every change, so debt in frequently changed code costs the most. Pay down debt where the code churns, and leave stable ugly code alone until it needs to change. Fixing the 'worst looking' code in isolation spends effort with little return."
+    theoryUrl: https://martinfowler.com/bliki/TechnicalDebt.html
+    options:
+      - { text: "Module A, because it looks the worst", correct: false }
+      - { text: "Module B, because its churn makes the interest highest", correct: true }
+      - { text: "Neither, debt is only paid down in a dedicated rewrite", correct: false }
+      - { text: "Both equally, to keep the codebase consistent", correct: false }
+  - type: single
+    prompt: "Management refuses to schedule 'refactoring sprints'. Which strategy is most likely to get debt paid down sustainably?"
+    explanation: "Tie debt work to the roadmap: improve the areas you are about to change, and make the cost visible with lead time or incident data so it can be prioritised against features. Hiding the work or waiting for a free sprint rarely works."
+    theoryUrl: https://martinfowler.com/bliki/DesignStaminaHypothesis.html
+    options:
+      - {
+          text: "Make the cost visible and refactor as part of feature work on that code",
+          correct: true,
+        }
+      - {
+          text: "Secretly pad estimates by 30% and refactor without telling anyone, to avoid a debate",
+          correct: false,
+        }
+      - { text: "Wait for a quiet quarter and plan a full rewrite then", correct: false }
+      - { text: "Stop all feature work until the debt is gone", correct: false }
+  - type: boolean
+    prompt: "A healthy engineering organisation should aim to eliminate all of its technical debt."
+    answer: false
+    explanation: "Some debt is a deliberate, cheap loan that buys speed or learning. The aim is to make debt visible, keep the interest low where code changes often, and repay it when it pays off, not to reach zero."
+    theoryUrl: https://martinfowler.com/bliki/TechnicalDebt.html
+  - type: single
+    prompt: "What characterises the 'architecture advice process'?"
+    explanation: "Anyone may make an architectural decision, but they must first seek advice from the people affected and from those with relevant expertise, and record the decision (for example in an ADR). It keeps autonomy and accountability without a central approval gate."
+    theoryUrl: https://martinfowler.com/articles/scaling-architecture-conversationally.html
+    options:
+      - { text: "Decisions are made by majority vote of all engineers", correct: false }
+      - {
+          text: "Only the chief architect may decide, after a written proposal and a review-board hearing",
+          correct: false,
+        }
+      - { text: "Each team can decide alone as long as it deploys on its own", correct: false }
+      - {
+          text: "Anyone can decide after seeking advice from those affected and from experts",
+          correct: true,
+        }
+  - type: single
+    prompt: "An architecture review board must approve every significant change, and teams wait three weeks for a slot. What replaces it best without losing control of quality?"
+    explanation: "Shift from gates to guardrails: automated fitness functions, golden paths with good defaults, ADRs for transparency and an advisory forum for the hard cases. This catches problems early and continuously, without making teams queue."
+    theoryUrl: https://martinfowler.com/articles/scaling-architecture-conversationally.html
+    options:
+      - { text: "Hold the review board every week instead of every three", correct: false }
+      - {
+          text: "Guardrails: automated checks, golden paths, ADRs and an advisory forum",
+          correct: true,
+        }
+      - { text: "Remove all review so teams can move at full speed", correct: false }
+      - { text: "Require two board approvals instead of one to reduce risk", correct: false }
+  - type: single
+    prompt: "How does a guardrail differ from a gate?"
+    explanation: "A gate stops work until someone approves; a guardrail lets teams move at speed and constrains them automatically only when they would cross a line (a failing policy check, a default configuration). Guardrails scale because they do not need a person in the loop."
+    theoryUrl: https://martinfowler.com/articles/scaling-architecture-conversationally.html
+    options:
+      - { text: "A gate is automatic, a guardrail needs a human approval", correct: false }
+      - { text: "They are the same, but guardrails apply only to security rules", correct: false }
+      - {
+          text: "A guardrail applies to infrastructure only, a gate to application code and its releases",
+          correct: false,
+        }
+      - {
+          text: "A gate blocks until approval; a guardrail lets teams move and stops them at a limit",
+          correct: true,
+        }
+  - type: single
+    prompt: "Two product teams have independently chosen different message brokers. Leadership wants consistency, but the teams value autonomy. Which approach balances them best?"
+    explanation: "Standardise where interoperability matters (event contracts, security, observability) and offer a recommended technology (a tech radar with adopt/hold) while letting teams choose inside their boundary, justified in an ADR. Forcing one tool everywhere or leaving everything free both have costs."
+    theoryUrl: https://www.thoughtworks.com/radar
+    options:
+      - { text: "Ban the less used broker and migrate immediately", correct: false }
+      - { text: "Leave both, and never discuss tooling across teams", correct: false }
+      - {
+          text: "Standardise contracts and cross-cutting concerns, recommend tools via a radar, allow exceptions",
+          correct: true,
+        }
+      - {
+          text: "Let the architect pick one broker and forbid deviation for all teams, migrating within a quarter, whatever the cost",
+          correct: false,
+        }

@@ -1,0 +1,321 @@
+version: 1
+title: "Architect Roadmap 31: NoSQL and data modeling"
+description: DynamoDB single-table design, partition keys and hot partitions, and choosing between document, key-value, wide-column and graph stores.
+language: en
+tags: [architect-roadmap, data, dynamodb, nosql, data-modeling]
+run:
+  questionsPerRun: 10
+  maxErrors: 3
+  timePerQuestionSec: 90
+questions:
+  - type: single
+    prompt: "You are modelling an e-commerce app on DynamoDB. The access patterns are: get a customer, list a customer's orders by date, get one order with its line items. How should you start the design?"
+    explanation: "DynamoDB modelling starts from the access patterns, because queries are only efficient on keys and indexes. You then design the keys (and GSIs) to satisfy them. Normalising first as in a relational database and joining later is not possible in DynamoDB."
+    theoryUrl: https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/data-modeling-foundations.html
+    options:
+      - {
+          text: "Normalise into one table per entity and join them in the application layer after each query",
+          correct: false,
+        }
+      - {
+          text: "Enumerate the access patterns and design keys and indexes to serve them",
+          correct: true,
+        }
+      - { text: "Create one item per attribute and use Scan to assemble the data", correct: false }
+      - { text: "Store everything as one JSON blob per customer", correct: false }
+  - type: single
+    prompt: "In a single-table design, a customer and their orders use PK = `CUSTOMER#123` for all items, with SK = `PROFILE` for the profile and SK = `ORDER#2025-03-01#789` for orders. How do you fetch the customer's orders from March 2025?"
+    explanation: "A Query on one partition key with a `begins_with` or range condition on the sort key reads just that item collection. Because the sort key embeds the date, orders are sorted and range-queryable. A Scan would read the entire table."
+    theoryUrl: https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Query.html
+    options:
+      - { text: "Scan the table with a filter on the date", correct: false }
+      - { text: "Query PK = `CUSTOMER#123` with SK begins_with `ORDER#2025-03`", correct: true }
+      - { text: "GetItem with PK only, which returns all items of the partition", correct: false }
+      - { text: "Join the customer table to the orders table on PK", correct: false }
+  - type: single
+    prompt: "What is the main reason for single-table design in DynamoDB?"
+    explanation: "Putting related entities in the same table under the same partition key lets one Query return them together, replacing joins and reducing round trips. It trades flexibility for performance, and it is not about reducing costs per table or avoiding indexes."
+    theoryUrl: https://aws.amazon.com/blogs/database/single-table-vs-multi-table-design-in-amazon-dynamodb/
+    options:
+      - {
+          text: "DynamoDB charges a flat monthly fee per table regardless of traffic, so fewer tables are cheaper",
+          correct: false,
+        }
+      - {
+          text: "Related items can be co-located and fetched in one Query without joins",
+          correct: true,
+        }
+      - { text: "Secondary indexes are not supported on multiple tables", correct: false }
+      - { text: "It makes schema changes easier than in any relational database", correct: false }
+  - type: single
+    prompt: "A DynamoDB table uses `status` (values: PENDING, SHIPPED, DELIVERED) as the partition key. Most writes go to PENDING. What problem will occur?"
+    explanation: "A low-cardinality, skewed partition key concentrates traffic on few partitions, creating a hot partition that throttles even if total provisioned capacity is high. A good partition key has high cardinality and spreads requests evenly."
+    theoryUrl: https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/bp-partition-key-design.html
+    options:
+      - {
+          text: "A hot partition with throttling, since few key values take most traffic",
+          correct: true,
+        }
+      - {
+          text: "Strongly consistent reads become unavailable on tables whose partition key has few distinct values",
+          correct: false,
+        }
+      - { text: "The table cannot have a sort key", correct: false }
+      - { text: "Items larger than 400 KB are rejected", correct: false }
+  - type: single
+    prompt: "A social app stores likes per post with PK = `POST#<id>`. A viral post receives 50,000 writes per second to its single counter item. What is the standard technique?"
+    explanation: "Write sharding spreads one hot key over several keys, for example `POST#<id>#<random 0-N>`, and readers sum the shards (or an aggregate is built from a stream). Increasing the provisioned capacity cannot exceed per-partition limits."
+    theoryUrl: https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/bp-partition-key-sharding.html
+    options:
+      - {
+          text: "Raise the table's provisioned write capacity until the throttling stops, since a single partition scales with it",
+          correct: false,
+        }
+      - { text: "Switch the table to eventually consistent writes", correct: false }
+      - {
+          text: "Write sharding: spread the counter over suffixed keys and aggregate on read",
+          correct: true,
+        }
+      - { text: "Move the counter into a Local Secondary Index", correct: false }
+  - type: single
+    prompt: "You need to look up orders by `order_id` (the table's PK) and also list all orders by `status` and `created_at` across all customers. What do you add?"
+    explanation: "A Global Secondary Index with `status` as partition key and `created_at` as sort key supports the second access pattern on a different key. Note that low-cardinality GSI keys can be hot, so sharding the status key may be needed. A Scan, or LSI (which must share the table's partition key), does not fit."
+    theoryUrl: https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/GSI.html
+    options:
+      - { text: "A Local Secondary Index with a different partition key", correct: false }
+      - { text: "Periodic Scans stored in a cache", correct: false }
+      - { text: "A Global Secondary Index keyed by status and created_at", correct: true }
+      - {
+          text: "A second item per order containing every attribute as a string set",
+          correct: false,
+        }
+  - type: single
+    prompt: "Which statement about DynamoDB Local Secondary Indexes (LSI) is correct?"
+    explanation: "An LSI shares the table's partition key and offers an alternate sort key, must be created with the table, and limits the item collection size to 10 GB per partition key value. A GSI can use a different partition key and be added later."
+    theoryUrl: https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/LSI.html
+    options:
+      - {
+          text: "It can use a different partition key from the table and be added at any time",
+          correct: false,
+        }
+      - { text: "It has no size limits because it is stored separately", correct: false }
+      - {
+          text: "It must be created with the table and shares the table's partition key",
+          correct: true,
+        }
+      - { text: "It is eventually consistent only", correct: false }
+  - type: single
+    prompt: "A team needs transactions across two items in DynamoDB: debit one account item and credit another, atomically. What should they use?"
+    explanation: "`TransactWriteItems` provides all-or-nothing writes across multiple items (and tables) with ACID semantics, at roughly double the capacity cost. Two independent PutItem calls can fail halfway, and conditional writes alone protect a single item."
+    theoryUrl: https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/transactions.html
+    options:
+      - { text: "Two sequential `UpdateItem` calls with retries", correct: false }
+      - { text: "`TransactWriteItems` with condition checks", correct: true }
+      - { text: "`BatchWriteItem`, which is atomic across items", correct: false }
+      - { text: "A Scan followed by a PutItem", correct: false }
+  - type: single
+    prompt: "Two clients read the same DynamoDB item (version 7), modify it and write it back. The second write overwrites the first's changes. What prevents this lost update?"
+    explanation: "Optimistic locking with a conditional write: store a version attribute and write with `ConditionExpression: version = :expected`, so the stale writer fails and retries. Strongly consistent reads alone do not prevent the lost update."
+    theoryUrl: https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/DynamoDBMapper.OptimisticLocking.html
+    options:
+      - {
+          text: "Use strongly consistent reads before every write, so the second client always sees version 8",
+          correct: false,
+        }
+      - { text: "Enable TTL on the item", correct: false }
+      - {
+          text: "Add a version attribute and a conditional write expecting the version read",
+          correct: true,
+        }
+      - { text: "Use a larger provisioned write capacity", correct: false }
+  - type: single
+    prompt: "Your DynamoDB data is read mostly by one access pattern, but a new report must run a query that filters on an attribute that is not a key. Which choice is the most sensible at 2 billion items?"
+    explanation: "With 2 billion items a Scan with a filter reads (and bills for) everything, so it is only acceptable for rare offline jobs. A GSI on the attribute, or exporting to an analytics store such as S3 with Athena, serves the query properly."
+    theoryUrl: https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/bp-query-scan.html
+    options:
+      - {
+          text: "Run a Scan with a filter expression every time the report is requested, since filters are applied before reading",
+          correct: false,
+        }
+      - {
+          text: "Add a GSI on the attribute, or export to S3 and query with Athena for reporting",
+          correct: true,
+        }
+      - { text: "Increase the page size of the Scan to 1 MB", correct: false }
+      - { text: "Change the partition key to the attribute and keep all queries", correct: false }
+  - type: single
+    prompt: "A product catalogue has varied attributes per product type (books, laptops, clothes), is read by product id, and is occasionally searched by category and price. Which store is the best starting point?"
+    explanation: "A document database (MongoDB, DynamoDB documents, Firestore) fits heterogeneous product attributes and read-by-id, with secondary indexes for category and price. A graph store is not needed, and a strict relational schema would need many nullable columns or EAV tables."
+    theoryUrl: https://www.mongodb.com/docs/manual/core/data-modeling-introduction/
+    options:
+      - { text: "A graph database, because products are connected", correct: false }
+      - { text: "A wide-column store with a single column family and one row", correct: false }
+      - { text: "A document database with secondary indexes", correct: true }
+      - { text: "A key-value store with no secondary indexes", correct: false }
+  - type: single
+    prompt: "You need to store user sessions looked up by session token only, with expiry after 30 minutes and very high throughput. Which choice fits best?"
+    explanation: "A key-value store such as Redis or DynamoDB (with TTL) matches a single-key lookup with expiry. A graph or relational store adds capabilities you do not use, and wide-column stores target large write-heavy time series and analytics."
+    theoryUrl: https://redis.io/docs/latest/develop/use/keyspace/
+    options:
+      - { text: "A graph database", correct: false }
+      - { text: "A relational database with joins to a users table", correct: false }
+      - { text: "A key-value store with TTL", correct: true }
+      - { text: "A search engine with full-text indexing", correct: false }
+  - type: single
+    prompt: "A telemetry platform ingests 2 million sensor readings per second, queried mostly by (device, time range), rarely updated, with retention of 90 days. Which model fits best?"
+    explanation: "Wide-column stores (Cassandra, ScyllaDB, Bigtable) are built for high write throughput with partitioning by device and clustering by time, which gives efficient range reads. Document stores can work but are not optimised for this append-heavy pattern, and graphs fit relationships."
+    theoryUrl: https://cassandra.apache.org/doc/latest/cassandra/developing/data-modeling/intro.html
+    options:
+      - { text: "A wide-column store partitioned by device and clustered by time", correct: true }
+      - { text: "A graph database with a node for every reading", correct: false }
+      - { text: "A single relational table with an index on every column", correct: false }
+      - { text: "A key-value store with one key per reading and a Scan for ranges", correct: false }
+  - type: single
+    prompt: "A fraud team needs to find accounts that share devices, phone numbers or addresses up to 4 hops apart, in real time. Which store is the best fit?"
+    explanation: "Multi-hop relationship traversal is the strength of graph databases, where traversing edges is a native operation. In relational or document stores, multi-level self-joins grow expensive quickly with depth."
+    theoryUrl: https://neo4j.com/docs/getting-started/get-started-with-neo4j/graph-database/
+    options:
+      - {
+          text: "A key-value store, with one key per account listing its neighbours",
+          correct: false,
+        }
+      - { text: "A graph database", correct: true }
+      - { text: "A wide-column store keyed by device", correct: false }
+      - { text: "A relational table with four self-joins on every query", correct: false }
+  - type: single
+    prompt: "In a document database, an order has up to 5 line items that are always read with the order. Where do you put the line items?"
+    explanation: "Embed small, bounded child data that is read and written together with the parent, so one read returns the whole order. Reference instead when the children are unbounded, shared or independently queried and updated."
+    theoryUrl: https://www.mongodb.com/docs/manual/data-modeling/concepts/embedding-vs-references/
+    options:
+      - { text: "Embedded in the order document", correct: true }
+      - {
+          text: "In a separate collection with one document per line item, fetched by a second query",
+          correct: false,
+        }
+      - { text: "In a separate database for isolation", correct: false }
+      - { text: "As separate top-level documents linked by random ids", correct: false }
+  - type: single
+    prompt: "In a document database, a blog post has comments that can grow to hundreds of thousands per post. How should comments be modelled?"
+    explanation: "Unbounded arrays inside one document cause growth beyond size limits (16 MB in MongoDB), larger rewrites and contention. Store comments as separate documents referencing the post, and paginate."
+    theoryUrl: https://www.mongodb.com/docs/manual/data-modeling/concepts/embedding-vs-references/
+    options:
+      - { text: "Embed all comments in the post document", correct: false }
+      - {
+          text: "Store comments as separate documents that reference the post, and paginate",
+          correct: true,
+        }
+      - {
+          text: "Store them as one large comma separated string field inside the post document, to keep one read per post",
+          correct: false,
+        }
+      - { text: "Duplicate the post in every comment document", correct: false }
+  - type: single
+    prompt: "A DynamoDB table with on-demand capacity throttles intermittently, even though its overall traffic is far below the account limits. CloudWatch shows throttles concentrated on a single partition key value. What is the most likely cause?"
+    explanation: "Per-partition throughput limits (around 1,000 WCU / 3,000 RCU per partition key) apply regardless of the table's total capacity, so a hot key throttles. Fix the access pattern with write sharding, caching or a more uniform key design."
+    theoryUrl: https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/bp-partition-key-design.html
+    options:
+      - { text: "The table has too many attributes per item", correct: false }
+      - { text: "On-demand tables cannot be used for more than ten partition keys", correct: false }
+      - { text: "A hot key exceeding per-partition throughput limits", correct: true }
+      - { text: "Strongly consistent reads are disabled", correct: false }
+  - type: boolean
+    prompt: "True or false: DynamoDB single-table design means you should never create a second table in the same application."
+    explanation: "False. Single-table is a technique for co-locating items that are accessed together, not a rule. Separate tables are reasonable for unrelated domains, different lifecycles, or different capacity and backup needs. Misapplying it can make the design rigid and hard to evolve."
+    theoryUrl: https://aws.amazon.com/blogs/database/single-table-vs-multi-table-design-in-amazon-dynamodb/
+    answer: false
+  - type: single
+    prompt: "A team ports a relational schema with 25 tables to DynamoDB with one table per entity and does joins in the application. Reads need 5 sequential GetItem calls per page. What does the single-table approach offer for this page?"
+    explanation: "By placing items needed together under one partition key, a single Query can fetch the customer, orders and items in one round trip, cutting latency and cost. The trade-off is that the key design must be planned around known access patterns."
+    theoryUrl: https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/data-modeling-foundations.html
+    options:
+      - {
+          text: "Fewer round trips, since co-located items are returned by one Query",
+          correct: true,
+        }
+      - {
+          text: "Joins executed by DynamoDB across tables to match relational semantics, with no extra reads",
+          correct: false,
+        }
+      - { text: "Automatic referential integrity between entities", correct: false }
+      - { text: "Unlimited item sizes for aggregated data", correct: false }
+  - type: single
+    prompt: "An ad-hoc analytics team wants flexible queries (group by arbitrary dimensions) over the same orders data stored in DynamoDB. What is the recommended architecture?"
+    explanation: "Operational NoSQL stores are optimised for known access patterns. For flexible analytics, stream or export the data to an analytical store (S3 plus Athena, Redshift or similar) instead of adding ever more indexes. Scans on the production table compete with live traffic."
+    theoryUrl: https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/S3DataExport.HowItWorks.html
+    options:
+      - { text: "Give the analysts permission to Scan the production table", correct: false }
+      - { text: "Create a GSI for every possible dimension", correct: false }
+      - {
+          text: "Switch the table to strongly consistent reads for all queries so analytical results are always exact and complete",
+          correct: false,
+        }
+      - {
+          text: "Export or stream the data to an analytics store and query it there",
+          correct: true,
+        }
+  - type: single
+    prompt: "A new feature needs to query a DynamoDB table by `email`. The existing items hold the email in an attribute, but not in a key. Which design is correct for a uniqueness lookup?"
+    explanation: "A GSI keyed by email supports lookup, but GSIs do not enforce uniqueness. To guarantee unique emails use a transaction that writes a separate item with PK `EMAIL#<email>` with `attribute_not_exists`. A GSI alone would allow duplicates."
+    theoryUrl: https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/transaction-apis.html
+    options:
+      - {
+          text: "A GSI on email, which also enforces uniqueness because a GSI key must be unique per item across the table",
+          correct: false,
+        }
+      - {
+          text: "A uniqueness item with PK `EMAIL#<email>` in a transaction with a not-exists condition",
+          correct: true,
+        }
+      - { text: "A Scan before every insert to check for duplicates", correct: false }
+      - { text: "A Local Secondary Index on email", correct: false }
+  - type: single
+    prompt: "The team stores each user's activity feed as items with PK = `USER#<id>` and SK = `ACTIVITY#<timestamp>`. A power user's partition grows to 50 GB. What do you want to verify first?"
+    explanation: "A table with an LSI limits an item collection to 10 GB per partition key. Without an LSI, collections can grow, though a single large partition key can still become a throughput bottleneck. Check for LSIs and the access distribution, and consider bucketing by time."
+    theoryUrl: https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/LSI.html#LSI.ItemCollections
+    options:
+      - {
+          text: "Whether the table has an LSI, which caps an item collection at 10 GB",
+          correct: true,
+        }
+      - { text: "Whether item names are shorter than 255 characters", correct: false }
+      - {
+          text: "Whether the table uses on-demand capacity, which prevents partitions above 10 GB",
+          correct: false,
+        }
+      - { text: "Whether the table has a TTL attribute defined", correct: false }
+  - type: single
+    prompt: "You must pick a database for a product with strict relational integrity, ad-hoc reporting joins and moderate scale (500 writes/sec). A teammate suggests DynamoDB 'because it scales'. What is the best advice?"
+    explanation: "At moderate scale with relational integrity and ad-hoc joins, a relational database such as PostgreSQL is the better fit. DynamoDB's scalability is valuable when access patterns are known and scale demands it, but it makes flexible querying and integrity harder."
+    theoryUrl: https://aws.amazon.com/nosql/
+    options:
+      - {
+          text: "DynamoDB, because relational databases cannot handle 500 writes per second on a single node",
+          correct: false,
+        }
+      - {
+          text: "PostgreSQL: the workload needs joins and integrity and is well within its range",
+          correct: true,
+        }
+      - { text: "A graph database, since integrity implies relationships", correct: false }
+      - { text: "Both in an active-active setup to avoid choosing", correct: false }
+  - type: multi
+    prompt: "Which are good partition key properties in DynamoDB? Select all that apply."
+    explanation: "A good partition key has high cardinality, spreads requests uniformly, and matches the access pattern so most queries address a single key. A timestamp as a pure partition key concentrates current writes on one partition."
+    theoryUrl: https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/bp-partition-key-design.html
+    options:
+      - { text: "High cardinality, with many distinct values", correct: true }
+      - { text: "Requests spread uniformly across the key values", correct: true }
+      - { text: "It is used in the most common queries so they target one key", correct: true }
+      - { text: "It is the current date, so recent data is in one place", correct: false }
+  - type: single
+    prompt: "A recommendation feature must answer 'friends of friends who like the same bands as me' for 20 million users with sub-100 ms latency. The team currently runs it as recursive SQL joins that take seconds. What is the best change?"
+    explanation: "This is a deep relationship traversal, which graph databases execute by following edges from the starting node without scanning join tables. Adding more indexes to the SQL joins helps only up to a point, and a key-value store or document store would need the application to perform the traversal."
+    theoryUrl: https://neo4j.com/docs/getting-started/get-started-with-neo4j/graph-database/
+    options:
+      - { text: "Move the relationship data to a graph database and traverse edges", correct: true }
+      - {
+          text: "Move to a key-value store and fetch each friend list in a loop in the app",
+          correct: false,
+        }
+      - { text: "Store each user's full network as one large document", correct: false }
+      - { text: "Increase the connection pool size of the SQL database", correct: false }

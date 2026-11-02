@@ -1,0 +1,395 @@
+version: 1
+title: "Architect Roadmap 06: What's new in React 19"
+description: Actions and form actions, useActionState, useFormStatus, useOptimistic, the use API, Suspense behaviour and error boundaries.
+language: en
+tags: [architect-roadmap, react, react-19, actions, suspense, error-boundaries, useoptimistic]
+run:
+  questionsPerRun: 10
+  maxErrors: 3
+  timePerQuestionSec: 60
+questions:
+  - type: single
+    prompt: 'In React 19 terminology, what is an "Action"?'
+    explanation: "By convention, an Action is a function that runs inside a transition, often async, to perform a mutation. React tracks its pending state, handles errors, and keeps the UI responsive while it runs. It is not a Redux action and not a server-only concept."
+    theoryUrl: https://react.dev/blog/2024/12/05/react-19#actions
+    options:
+      - { text: "A plain object with a `type` field that is passed to a reducer", correct: false }
+      - {
+          text: "A function that runs in a transition, typically async, to update data and state",
+          correct: true,
+        }
+      - {
+          text: "A function that can only run on the server, marked with `'use server'`, and called from a form",
+          correct: false,
+        }
+      - { text: "A DOM event handler that React batches with other handlers", correct: false }
+  - type: single
+    prompt: "What does React 19 allow you to pass to `startTransition` that earlier versions did not?"
+    code: |
+      const [isPending, startTransition] = useTransition()
+
+      startTransition(async () => {
+        await savePreferences(values)
+        setSaved(true)
+      })
+    codeLanguage: tsx
+    explanation: "React 19 supports async functions in transitions: `isPending` stays true until the whole promise settles, so you get a built-in pending state. Note that state updates after an `await` need their own `startTransition` wrapper to be marked as transitions."
+    theoryUrl: https://react.dev/reference/react/useTransition#react-doesnt-treat-my-state-update-after-await-as-a-transition
+    options:
+      - {
+          text: "An async function; `isPending` stays true until the promise settles",
+          correct: true,
+        }
+      - {
+          text: "A promise returned by `fetch`, which React awaits and cancels automatically on unmount",
+          correct: false,
+        }
+      - { text: "A generator function, whose steps React runs one per frame", correct: false }
+      - { text: "Nothing new: async callbacks were always supported this way", correct: false }
+  - type: single
+    prompt: "A `<form action={saveAction}>` has uncontrolled text inputs. What happens to the fields when the action succeeds?"
+    explanation: "In React 19, passing a function as a form's `action` makes React submit through it and, once the action succeeds, reset the form's uncontrolled fields automatically. Controlled inputs are not reset, since their value lives in state, and you can opt out with `onSubmit` and `preventDefault`."
+    theoryUrl: https://react.dev/reference/react-dom/components/form
+    options:
+      - {
+          text: "They keep their values, and you must call `form.reset()` yourself",
+          correct: false,
+        }
+      - { text: "They are cleared only if the action returns `true`", correct: false }
+      - { text: "They are reset automatically for uncontrolled inputs", correct: true }
+      - { text: "They become read-only, to prevent a double submit", correct: false }
+  - type: single
+    prompt: "What are `prev` and `state` when the action below is invoked for the first time?"
+    code: |
+      const [state, formAction, isPending] = useActionState(
+        async (prev: { count: number }, formData: FormData) => {
+          return { count: prev.count + 1 }
+        },
+        { count: 0 }
+      )
+    codeLanguage: tsx
+    explanation: "The function you pass receives the previous state as its first argument, and the `FormData` as the second. On the first call the previous state is the initial value `{ count: 0 }`, and `state` is that same value until the action returns."
+    theoryUrl: https://react.dev/reference/react/useActionState
+    options:
+      - { text: "`prev` is `undefined`; `state` is `{ count: 0 }`", correct: false }
+      - { text: "`prev` is `{ count: 0 }`; `state` is `{ count: 0 }`", correct: true }
+      - { text: "`prev` is `FormData`; `state` is `{ count: 0 }`", correct: false }
+      - {
+          text: "`prev` is `{ count: 0 }`; `state` is `undefined` until the first return",
+          correct: false,
+        }
+  - type: single
+    prompt: 'A signup action must report "email already taken" back to the form. What is the recommended approach with `useActionState`?'
+    explanation: "Expected failures, like validation or business-rule errors, are data: return them as the new state and render them. Throwing is for unexpected failures, which propagate to an error boundary and replace the UI. Using `alert` or a ref hides the state from rendering."
+    theoryUrl: https://react.dev/reference/react/useActionState#usage
+    options:
+      - {
+          text: "Return `{ error: 'Email already taken' }` from the action and render `state.error`",
+          correct: true,
+        }
+      - { text: "Throw an `Error` and rely on the nearest error boundary", correct: false }
+      - { text: "Call `alert()` inside the action and return nothing", correct: false }
+      - {
+          text: "Write the message to a `useRef` inside the action and read it in the next render, since refs persist",
+          correct: false,
+        }
+  - type: single
+    prompt: "A design-system `SubmitButton` must disable itself while its parent form is submitting. The form uses an `action`. How should the button know?"
+    explanation: "`useFormStatus` from `react-dom` reads the status of the nearest parent `<form>`, without prop drilling, so a reusable button can show a pending state. It must be called from a component rendered inside the form."
+    theoryUrl: https://react.dev/reference/react-dom/hooks/useFormStatus
+    options:
+      - {
+          text: "Call `useFormStatus()` inside `SubmitButton`, rendered as a child of the form",
+          correct: true,
+        }
+      - { text: "Read `document.forms[0].dataset.pending` in an effect", correct: false }
+      - {
+          text: "Call `useFormStatus()` in the component that renders the `<form>` itself",
+          correct: false,
+        }
+      - {
+          text: "Pass `isPending` from `useState` down through every layer by hand",
+          correct: false,
+        }
+  - type: single
+    prompt: "What does `pending` return in the component that renders the `<form>` itself?"
+    code: |
+      function Signup() {
+        const { pending } = useFormStatus()
+
+        return (
+          <form action={signup}>
+            <p>{String(pending)}</p>
+            <button>Send</button>
+          </form>
+        )
+      }
+    codeLanguage: tsx
+    explanation: "`useFormStatus` returns information about a `<form>` that is a parent of the component calling it. A hook called in the same component that renders the form sees no parent form, so `pending` is always `false`. Move it into a child, such as the button."
+    theoryUrl: https://react.dev/reference/react-dom/hooks/useFormStatus#caveats
+    options:
+      - { text: "`true` while the form submits, because it is the same form", correct: false }
+      - { text: "`undefined`, because the hook needs a context provider", correct: false }
+      - { text: "It throws, because the hook cannot run next to a form", correct: false }
+      - {
+          text: "Always `false`, because the form is not a parent of this component",
+          correct: true,
+        }
+  - type: single
+    prompt: "A like button uses `useOptimistic`. The click handler runs the action below. After the 20ms action finishes WITHOUT calling `setLikes`, what does the button show?"
+    code: |
+      const [likes, setLikes] = useState(0)
+      const [optimistic, addOptimistic] = useOptimistic(
+        likes,
+        (current: number, delta: number) => current + delta
+      )
+
+      <button onClick={() => startTransition(async () => {
+        addOptimistic(1)
+        await sleep(20)           // no setLikes call
+      })}>{optimistic} | {likes}</button>
+    codeLanguage: tsx
+    explanation: "While the Action is pending the optimistic value is shown: `1 | 0`. When the Action ends, the temporary state is discarded and `optimistic` reverts to the real source state, which never changed: `0 | 0`. If the real state had been updated to 1, it would show `1 | 1`."
+    theoryUrl: https://react.dev/reference/react/useOptimistic
+    options:
+      - { text: "`1 | 0`, since the optimistic value persists", correct: false }
+      - { text: "`0 | 0`, because the optimistic state reverts to the real state", correct: true }
+      - { text: "`1 | 1`, since React commits the optimistic value to the source", correct: false }
+      - {
+          text: "`0 | 1`, since the real state is updated by React after the action",
+          correct: false,
+        }
+  - type: single
+    prompt: "Same like button, but the action calls `setLikes(l => l + 1)` after the 20ms delay. What does the button show while pending, and what after it settles?"
+    explanation: "Pending: the optimistic value 1 is shown over the old real value 0, so `1 | 0`. When the action completes, the real state has been updated to 1, and the temporary layer is dropped, so `1 | 1` with no flicker, because both values agree."
+    theoryUrl: https://react.dev/reference/react/useOptimistic#usage
+    options:
+      - { text: "Pending `0 | 0`, then `1 | 1`", correct: false }
+      - { text: "Pending `1 | 1`, then `1 | 1`", correct: false }
+      - { text: "Pending `1 | 0`, then `1 | 1`", correct: true }
+      - { text: "Pending `1 | 0`, then `2 | 1`", correct: false }
+  - type: boolean
+    prompt: "Calling the `useOptimistic` setter from a plain `onClick`, outside any transition or Action, is fine: the optimistic value stays until the next render."
+    answer: false
+    explanation: "The optimistic state only lives for the duration of an Action or transition. Called outside of one, React warns that an optimistic update occurred outside a transition, and it does not persist as an optimistic value, so wrap the call in `startTransition` or use a form action."
+    theoryUrl: https://react.dev/reference/react/useOptimistic
+  - type: single
+    prompt: "A comments list adds a new comment optimistically, and the server later returns the real one with an id. What is a good use of the reducer argument of `useOptimistic`?"
+    explanation: "The update function merges the temporary item into the real list, so you can mark it as sending (`{ ...c, sending: true }`) with a temp id. When the Action ends and the real list arrives, the temporary item disappears and the real one replaces it. You never mutate the real array."
+    theoryUrl: https://react.dev/reference/react/useOptimistic
+    options:
+      - {
+          text: "Push the new comment into the real array, then fix it up after the response",
+          correct: false,
+        }
+      - {
+          text: "Return `[...current, { ...newComment, sending: true }]` as a temporary item",
+          correct: true,
+        }
+      - {
+          text: "Return `current` unchanged, and rely on the server response for the UI",
+          correct: false,
+        }
+      - {
+          text: "Store the pending comment in a `useRef`, and render it from there",
+          correct: false,
+        }
+  - type: single
+    prompt: "What does `use(promise)` do when called in a component whose promise is still pending?"
+    explanation: "`use` reads the value of a resource. For a pending promise, it suspends the component: React shows the nearest `Suspense` fallback and resumes rendering once the promise resolves, so no `useEffect` or loading flag is needed."
+    theoryUrl: https://react.dev/reference/react/use
+    options:
+      - { text: "It returns `undefined`, and re-renders when the promise resolves", correct: false }
+      - { text: "It blocks the main thread until the promise resolves", correct: false }
+      - {
+          text: "It suspends the component, and the nearest `Suspense` fallback is shown",
+          correct: true,
+        }
+      - { text: "It throws a TypeError, because promises must be awaited", correct: false }
+  - type: single
+    prompt: "A Client Component calls `use(fetchComments(postId))`, where `fetchComments` returns a new promise on each call. What is the problem?"
+    code: |
+      'use client'
+
+      function Comments({ postId }: { postId: string }) {
+        const comments = use(fetchComments(postId))
+        return <ul>{comments.map((c) => <li key={c.id}>{c.text}</li>)}</ul>
+      }
+    codeLanguage: tsx
+    explanation: "A promise created during the render of a Client Component is new on every render, so `use` suspends on a different promise each time and never settles on a stable one. React asks for a promise from a Server Component, or one cached outside of render (for example by a cache or a data library)."
+    theoryUrl: https://react.dev/reference/react/use
+    options:
+      - { text: "`use` can only read context in Client Components, not promises", correct: false }
+      - { text: "The promise is recreated on each render, so it is not stable", correct: true }
+      - { text: "`postId` must be wrapped in `useMemo` for `use` to accept it", correct: false }
+      - {
+          text: "`use` requires the promise to be awaited first, in an async component",
+          correct: false,
+        }
+  - type: multi
+    prompt: Which of these are valid ways to use `use`? Select all that apply.
+    explanation: "Unlike other hooks, `use` can be called inside conditions and loops, and it accepts both promises and context. It cannot be called inside a `try`/`catch` block: for a rejected promise, use an error boundary, or `.catch` on the promise before passing it."
+    theoryUrl: https://react.dev/reference/react/use
+    options:
+      - { text: "Reading a context after an early `return`", correct: true }
+      - { text: "Calling it inside an `if (showComments)` block", correct: true }
+      - { text: "Wrapping `use(promise)` in `try`/`catch` to handle rejection", correct: false }
+      - { text: "Passing a promise that comes from a Server Component as a prop", correct: true }
+  - type: single
+    prompt: "A promise passed to `use` rejects. Where does the error go by default?"
+    explanation: "A rejected promise read with `use` makes the component throw while rendering, and the nearest error boundary handles it. Alternatively you can attach `.catch()` to the promise to supply a fallback value before passing it in. A `try`/`catch` around `use` does not work."
+    theoryUrl: https://react.dev/reference/react/use
+    options:
+      - {
+          text: "To the nearest `Suspense` boundary, which displays its fallback forever",
+          correct: false,
+        }
+      - { text: "To `window.onerror` only, and the component keeps its last value", correct: false }
+      - { text: "To the nearest error boundary, as an error thrown during render", correct: true }
+      - { text: "It is swallowed, and `use` returns `undefined`", correct: false }
+  - type: single
+    prompt: "In the tree below, `Header` is ready and `Comments` suspends. What does the user see?"
+    code: |
+      <Suspense fallback={<PageSkeleton />}>
+        <Header />
+        <Suspense fallback={<CommentsSkeleton />}>
+          <Comments />   {/* suspends */}
+        </Suspense>
+      </Suspense>
+    codeLanguage: tsx
+    explanation: "A component that suspends shows the fallback of the nearest `Suspense` boundary above it. `Comments` is inside the inner boundary, so the user sees `Header` plus `CommentsSkeleton`. The outer fallback appears only if something outside the inner boundary suspends."
+    theoryUrl: https://react.dev/reference/react/Suspense#revealing-nested-content-as-it-loads
+    options:
+      - { text: "`PageSkeleton` replaces everything, until `Comments` resolves", correct: false }
+      - { text: "`PageSkeleton` and `CommentsSkeleton`, one under the other", correct: false }
+      - { text: "Nothing, because nested `Suspense` boundaries cancel each other", correct: false }
+      - { text: "`Header` with `CommentsSkeleton` below it", correct: true }
+  - type: boolean
+    prompt: "When a state update wrapped in `startTransition` makes an already visible part of the UI suspend, React replaces that content with the Suspense fallback immediately."
+    answer: false
+    explanation: "Transitions avoid hiding content that is already revealed: React keeps showing the old UI, and `isPending` is true, until the new content is ready. Fallbacks appear for content that was not displayed yet. A non-transition update would show the fallback."
+    theoryUrl: https://react.dev/reference/react/Suspense#preventing-already-revealed-content-from-hiding
+  - type: single
+    prompt: "A profile page loads `user`, then each `Posts` child loads posts based on `user.id`. The page feels slow and the network shows requests in sequence. What is the best fix?"
+    explanation: "When the child starts fetching only after the parent has rendered with its data, you get a waterfall. Start both requests as early as possible, for example in the parent, or at the route level, and pass the promises down to be read with `use` under separate Suspense boundaries, when they do not depend on each other."
+    theoryUrl: https://react.dev/reference/react/Suspense
+    options:
+      - {
+          text: "Add a `useEffect` in the child to prefetch, after the first render",
+          correct: false,
+        }
+      - {
+          text: "Wrap everything in one more `Suspense`, so the fetches run in parallel",
+          correct: false,
+        }
+      - {
+          text: "Start independent requests early, in the parent, and pass the promises down",
+          correct: true,
+        }
+      - { text: "Switch to `memo`, so the child's fetch is cached between renders", correct: false }
+  - type: single
+    prompt: "How do you implement an error boundary that catches render errors of its children?"
+    explanation: "Error boundaries still need a class component that defines `static getDerivedStateFromError` (to switch to a fallback UI) and/or `componentDidCatch` (to log). There is no hook for it, so most apps use a small class or a library such as `react-error-boundary`."
+    theoryUrl: https://react.dev/reference/react/Component#catching-rendering-errors-with-an-error-boundary
+    options:
+      - {
+          text: "With `try`/`catch` around the JSX returned by the parent, since render errors are thrown synchronously",
+          correct: false,
+        }
+      - { text: "With a `useErrorBoundary` hook from React", correct: false }
+      - {
+          text: "With a class component defining `getDerivedStateFromError` or `componentDidCatch`",
+          correct: true,
+        }
+      - { text: "With a `<Suspense>` that has an `error` prop", correct: false }
+  - type: multi
+    prompt: Which of these errors are NOT caught by an error boundary? Select all that apply.
+    explanation: "Error boundaries catch errors thrown while rendering, in lifecycle methods and in constructors of the tree below them. They do not catch errors in event handlers, in asynchronous code such as `setTimeout` or a promise, or an error thrown by the boundary itself. Those need `try`/`catch` or a state-based approach."
+    theoryUrl: https://react.dev/reference/react/Component#catching-rendering-errors-with-an-error-boundary
+    options:
+      - { text: "An error thrown inside an `onClick` handler", correct: true }
+      - { text: "An error thrown inside a `setTimeout` callback", correct: true }
+      - { text: "An error thrown by a child while rendering", correct: false }
+      - { text: "An error thrown by the error boundary's own render method", correct: true }
+  - type: single
+    prompt: "A button inside an error boundary has `onClick={() => { throw new Error('boom') }}`. The user clicks it. What does the boundary do?"
+    explanation: "Event handlers run outside the rendering phase, so a thrown error does not reach the boundary: the fallback is not shown and the UI stays as it is, while the error is reported to the browser as an uncaught exception. Catch it in the handler and set state, if the UI must react."
+    theoryUrl: https://react.dev/reference/react/Component#catching-rendering-errors-with-an-error-boundary
+    options:
+      - { text: "It shows its fallback, as for any error inside its subtree", correct: false }
+      - {
+          text: "It does nothing: the error is not caught by the boundary and surfaces as an uncaught error",
+          correct: true,
+        }
+      - {
+          text: "It unmounts the button and re-mounts it in a clean state, without showing a fallback, because the boundary resets itself",
+          correct: false,
+        }
+      - { text: "It retries the handler once, and then shows the fallback", correct: false }
+  - type: single
+    prompt: "React 19 changed how errors are reported. Which `createRoot` options let you log errors that boundaries catch, and those that nothing catches?"
+    explanation: "`createRoot(container, { onCaughtError, onUncaughtError, onRecoverableError })`: `onCaughtError` is called for errors caught by an error boundary, `onUncaughtError` for errors no boundary caught. React 19 no longer re-throws caught errors globally, which is why these hooks exist."
+    theoryUrl: https://react.dev/reference/react-dom/client/createRoot#parameters
+    options:
+      - { text: "`onCaughtError` and `onUncaughtError`", correct: true }
+      - { text: "`onError` and `onWarning`", correct: false }
+      - { text: "`onBoundaryError` and `onRenderError`", correct: false }
+      - { text: "`componentDidCatch` and `getDerivedStateFromError` on the root", correct: false }
+  - type: single
+    prompt: "In React 19, a component renders `<title>Order #42</title>` deep inside its JSX. Where does it end up in the document?"
+    explanation: "React 19 has built-in support for `<title>`, `<meta>` and `<link>` tags rendered anywhere in a component tree: it hoists them into the document's `<head>`. This works with client rendering, streaming and Server Components, without a helmet library."
+    theoryUrl: https://react.dev/blog/2024/12/05/react-19#support-for-metadata-tags
+    options:
+      - {
+          text: "Inside the `<div>` where it is rendered, with no effect on the tab title",
+          correct: false,
+        }
+      - {
+          text: "It is ignored, and React warns that metadata belongs in `index.html`",
+          correct: false,
+        }
+      - { text: "In the `<body>`, directly before the closing tag", correct: false }
+      - { text: "Hoisted into the document's `<head>`", correct: true }
+  - type: single
+    prompt: "What new capability do callback refs have in React 19?"
+    code: |
+      <input ref={(node) => {
+        const observer = new ResizeObserver(() => {})
+        observer.observe(node!)
+        return () => observer.disconnect()
+      }} />
+    codeLanguage: tsx
+    explanation: "A ref callback can now return a cleanup function, which React calls when the element is removed (or the ref changes), instead of calling the ref with `null`. It makes subscribing to an element, as in the snippet, symmetrical and easy to tear down."
+    theoryUrl: https://react.dev/blog/2024/12/05/react-19#cleanup-functions-for-refs
+    options:
+      - { text: "None: returning a value from a ref callback throws an error", correct: false }
+      - {
+          text: "It can return a cleanup function, which runs when the element is detached",
+          correct: true,
+        }
+      - {
+          text: "It is called only once, so it cannot observe later changes to the node",
+          correct: false,
+        }
+      - { text: "It receives the previous node as a second argument", correct: false }
+  - type: single
+    prompt: "A form uses a Server Function as its action: `<form action={createPost}>` where `createPost` is marked `'use server'`. What benefit does this give if JavaScript has not loaded yet?"
+    explanation: "With a Server Function passed to `action` in a Server Component (or hydrated form), the form can be submitted before hydration completes: it works as a regular HTML form post, and React enhances it once the JavaScript is ready. This is progressive enhancement, and it needs no client handler."
+    theoryUrl: https://react.dev/reference/rsc/server-functions
+    options:
+      - {
+          text: "The form is submitted as a regular POST, and works before hydration",
+          correct: true,
+        }
+      - {
+          text: "Nothing: the form is inert until the client bundle finishes loading",
+          correct: false,
+        }
+      - {
+          text: "The server runs `createPost` as soon as the page loads, without a submit",
+          correct: false,
+        }
+      - {
+          text: "The browser queues the submit, and replays it after the bundle loads",
+          correct: false,
+        }

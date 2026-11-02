@@ -1,0 +1,519 @@
+version: 1
+title: "Architect Roadmap 17: Node.js asynchronous patterns"
+description: Callbacks and their conventions, EventEmitter, Zalgo, promises and async/await, sequential, parallel and limited-concurrency execution, async error handling.
+language: en
+tags: [architect-roadmap, nodejs, async, promises, event-emitter]
+run:
+  questionsPerRun: 10
+  maxErrors: 3
+  timePerQuestionSec: 90
+questions:
+  - type: single
+    prompt: "Which of these describes the Node.js error-first callback convention?"
+    explanation: "The callback is the last argument, and its first argument is the error (or `null`), followed by the results. This lets one signature work for every async API and makes `util.promisify` possible. Putting the callback first or returning errors as a second argument breaks that contract."
+    theoryUrl: https://nodejs.org/en/learn/asynchronous-work/javascript-asynchronous-programming-and-callbacks
+    options:
+      - {
+          text: "The callback is the first argument and receives the result as its only parameter",
+          correct: false,
+        }
+      - {
+          text: "The callback is the last argument and receives `(err, ...results)`, with `err` null on success",
+          correct: true,
+        }
+      - {
+          text: "The function returns the error synchronously and passes the result to the callback",
+          correct: false,
+        }
+      - {
+          text: "The callback receives `(result, err)`, so that success handling comes first",
+          correct: false,
+        }
+  - type: single
+    prompt: "What does this script print?"
+    code: |
+      const cache = new Map()
+
+      function getUser(id, cb) {
+        if (cache.has(id)) return cb(null, cache.get(id))
+        setTimeout(() => {
+          cache.set(id, { id })
+          cb(null, cache.get(id))
+        }, 10)
+      }
+
+      getUser(1, () => console.log('first'))
+      setTimeout(() => {
+        console.log('before')
+        getUser(1, () => console.log('second'))
+        console.log('after')
+      }, 50)
+    codeLanguage: javascript
+    explanation: "`getUser` is sometimes synchronous (cache hit) and sometimes asynchronous (cache miss). On the second call the callback runs before `after`, so the output is first, before, second, after. This inconsistency is what Isaac Schlueter called releasing Zalgo, and it makes the caller's code order unpredictable."
+    theoryUrl: https://nodejs.org/en/learn/asynchronous-work/javascript-asynchronous-programming-and-callbacks
+    options:
+      - { text: "first, before, after, second", correct: false }
+      - { text: "before, first, second, after", correct: false }
+      - { text: "first, before, second, after", correct: true }
+      - { text: "first, second, before, after", correct: false }
+  - type: single
+    prompt: "In the previous `getUser` function, which change removes the Zalgo problem while keeping the cache?"
+    explanation: "A function must be either always sync or always async. Deferring the cache-hit callback with `process.nextTick` (or `queueMicrotask`) makes both branches asynchronous while still avoiding the I/O wait. Making the miss branch synchronous is impossible when it needs I/O, and calling the callback twice makes things worse."
+    theoryUrl: https://nodejs.org/en/learn/asynchronous-work/understanding-processnexttick
+    options:
+      - {
+          text: "Call `cb` in the cache-hit branch through `process.nextTick(() => cb(null, value))`",
+          correct: true,
+        }
+      - {
+          text: "Call `cb` in both branches, once synchronously and once after the timeout",
+          correct: false,
+        }
+      - {
+          text: "Replace the `Map` with a plain object, so lookups are asynchronous too",
+          correct: false,
+        }
+      - {
+          text: "Wrap the whole function body in a `try`/`catch` and call `cb` in `finally`",
+          correct: false,
+        }
+  - type: single
+    prompt: "What does this script print?"
+    code: |
+      const { EventEmitter } = require('node:events')
+
+      class Job extends EventEmitter {
+        constructor() {
+          super()
+          this.emit('ready')
+        }
+      }
+
+      const job = new Job()
+      job.on('ready', () => console.log('got ready'))
+      console.log('done')
+    codeLanguage: javascript
+    explanation: "`emit` is synchronous: every listener registered at that moment runs immediately and in order. The constructor emits `ready` before the caller can attach a listener, so the event is lost and only `done` is printed. The fix is to emit later, for example inside `process.nextTick`."
+    theoryUrl: https://nodejs.org/api/events.html#emitteremiteventname-args
+    options:
+      - { text: "done, then got ready on the next tick", correct: false }
+      - { text: "got ready, then done", correct: false }
+      - { text: "It throws, as an event cannot be emitted from a constructor", correct: false }
+      - { text: "Only done, the event was emitted before any listener existed", correct: true }
+  - type: single
+    prompt: "What does this script do?"
+    code: |
+      const { EventEmitter } = require('node:events')
+
+      const e = new EventEmitter()
+      try {
+        e.emit('error', new Error('boom'))
+      } catch (err) {
+        console.log('caught:', err.message)
+      }
+      console.log('next')
+    codeLanguage: javascript
+    explanation: "The `error` event is special: if there is no listener, `emit` throws the error synchronously. Here it is caught by the `try`/`catch`, so it prints `caught: boom` and then `next`. Without the `try`, the process would crash with an uncaught exception, so always attach an `error` listener to emitters you do not fully control."
+    theoryUrl: https://nodejs.org/api/events.html#error-events
+    options:
+      - {
+          text: "Prints next only, since an event without listeners is silently ignored",
+          correct: false,
+        }
+      - { text: "Prints caught: boom, then next", correct: true }
+      - {
+          text: "Prints next, and the error shows up later as an unhandled rejection",
+          correct: false,
+        }
+      - { text: "Crashes the process, since `try`/`catch` cannot catch events", correct: false }
+  - type: single
+    prompt: "What does this script print?"
+    code: |
+      const { EventEmitter } = require('node:events')
+
+      const e = new EventEmitter()
+      e.on('x', () => { throw new Error('listener failed') })
+      e.on('x', () => console.log('second listener'))
+
+      try {
+        e.emit('x')
+      } catch (err) {
+        console.log('caught:', err.message)
+      }
+    codeLanguage: javascript
+    explanation: "Listeners run synchronously inside `emit`, so an exception propagates to whoever called `emit`, and the remaining listeners are skipped. Output: `caught: listener failed` only. Treat listeners as untrusted code: one failing listener can break the emitter's caller."
+    theoryUrl: https://nodejs.org/api/events.html
+    options:
+      - { text: "second listener, then caught: listener failed", correct: false }
+      - { text: "caught: listener failed", correct: true }
+      - { text: "second listener only, as listener errors are swallowed", correct: false }
+      - { text: "caught: listener failed, then second listener", correct: false }
+  - type: single
+    prompt: "What does this script print?"
+    code: |
+      const { EventEmitter } = require('node:events')
+
+      const e = new EventEmitter()
+      e.once('hit', () => console.log('once'))
+      e.on('hit', () => console.log('on'))
+
+      e.emit('hit')
+      e.emit('hit')
+      console.log(e.listenerCount('hit'))
+    codeLanguage: javascript
+    explanation: "Listeners run in registration order. The `once` listener is removed before it is invoked on the first emit, so it prints only once. After two emits the output is once, on, on, and one listener remains."
+    theoryUrl: https://nodejs.org/api/events.html#emitteronceeventname-listener
+    options:
+      - { text: "once, on, once, on, 2", correct: false }
+      - { text: "on, once, on, 1", correct: false }
+      - { text: "once, on, on, 1", correct: true }
+      - { text: "once, on, on, 2", correct: false }
+  - type: single
+    prompt: "When is an `EventEmitter` a better fit than a plain callback for an async API?"
+    explanation: "A callback is for one result of one operation. An emitter fits when the same operation can notify several times (progress, data chunks, state changes) or when several independent parts need to react. For a single success/failure outcome, a callback or promise is simpler."
+    theoryUrl: https://nodejs.org/en/learn/asynchronous-work/the-nodejs-event-emitter
+    options:
+      - {
+          text: "When the operation yields exactly one result and you want it to be cancellable",
+          correct: false,
+        }
+      - {
+          text: "When a function needs to be synchronous in one branch and asynchronous in another",
+          correct: false,
+        }
+      - {
+          text: "When the same operation signals several times, such as progress or incoming data",
+          correct: true,
+        }
+      - {
+          text: "When you want the error to be thrown automatically to the caller's try/catch",
+          correct: false,
+        }
+  - type: single
+    prompt: "A long-lived service attaches a new listener with `emitter.on('tick', handler)` inside every incoming request handler and never removes it. After a while Node prints `MaxListenersExceededWarning: Possible EventEmitter memory leak detected`. What is the root cause?"
+    explanation: "Each request adds one more listener (and everything its closure captures), so the list grows without bound once past the default of 10. The warning is Node pointing at a real leak: the fix is to remove listeners (`off`, `once`, `AbortSignal`) or register once at startup. Raising the limit only hides it."
+    theoryUrl: https://nodejs.org/api/events.html#emittersetmaxlistenersn
+    options:
+      - {
+          text: "Node limits the emitter to 10 events per second, and requests exceed that rate",
+          correct: false,
+        }
+      - {
+          text: "Listeners accumulate per request and are never released, so the leak grows",
+          correct: true,
+        }
+      - {
+          text: "The handler is asynchronous, which makes Node copy it for every emit",
+          correct: false,
+        }
+      - {
+          text: "Emitters cannot be shared between requests, so Node warns on every reuse",
+          correct: false,
+        }
+  - type: single
+    prompt: "What does this script print?"
+    code: |
+      const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+
+      async function main() {
+        const out = []
+        ;[1, 2, 3].forEach(async (n) => {
+          await sleep(10)
+          out.push(n)
+        })
+        console.log('length', out.length)
+        await sleep(50)
+        console.log('length later', out.length)
+      }
+      main()
+    codeLanguage: javascript
+    explanation: "`forEach` ignores the promises returned by its async callback, so it does not wait for them. The first log runs with `out` still empty (0), and the three callbacks finish about 10 ms later, giving 3 after the 50 ms sleep. To wait, use `await Promise.all(items.map(...))` or a `for...of` loop."
+    theoryUrl: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/forEach
+    options:
+      - { text: "length 3, then length later 3", correct: false }
+      - { text: "length 0, then length later 3", correct: true }
+      - { text: "length 0, then length later 0, as the pushes never run", correct: false }
+      - {
+          text: "length 1, then length later 3, since the first item runs synchronously",
+          correct: false,
+        }
+  - type: single
+    prompt: "What does this script print, line by line?"
+    code: |
+      const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+
+      async function task(n) {
+        console.log('start', n)
+        await sleep(10)
+        console.log('end', n)
+      }
+
+      async function main() {
+        for (const n of [1, 2]) await task(n)
+        console.log('---')
+        await Promise.all([3, 4].map(task))
+      }
+      main()
+    codeLanguage: javascript
+    explanation: "`for...of` with `await` is sequential: task 1 finishes before task 2 starts. `map` starts both tasks immediately and `Promise.all` just waits, so both `start` lines come first, then both `end` lines (equal 10 ms delays resolve in creation order). That is the difference between sequential and parallel execution."
+    theoryUrl: https://nodejs.org/en/learn/asynchronous-work/asynchronous-flow-control
+    options:
+      - {
+          text: "start 1, end 1, start 2, end 2, ---, start 3, start 4, end 3, end 4",
+          correct: true,
+        }
+      - {
+          text: "start 1, start 2, end 1, end 2, ---, start 3, end 3, start 4, end 4",
+          correct: false,
+        }
+      - {
+          text: "start 1, end 1, start 2, end 2, ---, start 3, end 3, start 4, end 4",
+          correct: false,
+        }
+      - {
+          text: "start 1, start 2, end 1, end 2, ---, start 3, start 4, end 3, end 4",
+          correct: false,
+        }
+  - type: single
+    prompt: "What does this script print?"
+    code: |
+      const sleep = (ms, v, fail) => new Promise((res, rej) => setTimeout(() => {
+        console.log('finished', v)
+        fail ? rej(new Error(v)) : res(v)
+      }, ms))
+
+      Promise.all([sleep(30, 'A'), sleep(10, 'B', true), sleep(20, 'C')])
+        .then((r) => console.log('result', r))
+        .catch((e) => console.log('error', e.message))
+    codeLanguage: javascript
+    explanation: "`Promise.all` rejects as soon as one input rejects (B at 10 ms), so `error B` is logged immediately. It does not cancel the other operations: C and A still run to completion and log their `finished` lines at 20 and 30 ms, their results are just ignored."
+    theoryUrl: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise/all
+    options:
+      - { text: "finished B, error B", correct: false }
+      - { text: "finished B, finished C, finished A, error B", correct: false }
+      - { text: "finished B, error B, finished C, finished A", correct: true }
+      - { text: "finished B, finished C, finished A, result [A, B, C]", correct: false }
+  - type: single
+    prompt: "What does this script print?"
+    code: |
+      async function fail() { throw new Error('bad') }
+
+      async function a() {
+        try { return fail() } catch { return 'handled in a' }
+      }
+
+      async function b() {
+        try { return await fail() } catch { return 'handled in b' }
+      }
+
+      a().then(console.log, (e) => console.log('a rejected:', e.message))
+      b().then(console.log, (e) => console.log('b rejected:', e.message))
+    codeLanguage: javascript
+    explanation: "`return fail()` hands the pending promise to the caller without awaiting it, so the `try` block has already exited when it rejects and the `catch` never runs: `a` rejects. With `return await fail()` the rejection happens inside the `try`, so `b` handles it. The `b` result is logged first because `a` needs extra ticks to adopt the returned promise."
+    theoryUrl: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/await
+    options:
+      - { text: "handled in a, handled in b", correct: false }
+      - { text: "a rejected: bad, b rejected: bad", correct: false }
+      - { text: "handled in a, b rejected: bad", correct: false }
+      - { text: "handled in b, a rejected: bad", correct: true }
+  - type: single
+    prompt: "What does this script print?"
+    code: |
+      process.on('uncaughtException', (e) => console.log('uncaught:', e.message))
+
+      try {
+        setTimeout(() => {
+          throw new Error('late')
+        }, 0)
+      } catch (e) {
+        console.log('caught:', e.message)
+      }
+      console.log('sync done')
+    codeLanguage: javascript
+    explanation: "The `try`/`catch` only covers code that runs while the `try` block is on the stack. The callback runs later from the event loop with a fresh stack, so the throw escapes to the process-level `uncaughtException` handler. This is why callback APIs pass errors as arguments, and why `async`/`await` makes this easier."
+    theoryUrl: https://nodejs.org/api/process.html#event-uncaughtexception
+    options:
+      - { text: "caught: late, then sync done", correct: false }
+      - { text: "sync done, then uncaught: late", correct: true }
+      - { text: "sync done, then caught: late", correct: false }
+      - { text: "uncaught: late, then sync done", correct: false }
+  - type: single
+    prompt: "What is the output of this limited-concurrency runner? The task number is the duration in tens of milliseconds."
+    code: |
+      const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+
+      async function runLimited(tasks, limit) {
+        const queue = [...tasks]
+        async function worker(id) {
+          while (queue.length) {
+            const t = queue.shift()
+            console.log(`w${id} start ${t}`)
+            await sleep(t * 10)
+            console.log(`w${id} end ${t}`)
+          }
+        }
+        await Promise.all(Array.from({ length: limit }, (_, i) => worker(i + 1)))
+      }
+      runLimited([4, 1, 1, 1], 2)
+    codeLanguage: javascript
+    explanation: "Two workers share one queue. w1 takes the slow task (4) and w2 takes the short ones one after another (1, 1, 1), finishing three tasks before w1 is done. The pattern gives at most `limit` tasks in flight and no worker idles while the queue has work. It is safe because `shift()` is synchronous, with no await between check and take."
+    theoryUrl: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise/all
+    options:
+      - {
+          text: "w1 start 4, w2 start 1, w2 end 1, w2 start 1, w2 end 1, w2 start 1, w2 end 1, w1 end 4",
+          correct: true,
+        }
+      - {
+          text: "w1 start 4, w2 start 1, w2 end 1, w1 end 4, w2 start 1, w2 end 1, w2 start 1, w2 end 1",
+          correct: false,
+        }
+      - {
+          text: "w1 start 4, w1 end 4, w2 start 1, w2 end 1, w2 start 1, w2 end 1, w2 start 1, w2 end 1",
+          correct: false,
+        }
+      - {
+          text: "w1 start 4, w2 start 1, w1 start 1, w2 end 1, w1 end 4, w2 start 1, w2 end 1, w1 end 1",
+          correct: false,
+        }
+  - type: multi
+    prompt: "Which guarantees do promises give that plain callbacks do not? Select all that apply."
+    explanation: "A promise settles at most once, so a buggy producer cannot call you twice, and its `then` callbacks are always invoked asynchronously, which prevents Zalgo. Rejections propagate down a chain to the first handler. Promises are not cancellable and do not make code run in parallel."
+    theoryUrl: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Using_promises
+    options:
+      - {
+          text: "A promise settles at most once, even if `resolve` is called repeatedly",
+          correct: true,
+        }
+      - {
+          text: "`then` handlers always run asynchronously, even on an already-resolved promise",
+          correct: true,
+        }
+      - { text: "A pending promise can be cancelled by calling `promise.cancel()`", correct: false }
+      - {
+          text: "A rejection propagates through the chain until a handler deals with it",
+          correct: true,
+        }
+  - type: single
+    prompt: "A Node.js service (Node 20) creates a rejected promise with no `.catch` and no `unhandledRejection` listener. What happens by default?"
+    explanation: "Since Node 15 the default `--unhandled-rejections` mode is `throw`: an unhandled rejection is raised as an uncaught exception and crashes the process. Older versions only printed a warning. Failing fast is intentional, because a swallowed rejection leaves the program in an unknown state."
+    theoryUrl: https://nodejs.org/api/cli.html#--unhandled-rejectionsmode
+    options:
+      - { text: "Node prints a warning and the process keeps running, as before", correct: false }
+      - {
+          text: "The rejection is retried by the runtime until a handler is attached",
+          correct: false,
+        }
+      - {
+          text: "The process raises it as an uncaught exception and exits with a non-zero code",
+          correct: true,
+        }
+      - {
+          text: "The promise is garbage collected silently, as nothing observes it",
+          correct: false,
+        }
+  - type: single
+    prompt: "A job must download 5,000 files. The remote server rate-limits at about 20 concurrent connections. Which approach fits best?"
+    explanation: "A bounded-concurrency pool (workers over a shared queue, or a library like `p-limit`) keeps about 20 requests in flight and processes everything. `Promise.all` over all 5,000 would open them all at once, hit the limit and exhaust sockets and memory. A sequential loop is safe but about 20 times slower than needed."
+    theoryUrl: https://nodejs.org/en/learn/asynchronous-work/asynchronous-flow-control
+    options:
+      - {
+          text: "`await Promise.all(files.map(download))`, since the server decides what to throttle",
+          correct: false,
+        }
+      - {
+          text: "A `for...of` loop with `await`, as sequential is always the safest choice",
+          correct: false,
+        }
+      - {
+          text: "Split the files in 5,000 timers with random delays so they probably do not collide",
+          correct: false,
+        }
+      - { text: "A pool of about 20 workers draining a shared queue of downloads", correct: true }
+  - type: single
+    prompt: "A dashboard page loads three independent widgets (sales, traffic, alerts) from three services. If one service is down, the page must still render the other two. Which combinator fits?"
+    explanation: "`Promise.allSettled` waits for every promise and gives a `{status, value|reason}` entry for each, so you can render the successes and show an error state for the failures. `Promise.all` and `Promise.race` reject on the first failure and lose the other results. `Promise.any` returns only the first success."
+    theoryUrl: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise/allSettled
+    options:
+      - {
+          text: "`Promise.all`, with a try/catch around it to handle the failing service",
+          correct: false,
+        }
+      - { text: "`Promise.allSettled`, rendering each widget from its own result", correct: true }
+      - { text: "`Promise.race`, taking whichever service answers first", correct: false }
+      - { text: "`Promise.any`, since it ignores the failing services", correct: false }
+  - type: single
+    prompt: "You query three mirror servers that hold the same data, and you want the first successful answer, ignoring mirrors that fail. Which API fits?"
+    explanation: "`Promise.any` resolves with the first fulfilled promise and rejects (with an `AggregateError`) only when all of them fail. `Promise.race` settles with the first outcome, so a fast failure would win and reject. `Promise.all` waits for every mirror."
+    theoryUrl: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise/any
+    options:
+      - { text: "`Promise.race`, as the fastest response is always the best one", correct: false }
+      - { text: "`Promise.all`, then pick the first element of the result array", correct: false }
+      - { text: "`Promise.allSettled`, then filter out the rejected entries", correct: false }
+      - {
+          text: "`Promise.any`, which ignores rejections until every mirror has failed",
+          correct: true,
+        }
+  - type: single
+    prompt: "A deployment script must apply 12 database migrations. Each one depends on the schema produced by the previous one. How should the async work be structured?"
+    explanation: "When each step depends on the previous result, execution must be sequential: `for...of` with `await` (or a reduce over promises). Parallelising with `Promise.all` would run dependent migrations at once and corrupt the order. Limited concurrency is for independent tasks."
+    theoryUrl: https://nodejs.org/en/learn/asynchronous-work/asynchronous-flow-control
+    options:
+      - {
+          text: "`Promise.all(migrations.map(run))`, because the database serialises the writes",
+          correct: false,
+        }
+      - { text: "A pool of 4 workers over a shared queue, to speed up the deploy", correct: false }
+      - {
+          text: "`Promise.race` over the migrations, stopping when the first completes",
+          correct: false,
+        }
+      - {
+          text: "A `for...of` loop that awaits each migration before starting the next one",
+          correct: true,
+        }
+  - type: boolean
+    prompt: "`util.promisify(fn)` works on any function that takes a Node-style error-first callback as its last argument."
+    answer: true
+    explanation: "`promisify` assumes the `(err, value) => {}` convention and the callback in last position: it rejects when `err` is set and resolves with `value` otherwise. Functions with a different callback signature need the custom symbol `util.promisify.custom` or a hand-written wrapper."
+    theoryUrl: https://nodejs.org/api/util.html#utilpromisifyoriginal
+  - type: single
+    prompt: "In a callback-style function, which is the usual bug in `if (err) cb(err); ...rest of the function...` with no `return`?"
+    explanation: "Without `return`, execution continues after reporting the error and may call the callback a second time (or use an undefined result). The convention is `if (err) return cb(err)`. Callbacks must be called exactly once, a guarantee that promises give you for free."
+    theoryUrl: https://nodejs.org/en/learn/asynchronous-work/javascript-asynchronous-programming-and-callbacks
+    options:
+      - {
+          text: "The callback may run twice, or the code after it runs with invalid data",
+          correct: true,
+        }
+      - {
+          text: "The error is thrown on the next tick instead of being passed to the callback",
+          correct: false,
+        }
+      - { text: "Node converts the missing return into an unhandled rejection", correct: false }
+      - {
+          text: "Nothing, as `cb` is always asynchronous and ends the function anyway",
+          correct: false,
+        }
+  - type: multi
+    prompt: "Which of these are good ways to handle errors in asynchronous Node.js code? Select all that apply."
+    explanation: "Use `try`/`catch` around `await`, attach `.catch` to promise chains, and always listen for `error` on emitters and streams. A `try`/`catch` around a callback-based call does not catch what happens later in the callback, so it is not a valid strategy there."
+    theoryUrl: https://nodejs.org/api/errors.html
+    options:
+      - {
+          text: "`try`/`catch` around an `await` expression inside an async function",
+          correct: true,
+        }
+      - {
+          text: "Wrapping a callback-based call in `try`/`catch` to catch errors from its callback",
+          correct: false,
+        }
+      - { text: "Attaching an `error` listener to every EventEmitter that can fail", correct: true }
+      - {
+          text: "Ending promise chains with a `.catch` so a rejection is never left unhandled",
+          correct: true,
+        }
+  - type: boolean
+    prompt: "An API that calls its callback synchronously for cached data, and asynchronously for everything else, is harmless as long as both paths pass the same arguments."
+    answer: false
+    explanation: "The problem is timing, not arguments. Callers cannot know whether code after the call runs before or after the callback, so state they set up after the call may or may not be visible. That is Zalgo, and the rule is to make an API either always synchronous or always asynchronous."
+    theoryUrl: https://nodejs.org/en/learn/asynchronous-work/javascript-asynchronous-programming-and-callbacks

@@ -1,0 +1,339 @@
+version: 1
+title: "Architect Roadmap 38: Quality attributes"
+description: Availability and the number of nines, SLIs/SLOs and error budgets, RTO and RPO, multi-region disaster recovery, scalability, maintainability, and how to measure and balance them.
+language: en
+tags: [architect-roadmap, architecture, availability, disaster-recovery, scalability]
+run:
+  questionsPerRun: 10
+  maxErrors: 3
+  timePerQuestionSec: 90
+questions:
+  - type: single
+    prompt: "Roughly how much downtime per year does an availability target of 99.9% ('three nines') allow?"
+    explanation: "0.1% of a year is about 8.8 hours. 99.99% allows about 52 minutes per year and 99.999% about 5 minutes, which is why each extra nine is dramatically harder to reach."
+    theoryUrl: https://sre.google/sre-book/embracing-risk/
+    options:
+      - { text: "About 88 hours", correct: false }
+      - { text: "About 8.8 hours", correct: true }
+      - { text: "About 52 minutes", correct: false }
+      - { text: "About 5 minutes", correct: false }
+  - type: single
+    prompt: "Your contract promises 99.95% monthly availability and a month has 30 days. About how many minutes of downtime fit in the error budget?"
+    explanation: "A 30-day month has 43,200 minutes, and 0.05% of that is 21.6 minutes. The 43 minutes figure is the budget for 99.9%, and 4.3 minutes is the one for 99.99%."
+    theoryUrl: https://sre.google/sre-book/embracing-risk/
+    options:
+      - { text: "About 43 minutes", correct: false }
+      - { text: "About 4.3 minutes", correct: false }
+      - { text: "About 21.6 minutes", correct: true }
+      - { text: "About 2.2 hours", correct: false }
+  - type: single
+    prompt: "What does this script print?"
+    code: |
+      // each dependency is 99.9% available
+      const serial = 0.999 * 0.999 * 0.999;
+      // two independent replicas, each 99% available
+      const redundant = 1 - (1 - 0.99) ** 2;
+      console.log(serial.toFixed(4), redundant.toFixed(4));
+    codeLanguage: javascript
+    explanation: "A request that needs all three dependencies in series is only up when all are up, so the availabilities multiply: 0.9970. With two independent replicas the system is down only if both are down: 1 - 0.01^2 = 0.9999. Chaining hard dependencies lowers availability, redundancy raises it."
+    theoryUrl: https://docs.aws.amazon.com/wellarchitected/latest/reliability-pillar/availability.html
+    options:
+      - { text: "0.9990 0.9900", correct: false }
+      - { text: "0.9970 0.9999", correct: true }
+      - { text: "0.9997 0.9999", correct: false }
+      - { text: "0.9970 0.9800", correct: false }
+  - type: single
+    prompt: "A team computes that two replicas at 99% each give 99.99% availability. In production they still see outages about as often as with one replica. What is the most likely flaw in the calculation?"
+    explanation: "The formula assumes independent failures. Replicas that share an AZ, a deployment pipeline, a config store or a bad release fail together, so the real availability is capped by the shared component. Replica count, nines in the SLA and load balancer cost are not the cause."
+    theoryUrl: https://aws.amazon.com/builders-library/static-stability-using-availability-zones/
+    options:
+      - {
+          text: "Two replicas are not enough, redundancy only works from three replicas",
+          correct: false,
+        }
+      - { text: "Availability percentages cannot be multiplied or combined at all", correct: false }
+      - {
+          text: "The failures are correlated through shared components such as the AZ, release or config",
+          correct: true,
+        }
+      - {
+          text: "The load balancer in front of the replicas adds its own fixed overhead to every request, cancelling the redundancy gain",
+          correct: false,
+        }
+  - type: single
+    prompt: "Which statement correctly defines RTO and RPO?"
+    explanation: "RTO (Recovery Time Objective) is how long the service may be down. RPO (Recovery Point Objective) is how much data, measured as time, you can afford to lose. They are independent: a nightly backup gives an RPO of up to 24 hours even if restore takes minutes."
+    theoryUrl: https://docs.aws.amazon.com/whitepapers/latest/disaster-recovery-workloads-on-aws/disaster-recovery-options-in-the-cloud.html
+    options:
+      - {
+          text: "RTO is the maximum tolerable data loss, RPO is the maximum tolerable downtime",
+          correct: false,
+        }
+      - {
+          text: "RTO is the maximum tolerable downtime, RPO the maximum tolerable data loss in time",
+          correct: true,
+        }
+      - {
+          text: "RTO and RPO are two names for the time needed to fail over to another region and restore service",
+          correct: false,
+        }
+      - {
+          text: "RTO is measured in requests per second, RPO in the number of replicas required",
+          correct: false,
+        }
+  - type: single
+    prompt: "A payments ledger must have an RPO of zero across two regions that are 80 ms apart. What is the unavoidable trade-off?"
+    explanation: "RPO zero means no acknowledged write may be lost, so the write must be committed in both regions before it is acknowledged (synchronous replication). That adds the cross-region round trip to every write and ties availability to the remote region. Asynchronous replication is faster but loses the in-flight tail."
+    theoryUrl: https://docs.aws.amazon.com/wellarchitected/latest/reliability-pillar/welcome.html
+    options:
+      - {
+          text: "Asynchronous replication is enough as long as it uses a dedicated network link",
+          correct: false,
+        }
+      - {
+          text: "Synchronous cross-region commits add the round-trip latency to every write",
+          correct: true,
+        }
+      - {
+          text: "You must give up RTO, because zero data loss makes failover impossible",
+          correct: false,
+        }
+      - {
+          text: "Nightly snapshots shipped to the second region reach RPO zero if encrypted",
+          correct: false,
+        }
+  - type: single
+    prompt: "A back-office system must be back within 1 hour (RTO) and may lose a few minutes of data (RPO). It is used rarely and the budget is tight. Which DR strategy fits best?"
+    explanation: "Pilot light keeps data replicated and the minimal core ready in the second region, then scales out on failover: recovery in tens of minutes at low cost. Backup and restore usually takes hours. Warm standby and active-active meet the targets but cost much more than the requirement justifies."
+    theoryUrl: https://docs.aws.amazon.com/whitepapers/latest/disaster-recovery-workloads-on-aws/disaster-recovery-options-in-the-cloud.html
+    options:
+      - { text: "Multi-site active-active in two regions", correct: false }
+      - { text: "Backup and restore from weekly snapshots", correct: false }
+      - {
+          text: "Warm standby running at full production capacity, with continuous cross-region replication",
+          correct: false,
+        }
+      - {
+          text: "Pilot light with replicated data and a minimal core, scaled out on failover",
+          correct: true,
+        }
+  - type: multi
+    prompt: "A zone outage must not take your service down. Which measures help? Select all that apply."
+    explanation: "Spreading instances and data across AZs, and pre-provisioning enough capacity so a zone loss needs no scale-up (static stability) both remove the dependency on control-plane actions during the failure. Buying a bigger instance in the same AZ does nothing for an AZ outage."
+    theoryUrl: https://aws.amazon.com/builders-library/static-stability-using-availability-zones/
+    options:
+      - {
+          text: "Run instances and the primary/standby database in at least two AZs",
+          correct: true,
+        }
+      - { text: "Move to the largest instance size available in the current AZ", correct: false }
+      - {
+          text: "Keep enough spare capacity in the surviving AZs to absorb the load immediately",
+          correct: true,
+        }
+      - { text: "Use health checks so traffic is routed away from the failed zone", correct: true }
+  - type: single
+    prompt: "A company wants active-active writes in two regions for an inventory system that needs strong consistency. What is the fundamental difficulty?"
+    explanation: "Concurrent writes to the same record in two regions either need cross-region coordination (consensus or locks, paying the latency) or conflict resolution (accepting weaker consistency). Neither compute capacity nor DNS is the core problem, and the CAP trade-off does not go away with more replicas."
+    theoryUrl: https://www.allthingsdistributed.com/2008/12/eventually_consistent.html
+    options:
+      - { text: "DNS cannot return two region endpoints for the same hostname", correct: false }
+      - {
+          text: "Writes in both regions need cross-region coordination or conflict resolution",
+          correct: true,
+        }
+      - {
+          text: "Two regions cannot hold more than one copy of the same database without a shared storage volume",
+          correct: false,
+        }
+      - { text: "Compute capacity doubles, which breaks the autoscaling limits", correct: false }
+  - type: boolean
+    prompt: "Moving from 99.9% to 99.99% availability costs roughly the same as moving from 99% to 99.9%."
+    answer: false
+    explanation: "Each additional nine usually costs disproportionately more: tighter detection, automated failover, multi-AZ or multi-region, more testing and a larger on-call investment. That is why the target must come from business impact, not ambition."
+    theoryUrl: https://sre.google/sre-book/embracing-risk/
+  - type: single
+    prompt: "A service burned 100% of its monthly error budget in the first week. According to SRE practice, what should happen?"
+    explanation: "The error budget turns reliability into a shared decision rule: when it is spent, risky changes (feature launches) are slowed or frozen and effort goes to reliability work until the service is back within SLO. Raising the SLO or hiding the incidents defeats the mechanism."
+    theoryUrl: https://sre.google/sre-book/embracing-risk/
+    options:
+      - { text: "Loosen the SLO so the budget is no longer exhausted", correct: false }
+      - { text: "Keep shipping, because budgets are only reviewed quarterly", correct: false }
+      - { text: "Add more alerts and keep the release cadence unchanged", correct: false }
+      - { text: "Slow or freeze risky releases and prioritise reliability work", correct: true }
+  - type: single
+    prompt: "You must define an availability SLI for a REST API behind a load balancer. Which definition is best?"
+    explanation: "A good SLI is a ratio of good events to valid events as the user experiences it: here successful responses over all valid requests, measured at the load balancer. CPU, host uptime and instance counts describe resources, not what users get."
+    theoryUrl: https://sre.google/workbook/implementing-slos/
+    options:
+      - {
+          text: "Average CPU utilisation of the instances staying below 70% across the whole fleet",
+          correct: false,
+        }
+      - { text: "Percentage of time the instances answer ping", correct: false }
+      - { text: "Number of healthy instances in the target group", correct: false }
+      - {
+          text: "Valid requests answered without a 5xx, divided by all valid requests",
+          correct: true,
+        }
+  - type: single
+    prompt: "Dashboards show an average response time of 120 ms, yet customers complain about slowness. Why is the average misleading for this?"
+    explanation: "Latency distributions are long-tailed. A small share of very slow requests barely moves the mean but hits real users, especially on pages that fan out to many calls. Percentiles such as p95 and p99 expose the tail, so SLOs are written on them."
+    theoryUrl: https://sre.google/sre-book/monitoring-distributed-systems/
+    options:
+      - { text: "Averages are only valid for CPU metrics, never for latency", correct: false }
+      - { text: "The mean hides the slow tail, which percentiles like p99 reveal", correct: true }
+      - { text: "The monitoring agent adds 120 ms to every request it measures", correct: false }
+      - {
+          text: "Averages are computed over the median, so they ignore fast requests",
+          correct: false,
+        }
+  - type: single
+    prompt: "A web app keeps login sessions in each server's memory, so you pin users to one server with sticky sessions. Scaling out causes logouts when instances are replaced. Which change best fixes the scalability problem?"
+    explanation: "Stateless application servers can be added, removed or replaced freely. Moving the session to a shared store (Redis, database) or a signed token removes the affinity. A bigger server only delays the issue, and a longer sticky TTL makes replacement even more disruptive."
+    theoryUrl: https://aws.amazon.com/builders-library/avoiding-fallback-in-distributed-systems/
+    options:
+      - {
+          text: "Externalise the session to a shared store so any instance can serve any user",
+          correct: true,
+        }
+      - { text: "Increase the sticky-session cookie lifetime to 24 hours", correct: false }
+      - {
+          text: "Scale vertically to a bigger instance and keep sessions in memory, so fewer replacements happen",
+          correct: false,
+        }
+      - { text: "Replicate every session to all instances over a gossip protocol", correct: false }
+  - type: single
+    prompt: "An e-commerce database primary is at 90% CPU. The workload is 95% reads, mostly product lookups that tolerate a few seconds of staleness. What is the best first move?"
+    explanation: "With a read-heavy workload that tolerates staleness, read replicas and a cache offload the primary at low cost. Sharding is far more complex and solves write scaling, which is not the bottleneck. Synchronous replicas for reads would add write latency without helping."
+    theoryUrl: https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_ReadRepl.html
+    options:
+      - { text: "Shard the database by customer id across eight primaries", correct: false }
+      - { text: "Make all replicas synchronous so reads can be served anywhere", correct: false }
+      - { text: "Add read replicas and a cache, accepting replication lag", correct: true }
+      - { text: "Move the product catalog to a multi-region active-active store", correct: false }
+  - type: single
+    prompt: "A downstream service is slow. Every client retries immediately up to 5 times on timeout, and the slow service goes from degraded to completely down. What is happening and how do you mitigate it?"
+    explanation: "Immediate retries multiply the load on an already struggling dependency (retry storm), turning a partial failure into a cascading one. Use capped exponential backoff with jitter, a retry budget, and a circuit breaker. More retries or a longer timeout make it worse."
+    theoryUrl: https://aws.amazon.com/builders-library/timeouts-retries-and-backoff-with-jitter/
+    options:
+      - {
+          text: "A retry storm amplifies load, use backoff with jitter, retry budgets and a breaker",
+          correct: true,
+        }
+      - { text: "A memory leak in the client, upgrade the HTTP library", correct: false }
+      - {
+          text: "Too few retries, raise the count to 10 so requests eventually succeed after recovery",
+          correct: false,
+        }
+      - {
+          text: "The timeout is too short, raise it to 60 seconds and retry less often",
+          correct: false,
+        }
+  - type: multi
+    prompt: "Which of the following are meaningful measurements of maintainability? Select all that apply."
+    explanation: "Maintainability is about how cheaply and safely the system can change: lead time for changes, change failure rate and the number of dependency cycles all track that. Peak CPU and p99 latency are performance measures and say nothing about how hard the code is to evolve."
+    theoryUrl: https://dora.dev/guides/dora-metrics-four-keys/
+    options:
+      - { text: "Lead time for a change to reach production", correct: true }
+      - { text: "Peak CPU utilisation during the daily traffic spike", correct: false }
+      - { text: "Number of cyclic dependencies between modules", correct: true }
+      - { text: "Change failure rate of deployments", correct: true }
+  - type: single
+    prompt: "Security wants every request to pass an audit-logging step before it is answered. Product wants p99 latency under 200 ms. Which technique makes the trade-off explicit and comparable?"
+    explanation: "Quality attribute scenarios (stimulus, environment, response, response measure) ranked in a utility tree, as done in ATAM, force each concern to be stated measurably and prioritised by business value. Voting, or maximising every attribute, does not resolve conflicts between attributes."
+    theoryUrl: https://martinfowler.com/architecture/
+    options:
+      - {
+          text: "Maximise every attribute and fix conflicts when they appear in production",
+          correct: false,
+        }
+      - { text: "Let the loudest stakeholder decide, then document it", correct: false }
+      - {
+          text: "Write measurable quality attribute scenarios and rank them in a utility tree",
+          correct: true,
+        }
+      - { text: "Pick the attribute that is easiest to test and ignore the others", correct: false }
+  - type: single
+    prompt: "A load balancer health check calls /health, which queries the database. The database has a 30-second hiccup and the whole fleet is marked unhealthy, causing a full outage. What is the better design?"
+    explanation: "A deep health check that depends on a shared component makes every instance fail together, so the LB removes them all. Keep the load balancer check shallow (the process can serve) and surface dependency state through separate monitoring and graceful degradation."
+    theoryUrl: https://aws.amazon.com/builders-library/implementing-health-checks/
+    options:
+      - { text: "Increase the check frequency so recovery is detected faster", correct: false }
+      - {
+          text: "Add a second database query to the check for better coverage of every dependency's health",
+          correct: false,
+        }
+      - {
+          text: "Make the LB check shallow; handle dependency failures with degradation and alerts",
+          correct: true,
+        }
+      - { text: "Disable health checks entirely and rely on client retries", correct: false }
+  - type: single
+    prompt: "The recommendation service behind your product page is down. What should the page do to protect availability?"
+    explanation: "Graceful degradation keeps the core function (showing and buying the product) working by dropping the non-critical dependency, with a short timeout and a fallback such as cached or generic items. Failing the whole page makes a soft dependency behave like a hard one."
+    theoryUrl: https://martinfowler.com/bliki/CircuitBreaker.html
+    options:
+      - { text: "Return a 503 for the whole page until recommendations are back", correct: false }
+      - {
+          text: "Render the page with a fallback (cached or generic items) after a short timeout",
+          correct: true,
+        }
+      - {
+          text: "Retry the recommendation call for up to 30 seconds before rendering the page without it",
+          correct: false,
+        }
+      - { text: "Redirect users to a static maintenance page", correct: false }
+  - type: single
+    prompt: "Why does 'static stability' recommend pre-provisioning capacity for an AZ failure instead of relying on autoscaling to replace it?"
+    explanation: "During a large failure many customers hit the control plane at the same time, and scaling actions may be slow or fail. A statically stable design keeps working using resources already in place, without needing any control-plane call at the moment of failure."
+    theoryUrl: https://aws.amazon.com/builders-library/static-stability-using-availability-zones/
+    options:
+      - { text: "Autoscaling can never create instances in another AZ", correct: false }
+      - {
+          text: "Pre-provisioned capacity is always cheaper than autoscaled capacity because it avoids launch fees",
+          correct: false,
+        }
+      - {
+          text: "Autoscaling needs the control plane, which may be down exactly when you need it",
+          correct: true,
+        }
+      - { text: "Instances launched during an outage are billed at a higher rate", correct: false }
+  - type: single
+    prompt: "You alert when the error rate exceeds 1% for one minute, and the on-call is paged ten times a week for blips that never threaten the monthly SLO. What is the SRE-recommended improvement?"
+    explanation: "Burn-rate alerts page only when the error budget is being consumed fast enough to threaten the SLO, typically using a fast and a slow window. This reduces false positives while still catching real incidents. Raising the threshold blindly or muting alerts loses signal."
+    theoryUrl: https://sre.google/workbook/alerting-on-slos/
+    options:
+      - { text: "Alert on error budget burn rate over multiple windows", correct: true }
+      - { text: "Raise the threshold to 20% and keep the one-minute window", correct: false }
+      - { text: "Send the alerts to email instead of the pager", correct: false }
+      - { text: "Alert on CPU instead, since it moves more slowly", correct: false }
+  - type: single
+    prompt: "A background worker pool processes a queue that gets huge spikes at random times. Autoscaling on average CPU reacts too late and messages wait for minutes. Which scaling signal fits best?"
+    explanation: "For queue consumers, queue depth or the age of the oldest message (backlog per worker) leads the load, while CPU only rises after workers are already saturated. Memory and network metrics have the same lag problem."
+    theoryUrl: https://docs.aws.amazon.com/autoscaling/ec2/userguide/as-using-sqs-queue.html
+    options:
+      - { text: "Memory utilisation of the worker hosts", correct: false }
+      - { text: "Backlog per worker, from queue depth or oldest message age", correct: true }
+      - { text: "Network throughput of the load balancer", correct: false }
+      - { text: "A fixed schedule based on last month's busiest hour", correct: false }
+  - type: single
+    prompt: "A team cannot prevent every failure but wants better availability. Availability is MTBF / (MTBF + MTTR). Which investment is typically the most effective?"
+    explanation: "Reducing MTTR (fast detection, automated rollback, runbooks, tested failover) improves availability even when failures keep happening, and it is far cheaper than making failures rarer. Longer MTBF alone does not help once a failure occurs and takes hours to fix."
+    theoryUrl: https://sre.google/sre-book/introduction/
+    options:
+      - { text: "Add more features to reduce the user's reliance on one flow", correct: false }
+      - {
+          text: "Eliminate all bugs before every release with a longer QA phase and a stricter code freeze",
+          correct: false,
+        }
+      - { text: "Hire more developers to increase the commit rate", correct: false }
+      - {
+          text: "Cut detection and recovery time with automated rollback and tested failover",
+          correct: true,
+        }
+  - type: boolean
+    prompt: "A nightly database backup that has never been restored can be counted when you claim your RTO and RPO."
+    answer: false
+    explanation: "An untested backup is an assumption: it may be corrupt, incomplete or take far longer to restore than planned. RTO and RPO are only credible when measured by regular restore and failover drills."
+    theoryUrl: https://docs.aws.amazon.com/wellarchitected/latest/reliability-pillar/welcome.html

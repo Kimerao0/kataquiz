@@ -1,0 +1,333 @@
+version: 1
+title: "Architect Roadmap 28: Architectural styles and DDD"
+description: Modular monolith versus microservices, hexagonal and clean architecture, bounded contexts, aggregates, context mapping and the strangler fig migration pattern.
+language: en
+tags: [architect-roadmap, architecture, ddd, microservices, hexagonal]
+run:
+  questionsPerRun: 10
+  maxErrors: 3
+  timePerQuestionSec: 90
+questions:
+  - type: single
+    prompt: "A 6-person startup has one product, one deploy pipeline and frequent changes to the domain model. Management wants to start with microservices because 'that is how scalable companies do it'. What do you recommend?"
+    explanation: "With a small team and an unstable domain, a modular monolith gives clear module boundaries without the distributed-systems tax (network failures, versioned contracts, per-service ops). Boundaries can later be extracted along proven seams. Starting with many services before the boundaries are known tends to produce a distributed monolith."
+    theoryUrl: https://martinfowler.com/bliki/MonolithFirst.html
+    options:
+      - {
+          text: "Start with a modular monolith and enforce module boundaries so services can be extracted later",
+          correct: true,
+        }
+      - { text: "One microservice per database table to maximise independence", correct: false }
+      - {
+          text: "A single unstructured codebase, since structure slows down a small team",
+          correct: false,
+        }
+      - {
+          text: "Microservices from day one, so the team avoids a painful migration later and can scale each part independently",
+          correct: false,
+        }
+  - type: single
+    prompt: "Five microservices must always be deployed together because a change in one breaks the others' calls, and they share one database. Which description fits?"
+    explanation: "This is a distributed monolith: it has the operational cost of microservices but the coupling of a monolith, so independent deployability is lost. Shared database and lock-step releases are the classic symptoms. It is not a serverless or a hexagonal design."
+    theoryUrl: https://microservices.io/patterns/microservices.html
+    options:
+      - {
+          text: "A well-formed microservice architecture with shared infrastructure",
+          correct: false,
+        }
+      - { text: "A hexagonal architecture with several adapters", correct: false }
+      - { text: "A distributed monolith", correct: true }
+      - { text: "A strangler fig in its final stage", correct: false }
+  - type: single
+    prompt: "In a hexagonal (ports and adapters) architecture, where does the dependency between the domain and the database adapter point?"
+    explanation: "The domain defines ports (interfaces) and the adapter implements them, so source-code dependencies point inward to the domain. The domain never imports the ORM or SDK. This inversion is what allows swapping infrastructure and testing the domain in isolation."
+    theoryUrl: https://alistair.cockburn.us/hexagonal-architecture/
+    options:
+      - {
+          text: "The domain depends on the adapter's concrete class for persistence",
+          correct: false,
+        }
+      - { text: "The adapter depends on a port defined by the domain", correct: true }
+      - { text: "Both depend on a shared utilities package that exports the ORM", correct: false }
+      - { text: "There is no direction, ports are optional in hexagonal designs", correct: false }
+  - type: single
+    prompt: "In Clean Architecture, which layer may a use case (application service) depend on?"
+    explanation: "The dependency rule says source dependencies point inward: use cases may depend on entities (domain) but not on frameworks, UI or database details in outer rings. They talk to outer layers through interfaces defined inward."
+    theoryUrl: https://blog.cleancoder.com/uncle-bob/2012/08/13/the-clean-architecture.html
+    options:
+      - {
+          text: "The web framework's request and response types, so the use case can read headers and status codes directly",
+          correct: false,
+        }
+      - { text: "The database driver, to run queries directly", correct: false }
+      - { text: "The UI components that display the result", correct: false }
+      - { text: "Domain entities, plus interfaces it defines for outer layers", correct: true }
+  - type: single
+    prompt: "A Next.js route handler contains validation, pricing rules, Prisma calls and email sending in one 400-line function. The team wants to unit-test pricing without a database. Which refactoring fits hexagonal ideas best?"
+    explanation: "Extract the pricing rules as pure domain code, put persistence and email behind ports, and keep the handler as a thin adapter that wires them. Then pricing tests need no database or mail server. Mocking Prisma globally keeps the coupling in place."
+    theoryUrl: https://alistair.cockburn.us/hexagonal-architecture/
+    options:
+      - { text: "Mock the Prisma module globally in every test", correct: false }
+      - { text: "Move the entire function to a utils folder", correct: false }
+      - {
+          text: "Pure pricing logic in the domain, persistence and email behind ports, a thin adapter handler",
+          correct: true,
+        }
+      - {
+          text: "Split the handler into several handlers, one per concern, each calling Prisma directly and sharing the same test setup",
+          correct: false,
+        }
+  - type: single
+    prompt: "In domain-driven design, what is a bounded context?"
+    explanation: "A bounded context is an explicit boundary within which a model and its ubiquitous language are consistent. The same word (for example Customer) can mean different things in two contexts. It is a linguistic and model boundary first, and may or may not map to a deployable service."
+    theoryUrl: https://martinfowler.com/bliki/BoundedContext.html
+    options:
+      - { text: "A database schema owned by a single team", correct: false }
+      - {
+          text: "A boundary within which a domain model and its language are consistent",
+          correct: true,
+        }
+      - { text: "A microservice with its own CI pipeline", correct: false }
+      - {
+          text: "A package or module boundary that hides internal classes from other packages and exposes a public API",
+          correct: false,
+        }
+  - type: single
+    prompt: "Sales calls a person who buys 'Customer' and tracks credit limits. Support calls someone who opens tickets 'Customer' and tracks satisfaction. Engineers propose one shared Customer class with every field. What is the DDD recommendation?"
+    explanation: "Different contexts have different models of the same concept. Forcing one universal model creates a bloated, contested class. Keep a Customer model per bounded context and link them by identifier, translating at the boundaries."
+    theoryUrl: https://martinfowler.com/bliki/BoundedContext.html
+    options:
+      - {
+          text: "One shared Customer class owned by a platform team, so every context uses the same definition and fields",
+          correct: false,
+        }
+      - {
+          text: "A separate Customer model per context, linked by id and translated at the boundary",
+          correct: true,
+        }
+      - { text: "Rename one of them so the words never collide", correct: false }
+      - { text: "Use a generic JSON object with all fields optional", correct: false }
+  - type: single
+    prompt: "An Order aggregate contains order lines and must keep 'total never exceeds the credit limit' true. What does the aggregate root guarantee?"
+    explanation: "The aggregate root is the single entry point through which the aggregate is changed, so it enforces invariants within a transaction boundary. Outside code must not modify inner entities directly. It does not guarantee consistency across other aggregates, which is eventual."
+    theoryUrl: https://martinfowler.com/bliki/DDD_Aggregate.html
+    options:
+      - {
+          text: "It guarantees that all aggregates in the system are consistent at once, within a single distributed transaction",
+          correct: false,
+        }
+      - {
+          text: "It is the only entry point for changes, so it can enforce the aggregate's invariants",
+          correct: true,
+        }
+      - { text: "It makes order lines immutable after creation", correct: false }
+      - { text: "It caches inner entities to reduce database round trips", correct: false }
+  - type: single
+    prompt: "A design has an Order aggregate holding the full Customer aggregate, all the customer's past Orders and the Product catalogue entries. Loading an order takes 2 seconds and updates contend on locks. What is the guidance?"
+    explanation: "Aggregates should be small, consistency boundaries sized by true invariants. Reference other aggregates by id rather than embedding them, and use eventual consistency across aggregates. Large aggregates cause contention and slow loads."
+    theoryUrl: https://martinfowler.com/bliki/DDD_Aggregate.html
+    options:
+      - { text: "Keep the large aggregate and add a bigger cache", correct: false }
+      - { text: "Add optimistic locking and keep the structure", correct: false }
+      - {
+          text: "Make the aggregate even bigger so one transaction covers everything",
+          correct: false,
+        }
+      - {
+          text: "Shrink it to the real invariants and reference other aggregates by id",
+          correct: true,
+        }
+  - type: single
+    prompt: "In context mapping, your Billing context depends on a legacy ERP whose model is messy, and you do not want it leaking into your domain. Which pattern fits?"
+    explanation: "An anti-corruption layer translates between the upstream model and your own, so the legacy concepts do not corrupt your domain model. A shared kernel couples two models deliberately, and conformist means adopting the upstream model as it is."
+    theoryUrl: https://www.domainlanguage.com/ddd/
+    options:
+      - { text: "Shared kernel with the ERP team", correct: false }
+      - {
+          text: "Conformist, adopting the ERP's model in Billing so no translation code is needed",
+          correct: false,
+        }
+      - { text: "Open host service exposed by Billing", correct: false }
+      - {
+          text: "Anti-corruption layer translating ERP concepts to Billing's own model",
+          correct: true,
+        }
+  - type: single
+    prompt: "Two teams each own a context. Team A cannot get Team B to change its API, and B's model is acceptable for A's needs. Which context mapping relationship describes A adopting B's model without translation?"
+    explanation: "Conformist: the downstream team conforms to the upstream model when it has no influence and the model is good enough, avoiding the cost of translation. Partnership requires mutual coordination, and customer-supplier implies the downstream can negotiate."
+    theoryUrl: https://www.domainlanguage.com/ddd/
+    options:
+      - { text: "Partnership", correct: false }
+      - { text: "Customer-supplier", correct: false }
+      - { text: "Conformist", correct: true }
+      - { text: "Separate ways", correct: false }
+  - type: single
+    prompt: "A 12-year-old PHP monolith must move to a new platform without a big-bang rewrite, while the business keeps shipping features. Which approach do you choose?"
+    explanation: "The strangler fig pattern routes traffic through a facade and replaces functionality piece by piece with new implementations until the old system can be retired. A big-bang rewrite delays value and risks never reaching parity."
+    theoryUrl: https://martinfowler.com/bliki/StranglerFigApplication.html
+    options:
+      - { text: "Freeze features for a year and rewrite everything in parallel", correct: false }
+      - {
+          text: "Put a facade in front and migrate capabilities one by one, routing to new code as each is ready",
+          correct: true,
+        }
+      - {
+          text: "Copy the database to the new platform, then run both systems writing to it in parallel until the old one is retired",
+          correct: false,
+        }
+      - { text: "Fork the monolith per customer and rewrite each fork", correct: false }
+  - type: single
+    prompt: "During a strangler migration, the new Orders service and the monolith both write order data in their own databases. Reports show them drifting apart. What is the safest mitigation?"
+    explanation: "Choose one system of record per piece of data at a time and sync the other from it (for example with change data capture or events), and migrate ownership explicitly. Two writers on the same data without coordination guarantees drift."
+    theoryUrl: https://learn.microsoft.com/en-us/azure/architecture/patterns/strangler-fig
+    options:
+      - {
+          text: "Run a nightly job that overwrites one database with the other so both converge by morning",
+          correct: false,
+        }
+      - {
+          text: "Pick one system of record per dataset and replicate to the other via CDC or events",
+          correct: true,
+        }
+      - { text: "Allow both to write and merge conflicts manually each week", correct: false }
+      - { text: "Add database triggers on both sides that write to each other", correct: false }
+  - type: single
+    prompt: "A modular monolith has modules Orders, Billing and Inventory. A developer queries the Billing tables directly from Orders code 'for speed'. Which control best prevents that in the long run?"
+    explanation: "Enforce boundaries mechanically: each module exposes a public API and owns its tables, and tooling (lint rules, architecture tests, schema permissions) fails the build on violations. Code review conventions alone erode, and sharing one big schema invites coupling."
+    theoryUrl: https://martinfowler.com/articles/microservices.html
+    options:
+      - { text: "A wiki page explaining the rules", correct: false }
+      - {
+          text: "Architecture tests or lint rules failing on cross-module imports, plus per-module table ownership",
+          correct: true,
+        }
+      - {
+          text: "Moving all tables to a single shared schema with a naming convention per module and a code review checklist",
+          correct: false,
+        }
+      - { text: "Merging Orders and Billing into one module", correct: false }
+  - type: multi
+    prompt: "Which are legitimate reasons to extract a module of a monolith into a separate service? Select all that apply."
+    explanation: "Good reasons are distinct scaling or resource profiles, independent release cadence owned by a separate team, and isolation of a component with different reliability or security requirements. 'It is trendy' or 'the file is long' are not reasons."
+    theoryUrl: https://martinfowler.com/articles/microservices.html
+    options:
+      - { text: "It needs a very different scaling profile from the rest", correct: true }
+      - { text: "A separate team owns it and needs an independent release cadence", correct: true }
+      - { text: "It has stricter isolation or compliance requirements", correct: true }
+      - { text: "The module's source files have grown beyond 5,000 lines", correct: false }
+  - type: single
+    prompt: "Using the Orders service's database from the Shipping service directly through SQL views 'because it is faster than an API' leads to which main problem?"
+    explanation: "A shared database couples services at the schema level, so one team cannot change tables without breaking the other, and independent deployability is lost. The database becomes an integration API without versioning or contracts."
+    theoryUrl: https://microservices.io/patterns/data/database-per-service.html
+    options:
+      - { text: "SQL views cannot be indexed in any database", correct: false }
+      - { text: "It makes the system impossible to monitor", correct: false }
+      - {
+          text: "Schema-level coupling, so Orders cannot evolve its tables independently",
+          correct: true,
+        }
+      - { text: "Services using the same database can no longer run in containers", correct: false }
+  - type: single
+    prompt: "You split a checkout monolith into services. A page now needs data from 6 services, each called synchronously in sequence, and p99 latency tripled. Which change is the most appropriate first step?"
+    explanation: "Reduce chatty synchronous chains: aggregate via a BFF/API composition layer that calls services in parallel, or revisit the boundaries if a page always needs all six. Slicing into more services or adding retries does not reduce the dependency chain."
+    theoryUrl: https://microservices.io/patterns/data/api-composition.html
+    options:
+      - { text: "Add retries to every call", correct: false }
+      - {
+          text: "Split each of the six services further so each handles less data and responds faster, then call them in sequence",
+          correct: false,
+        }
+      - {
+          text: "Compose the data in a layer calling services in parallel, and revisit the boundaries if the calls are always needed together",
+          correct: true,
+        }
+      - {
+          text: "Increase the timeout for each service call to 30 seconds, so slow dependencies no longer fail the page and retries are rarely needed",
+          correct: false,
+        }
+  - type: single
+    prompt: "A domain expert says 'a Policy is bound when the underwriter approves the quote', but the code calls this `finalizeRecord()`. What does DDD say?"
+    explanation: "The ubiquitous language should be shared by experts and developers and appear in the code, so rename to something like `bindPolicy()`. Translating between business and code terms hides misunderstandings."
+    theoryUrl: https://martinfowler.com/bliki/UbiquitousLanguage.html
+    options:
+      - { text: "Keep the technical name, because code should be domain-agnostic", correct: false }
+      - { text: "Write a glossary mapping the code terms to business terms", correct: false }
+      - {
+          text: "Rename it to match the business language, for example `bindPolicy()`",
+          correct: true,
+        }
+      - { text: "Ask the domain expert to adopt the code's names", correct: false }
+  - type: single
+    prompt: "In which situation is a full DDD tactical approach (aggregates, domain events, repositories) a poor fit?"
+    explanation: "DDD pays off in complex core domains with rich rules. For simple CRUD or generic subdomains (such as an admin panel for static data), it adds ceremony without value, and bought or simple solutions are better."
+    theoryUrl: https://martinfowler.com/bliki/BoundedContext.html
+    options:
+      - { text: "A pricing engine with hundreds of evolving business rules", correct: false }
+      - { text: "A simple admin screen that edits a list of countries", correct: true }
+      - { text: "A claims-processing workflow with many policy exceptions", correct: false }
+      - { text: "A trading system with complex settlement rules", correct: false }
+  - type: single
+    prompt: "A team puts 'Domain', 'Application', 'Infrastructure' folders in a CRUD app, but every Domain class is an anemic data bag and all rules live in service classes. What is the best description?"
+    explanation: "This is the anemic domain model anti-pattern: the layers are there, but behaviour sits outside the entities, so the domain does not protect its own invariants. Moving rules into entities and aggregates (or admitting the app is CRUD and simplifying) fixes the mismatch."
+    theoryUrl: https://martinfowler.com/bliki/AnemicDomainModel.html
+    options:
+      - { text: "A correct implementation of the dependency rule", correct: false }
+      - { text: "An anemic domain model, with rules outside the domain objects", correct: true }
+      - { text: "A properly applied bounded context", correct: false }
+      - { text: "A strangler facade", correct: false }
+  - type: single
+    prompt: "Your Notifications context needs to know when an order is paid in the Payments context, without Payments knowing about Notifications. Which integration fits?"
+    explanation: "Payments publishes a domain event (OrderPaid) as part of its published language and Notifications subscribes and reacts. This keeps the dependency pointing from consumer to event contract, and Payments stays unaware of consumers. A direct call from Payments to Notifications inverts the dependency."
+    theoryUrl: https://martinfowler.com/eaaDev/DomainEvent.html
+    options:
+      - { text: "Payments calls the Notifications REST API after each payment", correct: false }
+      - { text: "Both contexts share a table with a 'notified' flag", correct: false }
+      - { text: "Notifications polls Payments' private tables every minute", correct: false }
+      - {
+          text: "Payments publishes an OrderPaid event that Notifications subscribes to",
+          correct: true,
+        }
+  - type: boolean
+    prompt: "True or false: each bounded context must be deployed as its own microservice."
+    explanation: "False. A bounded context is a model boundary. Several contexts can live in one deployable modular monolith, and one context can contain several services. Deployment is a separate decision."
+    theoryUrl: https://martinfowler.com/bliki/BoundedContext.html
+    answer: false
+  - type: single
+    prompt: "A platform has 200 engineers in 25 teams and releases are blocked because everyone merges into one repository and one pipeline. What change aligns architecture with the organisation?"
+    explanation: "Conway's law says systems mirror the communication structure of the organisation. Aligning services or modules and ownership with stream-aligned teams, each able to deploy independently, reduces coordination costs. Adding a release manager just reinforces the bottleneck."
+    theoryUrl: https://martinfowler.com/bliki/ConwaysLaw.html
+    options:
+      - {
+          text: "Hire a release manager to schedule merges and run a weekly release train across all 25 teams",
+          correct: false,
+        }
+      - {
+          text: "Align modules or services with team ownership, with independent pipelines (Conway's law)",
+          correct: true,
+        }
+      - { text: "Make everyone use the same IDE settings", correct: false }
+      - { text: "Move all code into a single package", correct: false }
+  - type: single
+    prompt: "While strangling a monolith, you routed 100% of /invoices traffic to the new service. Last week bugs appeared, and you want a safe way to move the next route. Which technique reduces risk the most?"
+    explanation: "Gradual rollout at the facade (percentage or cohort-based routing, optionally shadow traffic compared against the old implementation) lets you detect differences and roll back quickly. Cutting over all at once on a weekend concentrates the risk."
+    theoryUrl: https://learn.microsoft.com/en-us/azure/architecture/patterns/strangler-fig
+    options:
+      - {
+          text: "Cut over all traffic on a quiet weekend and fix issues as they come in, since users are fewer",
+          correct: false,
+        }
+      - {
+          text: "Route a small percentage or cohort first, compare with the old path, then ramp up",
+          correct: true,
+        }
+      - { text: "Delete the old code first so no one can use it", correct: false }
+      - { text: "Run the new service only in staging and promote after a month", correct: false }
+  - type: single
+    prompt: "A service layer function `createOrder(req: Request)` reads headers and returns `NextResponse`. Why does this violate clean architecture's dependency rule?"
+    explanation: "The use case depends on framework types from an outer ring (HTTP request and response), so it cannot be reused or tested without that framework. Use cases should take plain input DTOs and return plain results, with the controller mapping HTTP to them."
+    theoryUrl: https://blog.cleancoder.com/uncle-bob/2012/08/13/the-clean-architecture.html
+    options:
+      - { text: "Functions are not allowed in the application layer", correct: false }
+      - { text: "Because it returns a value instead of a void", correct: false }
+      - { text: "The use case depends on framework types from an outer layer", correct: true }
+      - { text: "Because it creates an entity, and only repositories may do that", correct: false }

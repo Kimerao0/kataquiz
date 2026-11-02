@@ -1,0 +1,322 @@
+version: 1
+title: "Architect Roadmap 27: Messaging platforms"
+description: Kafka partitions, consumer groups, offsets and retention compared with RabbitMQ and cloud queues (SQS, Pub/Sub), and stream processing versus message queues.
+language: en
+tags: [architect-roadmap, event-driven, kafka, rabbitmq, sqs]
+run:
+  questionsPerRun: 10
+  maxErrors: 3
+  timePerQuestionSec: 60
+questions:
+  - type: single
+    prompt: "In Kafka, what is the unit of parallelism for a consumer group reading a topic?"
+    explanation: "Each partition is assigned to at most one consumer within a group, so the number of partitions caps the useful parallelism. More consumers than partitions leaves the extra ones idle. Topics are split into partitions, not into groups, and brokers are not the unit of consumption."
+    theoryUrl: https://kafka.apache.org/documentation/#intro_concepts_and_terms
+    options:
+      - {
+          text: "The topic, because each topic is read by exactly one consumer in the group at a time",
+          correct: false,
+        }
+      - { text: "The broker, because each broker serves one consumer", correct: false }
+      - {
+          text: "The partition, which is assigned to at most one consumer in the group",
+          correct: true,
+        }
+      - { text: "The message, because consumers lock messages one by one", correct: false }
+  - type: single
+    prompt: "A topic has 3 partitions and a consumer group runs 5 instances. What happens?"
+    explanation: "Partitions are split among consumers with each partition owned by one consumer, so 3 consumers get one partition and 2 sit idle (ready as standbys if a member fails). Kafka does not split a partition among several consumers of the same group."
+    theoryUrl: https://kafka.apache.org/documentation/#intro_consumers
+    options:
+      - {
+          text: "All 5 consumers receive messages, with partitions split into sub-partitions",
+          correct: false,
+        }
+      - { text: "Three consumers each own one partition, two are idle", correct: true }
+      - { text: "Kafka rejects the fifth consumer and the group fails to start", correct: false }
+      - { text: "Every consumer receives every message of every partition", correct: false }
+  - type: single
+    prompt: "What does this print for a range-style assignment of 6 partitions to 4 consumers?"
+    code: |
+      function assign(parts, consumers) {
+        const base = Math.floor(parts / consumers);
+        const extra = parts % consumers;
+        const out = [];
+        let p = 0;
+        for (let c = 0; c < consumers; c++) {
+          const n = base + (c < extra ? 1 : 0);
+          out.push(Array.from({ length: n }, () => p++));
+        }
+        return out;
+      }
+      console.log(JSON.stringify(assign(6, 4)));
+    codeLanguage: javascript
+    explanation: "base is 1 and extra is 2, so the first two consumers get two partitions and the remaining two get one: [[0,1],[2,3],[4],[5]]. This shows why partition counts that are not multiples of the consumer count produce uneven load."
+    theoryUrl: https://kafka.apache.org/documentation/#intro_consumers
+    options:
+      - { text: "[[0,1],[2,3],[4],[5]]", correct: true }
+      - { text: "[[0],[1],[2],[3,4,5]]", correct: false }
+      - { text: "[[0,1],[2],[3],[4,5]]", correct: false }
+      - { text: "[[0,1,2],[3],[4],[5]]", correct: false }
+  - type: single
+    prompt: "What is a Kafka consumer's committed offset?"
+    explanation: "The committed offset is the position, per partition and group, from which the consumer resumes after a restart or rebalance. It does not delete data from the log and it is not a message id or a lock. When it is committed relative to processing determines at-most-once versus at-least-once behaviour."
+    theoryUrl: https://kafka.apache.org/documentation/#intro_consumers
+    options:
+      - { text: "The per-partition position from which the group resumes reading", correct: true }
+      - { text: "A flag on the message that deletes it from the log once consumed", correct: false }
+      - { text: "A unique id assigned by the producer to each message", correct: false }
+      - { text: "A lock that prevents other groups from reading the partition", correct: false }
+  - type: single
+    prompt: "A consumer commits offsets automatically every 5 seconds, and processing of a message takes 20 seconds. The process crashes mid-processing. What is the most likely consequence after the restart?"
+    explanation: "With auto-commit, offsets can be committed for messages whose processing has not finished (loss) or processing can finish without a commit (duplicate). Here the timing is not aligned with the work, so you may lose or repeat messages. Manual commits after successful processing are the usual way to get at-least-once."
+    theoryUrl: https://kafka.apache.org/documentation/#consumerconfigs_enable.auto.commit
+    options:
+      - {
+          text: "Nothing, because Kafka retries the message by itself using the log until the consumer finishes",
+          correct: false,
+        }
+      - {
+          text: "Messages may be lost or reprocessed, because commits are not tied to completed work",
+          correct: true,
+        }
+      - { text: "The broker blocks the group until the consumer replies", correct: false }
+      - { text: "Only duplicates are possible, never loss", correct: false }
+  - type: boolean
+    prompt: "True or false: in Kafka, a message is deleted from a topic once every consumer group has consumed it."
+    explanation: "False. Kafka retains messages according to the retention policy (time or size) or log compaction, independently of consumption. This is why new consumer groups can read history and consumers can replay by resetting offsets."
+    theoryUrl: https://kafka.apache.org/documentation/#design_filesystem
+    answer: false
+  - type: single
+    prompt: "Which Kafka feature lets a topic keep only the latest value for each key, for example a changelog of current user profiles?"
+    explanation: "Log compaction retains at least the last record for each key and removes older ones (a null value acts as a tombstone). Time-based retention would drop even the latest value after the window, and replication factor is about durability."
+    theoryUrl: https://kafka.apache.org/documentation/#compaction
+    options:
+      - { text: "Time-based retention with a very short window", correct: false }
+      - { text: "Increasing the replication factor", correct: false }
+      - { text: "Log compaction", correct: true }
+      - { text: "Consumer group rebalancing", correct: false }
+  - type: single
+    prompt: "What does this print for a compacted log, where a null value is a tombstone?"
+    code: |
+      const log = [
+        ['k1', 'a'], ['k2', 'b'], ['k1', 'c'],
+        ['k2', null], ['k3', 'd'],
+      ];
+      const latest = new Map();
+      for (const [k, v] of log) latest.set(k, v);
+      console.log(JSON.stringify([...latest].filter(([, v]) => v !== null)));
+    codeLanguage: javascript
+    explanation: 'Compaction keeps the latest value for each key: k1 becomes ''c'', k2 ends with a tombstone (deleted), k3 stays ''d''. The result is [["k1","c"],["k3","d"]], which is the current-state view of the topic.'
+    theoryUrl: https://kafka.apache.org/documentation/#compaction
+    options:
+      - { text: '[["k1","a"],["k2","b"],["k3","d"]]', correct: false }
+      - { text: '[["k1","c"],["k2",null],["k3","d"]]', correct: false }
+      - { text: '[["k1","c"],["k3","d"]]', correct: true }
+      - { text: '[["k3","d"]]', correct: false }
+  - type: single
+    prompt: "A consumer group reads a 3-partition topic. Latest offsets are 120, 80 and 100, committed offsets are 100, 80 and 90. What is the total consumer lag?"
+    explanation: "Lag per partition is the log end offset minus the committed offset: 20 + 0 + 10 = 30. Lag is the key health metric for consumers: growing lag means they cannot keep up."
+    theoryUrl: https://kafka.apache.org/documentation/#monitoring
+    options:
+      - { text: "300", correct: false }
+      - { text: "30", correct: true }
+      - { text: "20", correct: false }
+      - {
+          text: "0, since a partition at its end has no lag and others are ignored",
+          correct: false,
+        }
+  - type: single
+    prompt: "Which routing model describes RabbitMQ most accurately?"
+    explanation: "Producers publish to an exchange, which routes messages to queues via bindings (direct, topic, fanout, headers) and consumers read from queues. Kafka is the one with partitioned append-only logs. Publishers do not write directly to queues in the AMQP 0-9-1 model."
+    theoryUrl: https://www.rabbitmq.com/tutorials/amqp-concepts
+    options:
+      - {
+          text: "Producers append to partitioned logs, consumers track their offsets",
+          correct: false,
+        }
+      - {
+          text: "Producers publish to topics and consumers poll a shared database table",
+          correct: false,
+        }
+      - {
+          text: "Producers publish to an exchange that routes messages to queues through bindings",
+          correct: true,
+        }
+      - {
+          text: "Producers send directly to consumers through peer-to-peer sockets",
+          correct: false,
+        }
+  - type: single
+    prompt: "You need complex routing (by header and wildcard patterns), per-message TTLs and priorities, with modest throughput and no need for replay. Which platform fits best?"
+    explanation: "RabbitMQ's exchanges, bindings, per-message TTL and priority queues are designed for flexible routing and task distribution. Kafka is optimised for high-throughput retained logs and replay, and does not offer per-message routing or priorities."
+    theoryUrl: https://www.rabbitmq.com/tutorials/amqp-concepts
+    options:
+      - { text: "RabbitMQ", correct: true }
+      - { text: "Kafka, with one topic per routing pattern", correct: false }
+      - { text: "A relational table polled every second", correct: false }
+      - { text: "Kafka, with a consumer group per message priority", correct: false }
+  - type: single
+    prompt: "You need to retain events for 30 days so that new services can replay the history and a bug fix can reprocess last week's data. Which fits best?"
+    explanation: "A retained log such as Kafka keeps messages after they are read, and consumers choose their own offset, so replay is natural. Classic queues like RabbitMQ and SQS remove messages once acknowledged (SQS retention is at most 14 days), so they do not support replay by design."
+    theoryUrl: https://kafka.apache.org/documentation/#intro_concepts_and_terms
+    options:
+      - { text: "An SQS Standard queue with long retention", correct: false }
+      - { text: "A RabbitMQ classic queue with publisher confirms", correct: false }
+      - { text: "A Kafka topic with 30-day retention", correct: true }
+      - { text: "SNS topic with delivery retries", correct: false }
+  - type: single
+    prompt: "In SQS, a consumer receives a message and takes longer than the visibility timeout to process it. What happens?"
+    explanation: "While a message is in flight it is hidden for the visibility timeout. If the consumer does not delete it in time, it becomes visible again and another consumer can receive it, so processing can happen twice. Raising the timeout or extending it while working avoids this, and consumers still need idempotency."
+    theoryUrl: https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-visibility-timeout.html
+    options:
+      - { text: "The message is deleted automatically after the timeout", correct: false }
+      - { text: "The message is moved to the DLQ after the first timeout", correct: false }
+      - {
+          text: "SQS holds the message until the consumer finishes, however long it takes",
+          correct: false,
+        }
+      - {
+          text: "The message becomes visible again and may be processed by another consumer",
+          correct: true,
+        }
+  - type: single
+    prompt: "How does Google Cloud Pub/Sub differ from SQS in how several services get the same event?"
+    explanation: "Pub/Sub topics fan out to multiple subscriptions, each receiving its own copy of every message, while SQS is a point-to-point queue where consumers compete for messages. With SQS you get fan-out by pairing it with SNS."
+    theoryUrl: https://cloud.google.com/pubsub/docs/overview
+    options:
+      - { text: "Pub/Sub delivers each message to one subscriber only, like SQS", correct: false }
+      - {
+          text: "A topic delivers a copy to every subscription, while an SQS queue's consumers compete",
+          correct: true,
+        }
+      - { text: "SQS has topics and subscriptions, Pub/Sub only has queues", correct: false }
+      - {
+          text: "Pub/Sub requires consumers to manage partition offsets manually, while SQS tracks them for you",
+          correct: false,
+        }
+  - type: single
+    prompt: "What is the main conceptual difference between a message queue and an event stream?"
+    explanation: "A queue distributes work items and removes them on acknowledgement, with consumers competing. A stream is a retained, ordered log that many independent consumers can read at their own pace and replay. Both can be durable and both can be distributed, so those are not the differences."
+    theoryUrl: https://aws.amazon.com/compare/the-difference-between-rabbitmq-and-kafka/
+    options:
+      - {
+          text: "Streams are durable on disk while queues are always in memory, so queues lose every message when a broker restarts",
+          correct: false,
+        }
+      - { text: "Queues cannot be distributed across multiple machines", correct: false }
+      - {
+          text: "A queue removes messages once handled, a stream keeps an ordered log many consumers can read",
+          correct: true,
+        }
+      - { text: "Streams require JSON payloads, queues accept any format", correct: false }
+  - type: single
+    prompt: "You are computing a rolling 5-minute count of failed logins per user from a live event feed and need results continuously. Which approach is the best fit?"
+    explanation: "Stream processing (Kafka Streams, Flink) applies windowed aggregations continuously, with state and event-time handling. A nightly batch is too slow for the need, and a work queue can distribute tasks but does not give windowing or stateful aggregation."
+    theoryUrl: https://kafka.apache.org/documentation/streams/
+    options:
+      - { text: "A nightly batch job that reads all events and writes the counts", correct: false }
+      - {
+          text: "A stream processor with a 5-minute windowed aggregation keyed by user",
+          correct: true,
+        }
+      - {
+          text: "A work queue where each worker handles one login event and discards it",
+          correct: false,
+        }
+      - { text: "A cron job running every 5 minutes with a full table scan", correct: false }
+  - type: multi
+    prompt: "Which events typically trigger a Kafka consumer group rebalance? Select all that apply."
+    explanation: "Membership changes (a consumer joins, leaves or is considered dead after missing heartbeats or exceeding max.poll.interval.ms) and changes in the topic's partition count cause a rebalance. Producing more messages to a partition does not."
+    theoryUrl: https://kafka.apache.org/documentation/#consumerconfigs_max.poll.interval.ms
+    options:
+      - { text: "A new consumer instance joins the group", correct: true }
+      - { text: "A consumer exceeds max.poll.interval.ms between polls", correct: true }
+      - { text: "Partitions are added to a subscribed topic", correct: true }
+      - { text: "Producers increase their message rate", correct: false }
+  - type: single
+    prompt: "A producer sends payment events with acks=1 and the leader broker fails right after acknowledging, before followers have copied the data. What is the risk?"
+    explanation: "With acks=1 the leader acks after writing locally, so if it dies before replication, a new leader may lack those records and they are lost. acks=all with min.insync.replicas of 2 or more waits for in-sync followers and prevents this, at a latency cost."
+    theoryUrl: https://kafka.apache.org/documentation/#producerconfigs_acks
+    options:
+      - {
+          text: "The acknowledged messages may be lost because followers had not copied them",
+          correct: true,
+        }
+      - { text: "The messages are duplicated on every follower", correct: false }
+      - { text: "Consumers receive the messages out of order", correct: false }
+      - {
+          text: "No risk, because the leader's disk is always replayed on failover",
+          correct: false,
+        }
+  - type: single
+    prompt: "Which design is most appropriate for a task queue where 20 workers should pick up jobs with at most one worker per job, and slow jobs must not block faster ones?"
+    explanation: "A competing-consumers queue (SQS, RabbitMQ) lets any free worker take the next job, so slow jobs don't hold up others. In Kafka, a slow message blocks the rest of its partition because consumption is sequential per partition, and a topic limited to few partitions caps the worker count."
+    theoryUrl: https://www.enterpriseintegrationpatterns.com/patterns/messaging/CompetingConsumers.html
+    options:
+      - { text: "A competing-consumers queue such as SQS or RabbitMQ", correct: true }
+      - { text: "A Kafka topic with 3 partitions and 20 consumers", correct: false }
+      - { text: "A Kafka topic with a single partition for strict ordering", correct: false }
+      - { text: "A compacted Kafka topic keyed by job id", correct: false }
+  - type: single
+    prompt: "You increase a keyed Kafka topic from 6 to 12 partitions in production. What is a significant side effect for consumers relying on per-key order?"
+    explanation: "The partition is computed from hash(key) mod partitionCount, so changing the count remaps keys to different partitions. New events for a key may go to another partition than its old events, breaking per-key ordering during the transition. Plan partition counts upfront or migrate to a new topic."
+    theoryUrl: https://kafka.apache.org/documentation/#basic_ops_modify_topic
+    options:
+      - {
+          text: "Existing messages are rebalanced evenly across the new partitions, so per-key ordering is preserved automatically",
+          correct: false,
+        }
+      - {
+          text: "Keys may map to different partitions than before, breaking per-key ordering across the change",
+          correct: true,
+        }
+      - { text: "Consumers must restart from offset 0 on every partition", correct: false }
+      - { text: "Nothing, since partitions are chosen by consumers", correct: false }
+  - type: single
+    prompt: "An analytics team wants to add a new consumer for an existing Kafka topic without affecting the order service that already reads it. What do they do?"
+    explanation: "They use a new consumer group id. Each group tracks its own offsets, so groups read independently and do not steal messages from each other. Reusing the group id would split partitions with the existing consumers."
+    theoryUrl: https://kafka.apache.org/documentation/#intro_consumers
+    options:
+      - { text: "Reuse the order service's group id so offsets are shared", correct: false }
+      - { text: "Create a copy of the topic and publish each event twice", correct: false }
+      - { text: "Pause the order service while analytics catches up", correct: false }
+      - { text: "Start consumers with a new group id", correct: true }
+  - type: single
+    prompt: "A team uses RabbitMQ and notices queue memory growing without bound after the consumers slow down. Which mechanism limits how many unacknowledged messages a consumer receives?"
+    explanation: "The consumer prefetch count (basic.qos) caps unacknowledged messages per consumer, giving backpressure and fair dispatch. Publisher confirms control producer-side acknowledgement, and exchanges only route messages."
+    theoryUrl: https://www.rabbitmq.com/docs/consumer-prefetch
+    options:
+      - { text: "Publisher confirms", correct: false }
+      - { text: "Topic exchange bindings", correct: false }
+      - { text: "Consumer prefetch count", correct: true }
+      - { text: "Message TTL on the exchange", correct: false }
+  - type: single
+    prompt: "Which of these is an accurate trade-off when comparing Kafka and SQS for an event backbone of a growing platform?"
+    explanation: "SQS is fully managed with little to operate and per-message pricing, but it has no replay and consumers compete. Kafka offers replay, ordering per partition and high throughput, at the cost of operating or paying for a cluster and managing partitions. Neither is strictly better."
+    theoryUrl: https://aws.amazon.com/compare/the-difference-between-rabbitmq-and-kafka/
+    options:
+      - { text: "SQS supports replay of consumed messages, Kafka does not", correct: false }
+      - { text: "Kafka needs no capacity planning, SQS needs partitions to scale", correct: false }
+      - {
+          text: "Kafka offers replay and per-partition ordering but needs more operational effort than SQS",
+          correct: true,
+        }
+      - { text: "Both deliver exactly-once to any consumer without idempotency", correct: false }
+  - type: boolean
+    prompt: "True or false: in Kafka, ordering is guaranteed across all partitions of a topic."
+    explanation: "False. Kafka guarantees order only within a partition. If you need ordering for related events, route them to the same partition via a key."
+    theoryUrl: https://kafka.apache.org/documentation/#intro_concepts_and_terms
+    answer: false
+  - type: single
+    prompt: "A consumer processes messages and writes results to another Kafka topic. The team wants consumed offsets and produced records to be committed atomically. What provides this?"
+    explanation: "Kafka transactions let a producer write to output topics and commit consumer offsets in one atomic unit, with consumers reading with isolation.level=read_committed. This is the basis of exactly-once in Kafka Streams. Auto-commit and idempotent producers alone do not span both."
+    theoryUrl: https://kafka.apache.org/documentation/#semantics
+    options:
+      - { text: "Enabling enable.auto.commit", correct: false }
+      - { text: "Setting acks=0 on the producer", correct: false }
+      - {
+          text: "Transactions covering the produced records and the consumer offsets",
+          correct: true,
+        }
+      - { text: "Increasing the number of partitions on the output topic", correct: false }

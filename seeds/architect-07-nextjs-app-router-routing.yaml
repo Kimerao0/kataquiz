@@ -1,0 +1,446 @@
+version: 1
+title: "Architect Roadmap 07: App Router and routing"
+description: The app/ folder structure, layouts and templates, pages, dynamic routes, loading and error files, route groups, parallel routes and intercepting routes.
+language: en
+tags: [architect-roadmap, nextjs, app-router, routing, layouts, parallel-routes]
+run:
+  questionsPerRun: 10
+  maxErrors: 3
+  timePerQuestionSec: 60
+questions:
+  - type: single
+    prompt: "In the App Router, what makes a folder inside `app/` reachable as a URL?"
+    explanation: "A route segment becomes public only when it contains a `page` or `route` file. Other files such as components, styles or tests can be colocated in the folder and are never served, and only the content returned by `page`/`route` is sent to the client. A `layout` alone does not create a URL."
+    theoryUrl: https://nextjs.org/docs/app/getting-started/project-structure
+    options:
+      - { text: "Any folder in app/ is public as soon as it contains a file", correct: false }
+      - { text: "It contains a layout file that exports a default component", correct: false }
+      - { text: "It is listed in a routes manifest in next.config.ts", correct: false }
+      - { text: "It contains a page or a route file, and nothing else is needed", correct: true }
+  - type: multi
+    prompt: "Given the tree below, which URLs are served? Select all that apply."
+    code: |
+      app/
+        layout.tsx
+        (marketing)/
+          about/page.tsx
+        (shop)/
+          cart/page.tsx
+        _components/
+          Button.tsx
+    codeLanguage: bash
+    explanation: "Parenthesised folders are route groups and are omitted from the URL, so `/about` and `/cart` exist. `/marketing/about` does not, because the group name never appears in the path. `_components` is a private folder with no `page` file, so `/_components/Button` is not routable."
+    theoryUrl: https://nextjs.org/docs/app/api-reference/file-conventions/route-groups
+    options:
+      - { text: "/about", correct: true }
+      - { text: "/marketing/about", correct: false }
+      - { text: "/cart", correct: true }
+      - { text: "/_components/Button", correct: false }
+  - type: single
+    prompt: "A user moves from `/dashboard/overview` to `/dashboard/settings`, both under the same `app/dashboard/layout.tsx`. What happens to that layout?"
+    explanation: "Layouts are preserved on navigation: they stay mounted, keep their state, remain interactive and do not re-render, because only the changed page segment is rendered (partial rendering). Remounting on every navigation is what `template.js` does, and a layout is not re-fetched from the server just because a sibling page changed."
+    theoryUrl: https://nextjs.org/docs/app/getting-started/layouts-and-pages
+    options:
+      - {
+          text: "It unmounts and mounts again, resetting its Client Component state",
+          correct: false,
+        }
+      - { text: "It re-renders on the server but keeps the DOM nodes intact", correct: false }
+      - { text: "It is rebuilt only if the pages use different data fetching", correct: false }
+      - {
+          text: "It stays mounted and does not re-render, only the page segment changes",
+          correct: true,
+        }
+  - type: single
+    prompt: "A shared `layout.tsx` must highlight the active nav link, but the layout cannot read the current pathname. What is the correct approach?"
+    explanation: "Layouts do not re-render on navigation, so they cannot receive a pathname or search params that would immediately go stale. Extract the nav links into a small Client Component that calls `usePathname()` and render it inside the layout, which stays a Server Component. Making the whole layout a Client Component works but bundles far more JavaScript than needed."
+    theoryUrl: https://nextjs.org/docs/app/api-reference/file-conventions/layout
+    options:
+      - { text: "Move the links into a Client Component that calls `usePathname()`", correct: true }
+      - { text: "Read the `pathname` prop that Next.js passes to every layout", correct: false }
+      - {
+          text: "Convert the entire layout to a Client Component and drop the server data",
+          correct: false,
+        }
+      - {
+          text: "Add a template.js and compare the URL string inside it on the server",
+          correct: false,
+        }
+  - type: single
+    prompt: "A form inside a page keeps its typed text when navigating between sibling pages, but the product wants it cleared on every navigation. Which file convention gives that behaviour?"
+    explanation: "A `template.js` wraps its children like a layout but gets a new key on each navigation, so child Client Components are remounted and their state is reset (and effects re-run). A layout preserves state, `loading.js` is only a Suspense fallback and `error.js` is an error boundary, so none of them remount children on navigation."
+    theoryUrl: https://nextjs.org/docs/app/api-reference/file-conventions/template
+    options:
+      - { text: "layout.js, because layouts are recreated on every route change", correct: false }
+      - { text: "template.js, which remounts its children on every navigation", correct: true }
+      - { text: "loading.js, because its Suspense boundary resets inner state", correct: false }
+      - { text: "error.js, because its boundary remounts the subtree on render", correct: false }
+  - type: single
+    prompt: "With the route `app/shop/[...slug]/page.tsx`, what is the value of `params` (after awaiting it) for the URL `/shop/clothes/tops/shirts`?"
+    code: |
+      export default async function Page({
+        params,
+      }: {
+        params: Promise<{ slug: string[] }>
+      }) {
+        const { slug } = await params
+        return <pre>{JSON.stringify(slug)}</pre>
+      }
+    codeLanguage: tsx
+    explanation: "A catch-all segment captures every remaining segment as an array of strings, so the value is `['clothes','tops','shirts']`. A plain `[slug]` would capture a single string, and the URL would not match at all. Note that `params` is a Promise and must be awaited."
+    theoryUrl: https://nextjs.org/docs/app/api-reference/file-conventions/dynamic-routes
+    options:
+      - { text: '["clothes", "tops", "shirts"]', correct: true }
+      - { text: 'The string "clothes/tops/shirts"', correct: false }
+      - { text: '["clothes"] and the rest is ignored by the router', correct: false }
+      - { text: "undefined, because the segment name is not a plain `[slug]`", correct: false }
+  - type: single
+    prompt: "Which folder name matches `/docs` as well as `/docs/a` and `/docs/a/b`?"
+    explanation: "An optional catch-all segment, `[[...slug]]`, also matches the route without the parameter, where `slug` is `undefined`. A regular catch-all `[...slug]` requires at least one segment, so `/docs` would 404. `[slug]` matches exactly one segment."
+    theoryUrl: https://nextjs.org/docs/app/api-reference/file-conventions/dynamic-routes
+    options:
+      - { text: "app/docs/[...slug]/page.tsx", correct: false }
+      - { text: "app/docs/[[...slug]]/page.tsx", correct: true }
+      - { text: "app/docs/[slug]/page.tsx", correct: false }
+      - { text: "app/docs/[[slug]]/page.tsx", correct: false }
+  - type: single
+    prompt: "A page that needs its route params is marked `'use client'`. In Next 16 `params` is a Promise. How do you read it inside that Client Component page?"
+    code: |
+      'use client'
+      import { use } from 'react'
+
+      export default function Page({
+        params,
+      }: {
+        params: Promise<{ id: string }>
+      }) {
+        const { id } = use(params)
+        return <h1>{id}</h1>
+      }
+    codeLanguage: tsx
+    explanation: "Client Components cannot be `async`, so you unwrap the Promise with React's `use` (or call the `useParams` hook anywhere in the client tree). Using `await` in a Client Component is not supported, and reading `params.id` directly on the Promise gives `undefined`."
+    theoryUrl: https://nextjs.org/docs/app/api-reference/file-conventions/dynamic-routes
+    options:
+      - { text: "Make the Client Component async and await the params prop", correct: false }
+      - {
+          text: "Read params.id synchronously, the router resolves it before render",
+          correct: false,
+        }
+      - { text: "Import `params` from next/navigation as a module-level constant", correct: false }
+      - { text: "Unwrap it with React `use(params)`, or use the `useParams` hook", correct: true }
+  - type: single
+    prompt: "What does adding `app/blog/loading.tsx` do under the hood?"
+    explanation: "Next.js wraps the segment's `page` (and everything below it) in a React `<Suspense>` boundary using `loading.tsx` as the fallback, and nests that boundary inside the segment's layout. The layout therefore renders immediately while the page streams in. It is not a global spinner and it does not delay the layout."
+    theoryUrl: https://nextjs.org/docs/app/api-reference/file-conventions/loading
+    options:
+      - {
+          text: "It wraps layout and page in a Suspense boundary with that fallback",
+          correct: false,
+        }
+      - {
+          text: "It shows a spinner while the browser downloads the JavaScript bundle",
+          correct: false,
+        }
+      - {
+          text: "It wraps the page in a Suspense boundary, nested inside the layout",
+          correct: true,
+        }
+      - {
+          text: "It is a client-side only overlay and never appears in streamed HTML",
+          correct: false,
+        }
+  - type: single
+    prompt: "`app/dashboard/layout.tsx` calls `await cookies()` at the top level to render a user menu, and `app/dashboard/loading.tsx` exists. Users report a frozen screen when navigating to the dashboard. Why does `loading.tsx` not help?"
+    explanation: "`loading.tsx` sits below the layout in the component hierarchy, so it only covers the page and its children, not uncached or runtime data the layout itself awaits. The layout blocks navigation until it finishes. The fix is to wrap the runtime access in its own `<Suspense>` boundary (for example around the user menu) or move the data access into the page."
+    theoryUrl: https://nextjs.org/docs/app/getting-started/fetching-data
+    options:
+      - {
+          text: "The boundary sits below the layout, so it cannot cover the layout's own await",
+          correct: true,
+        }
+      - {
+          text: "loading.tsx only runs on the first visit, so later navigations never show it",
+          correct: false,
+        }
+      - {
+          text: "Calling cookies() disables Suspense for the whole route segment and its children",
+          correct: false,
+        }
+      - {
+          text: "loading.tsx must be a Client Component to work with request data such as cookies",
+          correct: false,
+        }
+  - type: single
+    prompt: "A component in `app/dashboard/page.tsx` throws during render. You have `app/dashboard/error.tsx` and `app/dashboard/layout.tsx`. Which statement is correct?"
+    explanation: "`error.tsx` wraps the segment's `page`, `loading`, `not-found` and nested layouts in an error boundary, so a page error shows the fallback while the segment's own layout stays visible. The same boundary does not wrap the layout or template of its own segment, so an error thrown by `dashboard/layout.tsx` bubbles up to the parent segment's `error.tsx` instead."
+    theoryUrl: https://nextjs.org/docs/app/api-reference/file-conventions/error
+    options:
+      - {
+          text: "error.tsx renders inside the dashboard layout, which stays on screen",
+          correct: true,
+        }
+      - { text: "error.tsx replaces the whole page including the dashboard layout", correct: false }
+      - {
+          text: "The error bubbles to the root error boundary regardless of error.tsx",
+          correct: false,
+        }
+      - {
+          text: "error.tsx also catches errors thrown by dashboard/layout.tsx itself",
+          correct: false,
+        }
+  - type: boolean
+    prompt: "A route-segment `error.tsx` file must be a Client Component."
+    answer: true
+    explanation: "React error boundaries must be Client Components, so `error.tsx` (and `global-error.tsx`) need `'use client'`. This is also why `metadata` and `generateMetadata` exports are not supported in those files."
+    theoryUrl: https://nextjs.org/docs/app/api-reference/file-conventions/error
+  - type: single
+    prompt: "The root layout itself throws and you want a last-resort fallback UI. Which file handles it, and what must it contain?"
+    explanation: "`global-error.tsx` in the root of `app/` replaces the root layout when it is active, so it must define its own `<html>` and `<body>` tags and be a Client Component. A normal `error.tsx` at the root cannot catch the root layout's errors because it renders inside that layout."
+    theoryUrl: https://nextjs.org/docs/app/api-reference/file-conventions/error
+    options:
+      - {
+          text: "app/error.tsx, which can wrap the root layout if it is a Client Component",
+          correct: false,
+        }
+      - {
+          text: "app/not-found.tsx, which is rendered for every unhandled exception",
+          correct: false,
+        }
+      - { text: "app/loading.tsx, which swaps in once the root layout fails", correct: false }
+      - {
+          text: "app/global-error.tsx, which must render its own html and body tags",
+          correct: true,
+        }
+  - type: single
+    prompt: "In the `error.tsx` props of Next.js 16.4, what is the difference between `retry()` and `reset()`?"
+    explanation: "`retry()` asks the router to re-fetch and re-render the boundary's children, which is what you want when the cause was transient (a failed request). `reset()` only clears the error state and re-renders the children without re-fetching their content, so a server error will usually just come back. The docs recommend `retry()` in most cases."
+    theoryUrl: https://nextjs.org/docs/app/api-reference/file-conventions/error
+    options:
+      - {
+          text: "retry() reloads the whole browser page, reset() calls the server action again",
+          correct: false,
+        }
+      - {
+          text: "retry() re-fetches and re-renders the children, reset() only clears the error state",
+          correct: true,
+        }
+      - {
+          text: "They are aliases kept for backward compatibility with identical behaviour",
+          correct: false,
+        }
+      - {
+          text: "retry() only works in production, reset() only works in development",
+          correct: false,
+        }
+  - type: single
+    prompt: "What does the folder name `(shop)` do in `app/(shop)/cart/page.tsx`?"
+    explanation: "Wrapping a folder name in parentheses creates a route group: it organises files and lets you scope layouts, but it is omitted from the URL, so this page is served at `/cart`. Route groups are not slots (`@`) and do not add a path prefix."
+    theoryUrl: https://nextjs.org/docs/app/api-reference/file-conventions/route-groups
+    options:
+      - {
+          text: "It adds a `/shop` prefix and keeps the page private to the shop team",
+          correct: false,
+        }
+      - {
+          text: "It groups routes for organisation and is omitted from the URL path",
+          correct: true,
+        }
+      - { text: "It defines a parallel slot that is passed to the parent layout", correct: false }
+      - { text: "It marks the route as statically generated at build time only", correct: false }
+  - type: single
+    prompt: "Marketing pages need a different `<html>`/`<body>` shell than the logged-in product, and there is no top-level `app/layout.tsx`. How do you structure it, and what is the trade-off?"
+    explanation: "Create route groups such as `(marketing)` and `(app)`, each with its own root `layout.tsx` containing `<html>` and `<body>`. The trade-off is that navigating between two different root layouts triggers a full page load instead of a client-side transition. The home route must live inside one of the groups when there is no top-level layout."
+    theoryUrl: https://nextjs.org/docs/app/api-reference/file-conventions/route-groups
+    options:
+      - {
+          text: "Use two route groups with their own root layouts, and navigation stays client-side as usual",
+          correct: false,
+        }
+      - {
+          text: "Use one root layout and render html and body conditionally from the current pathname",
+          correct: false,
+        }
+      - {
+          text: "Use two route groups with their own root layouts, accepting a full reload between them",
+          correct: true,
+        }
+      - {
+          text: "Use @marketing and @app parallel slots, which each replace the root layout",
+          correct: false,
+        }
+  - type: multi
+    prompt: "Which are valid uses of route groups? Select all that apply."
+    explanation: "Route groups organise code by team or concern, define several root layouts, and let some segments share a layout while others do not. They never change the URL, so they cannot be used to add a path prefix."
+    theoryUrl: https://nextjs.org/docs/app/api-reference/file-conventions/route-groups
+    options:
+      - {
+          text: "Organising routes by team, feature or concern without changing URLs",
+          correct: true,
+        }
+      - { text: "Creating multiple root layouts for different parts of the app", correct: true }
+      - { text: "Opting a subset of routes into a shared layout", correct: true }
+      - { text: "Adding a URL prefix such as `/admin` to every route inside", correct: false }
+  - type: single
+    prompt: "You have `app/(marketing)/about/page.tsx` and `app/(shop)/about/page.tsx`. What happens at build time?"
+    explanation: "Both pages resolve to `/about` because group names are not part of the URL. Routes in different groups must not resolve to the same path, so the build fails with a conflict. Next.js does not pick one by alphabetical order or merge them."
+    theoryUrl: https://nextjs.org/docs/app/api-reference/file-conventions/route-groups
+    options:
+      - {
+          text: "The one in the first group alphabetically wins and the other is ignored",
+          correct: false,
+        }
+      - { text: "Both are served, one at /about and the other at /shop/about", correct: false }
+      - { text: "The build fails because both routes resolve to the same URL", correct: true }
+      - { text: "Next.js merges them, rendering both pages one after the other", correct: false }
+  - type: single
+    prompt: "You add `app/dashboard/route.ts` exporting `GET` next to the existing `app/dashboard/page.tsx`. What happens?"
+    explanation: "A `route` file and a `page` file cannot coexist in the same segment, because each takes over all HTTP verbs for that URL. The build reports a conflict. Put the handler under a different segment such as `app/api/dashboard/route.ts`."
+    theoryUrl: https://nextjs.org/docs/app/getting-started/route-handlers
+    options:
+      - {
+          text: "route.ts answers GET requests and page.tsx answers browser navigations",
+          correct: false,
+        }
+      - {
+          text: "It is a conflict, because a segment cannot have both page and route files",
+          correct: true,
+        }
+      - {
+          text: "page.tsx wins for GET and route.ts only handles the other HTTP verbs",
+          correct: false,
+        }
+      - {
+          text: "route.ts is only used when the Accept header asks for application/json",
+          correct: false,
+        }
+  - type: single
+    prompt: "A dashboard layout receives `children`, `team` and `analytics` props, where `team` and `analytics` come from folders `@team` and `@analytics`. How does the `@analytics` folder affect the URL?"
+    explanation: "Slots defined with `@folder` are named parallel-route slots passed as props to the parent layout. They are not route segments, so `app/@analytics/views/page.tsx` is served at `/views`, not `/@analytics/views`."
+    theoryUrl: https://nextjs.org/docs/app/api-reference/file-conventions/parallel-routes
+    options:
+      - { text: "It adds an `/analytics` segment, so pages live at /analytics/...", correct: false }
+      - {
+          text: "It does not appear in the URL, because slots are not route segments",
+          correct: true,
+        }
+      - {
+          text: "It adds `/@analytics` but the router hides the at sign in the browser",
+          correct: false,
+        }
+      - {
+          text: "It becomes a query parameter, such as ?slot=analytics, on every URL",
+          correct: false,
+        }
+  - type: single
+    prompt: "What is `default.tsx` for in a parallel-routes setup?"
+    explanation: "On a hard navigation (full page load or refresh), Next.js cannot recover which subpage each slot was showing during earlier soft navigations. For slots that do not match the current URL it renders `default.tsx` as a fallback; without it, the route errors or 404s. `children` is an implicit slot and needs one too."
+    theoryUrl: https://nextjs.org/docs/app/api-reference/file-conventions/default
+    options:
+      - {
+          text: "It is the default skeleton shown while a slot streams on soft navigation",
+          correct: false,
+        }
+      - {
+          text: "It marks which slot is rendered first when several slots load in parallel",
+          correct: false,
+        }
+      - {
+          text: "It is the fallback for slots that do not match the URL after a full page load",
+          correct: true,
+        }
+      - {
+          text: "It stores the last visited subpage of the slot in the browser's session",
+          correct: false,
+        }
+  - type: single
+    prompt: "A dashboard has `@team` and `@analytics` slots. Via client-side links the user goes from `/` to `/settings`, which exists only in `@team`. What does `@analytics` show right after the soft navigation, and after a browser refresh on `/settings`?"
+    explanation: "During soft navigation Next.js tracks the active state of every slot and keeps the previous subpage of `@analytics`. A refresh is a hard navigation, where that state cannot be recovered, so the unmatched slot renders its `default.tsx` (or errors if there is none)."
+    theoryUrl: https://nextjs.org/docs/app/api-reference/file-conventions/parallel-routes
+    options:
+      - {
+          text: "Its previous subpage after the soft navigation, default.tsx after the refresh",
+          correct: true,
+        }
+      - {
+          text: "Its previous subpage in both cases, because slots persist their state in the URL",
+          correct: false,
+        }
+      - {
+          text: "default.tsx in both cases, because the URL no longer matches any analytics page",
+          correct: false,
+        }
+      - {
+          text: "A 404 after the soft navigation, and its previous subpage after the refresh",
+          correct: false,
+        }
+  - type: single
+    prompt: "A layout swaps between `admin` and `user` slots based on the viewer's role. A teammate says this protects the admin dashboard data. Is that right?"
+    code: |
+      export default function Layout({ user, admin }: {
+        user: React.ReactNode
+        admin: React.ReactNode
+      }) {
+        return isAdmin() ? admin : user
+      }
+    codeLanguage: tsx
+    explanation: "Both slots are rendered on the server whatever the layout returns, so `@admin/page.tsx` still runs its data fetching for every user. The conditional only controls what is displayed. Authorization must be enforced inside each slot's page or in the Data Access Layer next to the data."
+    theoryUrl: https://nextjs.org/docs/app/api-reference/file-conventions/parallel-routes
+    options:
+      - {
+          text: "Yes, the unused slot is never rendered, so its fetching does not run",
+          correct: false,
+        }
+      - {
+          text: "Yes, but only when the unused slot also defines a default.tsx file",
+          correct: false,
+        }
+      - {
+          text: "No, both slots render server-side, so authorize inside the slot or the data layer",
+          correct: true,
+        }
+      - {
+          text: "No, because slots are always exposed on the URL and can be requested directly",
+          correct: false,
+        }
+  - type: single
+    prompt: "You build a photo gallery modal with the structure below. A user clicks a link to `/photo/42` from the feed, and later reloads the browser on `/photo/42`. What do they see in each case?"
+    code: |
+      app/
+        layout.tsx              // renders {children} and {modal}
+        page.tsx                // feed, with <Link href="/photo/42">
+        @modal/
+          default.tsx           // returns null
+          (.)photo/[id]/page.tsx
+        photo/[id]/page.tsx
+    codeLanguage: bash
+    explanation: "On a soft navigation the `(.)photo` route in `@modal` intercepts the URL and the photo opens as a modal over the feed. On a reload there is no interception, so the real `photo/[id]/page.tsx` renders as a full page and `@modal` falls back to `default.tsx`. That is what makes the modal shareable by URL."
+    theoryUrl: https://nextjs.org/docs/app/api-reference/file-conventions/intercepting-routes
+    options:
+      - {
+          text: "A modal in both cases, because the interception is stored in the URL",
+          correct: false,
+        }
+      - {
+          text: "A full page in both cases, because interception works only in development",
+          correct: false,
+        }
+      - { text: "A full photo page after the click, and a modal after the reload", correct: false }
+      - { text: "A modal after the click, and the full photo page after the reload", correct: true }
+  - type: single
+    prompt: "Which folder intercepts `/photo/[id]` when the intercepting route lives at `app/feed/@modal/(..)photo/[id]/page.tsx`?"
+    explanation: "The `(..)` convention matches one route-segment level up, and slot folders such as `@modal` are not route segments. So `(..)` from `feed/@modal` points to `app/photo`, one segment above `feed`, even though it is two levels up in the file system. `(...)` would match from the root and `(.)` the same level."
+    theoryUrl: https://nextjs.org/docs/app/api-reference/file-conventions/intercepting-routes
+    options:
+      - { text: "app/photo/[id], because slots do not count as a segment level", correct: true }
+      - {
+          text: "app/feed/photo/[id], because (..) means the parent folder on disk",
+          correct: false,
+        }
+      - {
+          text: "app/feed/@modal/photo/[id], because (..) matches the slot's sibling",
+          correct: false,
+        }
+      - {
+          text: "It cannot intercept anything, because (..) is valid only without slots",
+          correct: false,
+        }

@@ -1,0 +1,472 @@
+version: 1
+title: "Architect Roadmap 10: Next.js in production"
+description: Proxy (formerly middleware), route handlers, metadata and SEO, image and font optimization, environment variables, authentication and sessions, and deployment options.
+language: en
+tags: [architect-roadmap, nextjs, proxy, metadata, authentication, deployment]
+run:
+  questionsPerRun: 10
+  maxErrors: 3
+  timePerQuestionSec: 60
+questions:
+  - type: single
+    prompt: "You upgrade a project to Next.js 16 and still have a `middleware.ts` that redirects unauthenticated users. What is the current convention?"
+    explanation: "The `middleware` file convention was deprecated and renamed to `proxy` in Next.js 16: you create `proxy.ts` at the project root (or in `src`) and export a `proxy` function or a default export. The functionality is the same, but the name better reflects that it sits in front of the app on a network boundary."
+    theoryUrl: https://nextjs.org/docs/app/getting-started/proxy
+    options:
+      - {
+          text: "Keep middleware.ts, because proxy.ts is only for the Pages Router",
+          correct: false,
+        }
+      - {
+          text: "Move the logic into app/layout.tsx, because the convention was removed",
+          correct: false,
+        }
+      - {
+          text: "Replace it with an instrumentation.ts file that exports a register function",
+          correct: false,
+        }
+      - {
+          text: "Rename it to proxy.ts and export a function named proxy, or a default",
+          correct: true,
+        }
+  - type: single
+    prompt: "Which runtime does `proxy.ts` use by default in Next.js 16?"
+    explanation: "Proxy defaults to the Node.js runtime, so you can use Node.js APIs and most packages. The `runtime` segment option is not available in Proxy files, and setting it throws an error. The Edge Runtime is the limited alternative and is not what Proxy uses."
+    theoryUrl: https://nextjs.org/docs/app/api-reference/file-conventions/proxy
+    options:
+      - { text: "The Edge Runtime, with no Node.js APIs and no way to change it", correct: false }
+      - {
+          text: "The Node.js runtime, and a `runtime` option in the file is an error",
+          correct: true,
+        }
+      - {
+          text: "The Edge Runtime by default, and `runtime = 'nodejs'` switches it",
+          correct: false,
+        }
+      - {
+          text: "The browser runtime, since it runs before the request reaches the server",
+          correct: false,
+        }
+  - type: single
+    prompt: "Your `proxy.ts` redirects every request without a session cookie to `/login`, and it has no `config.matcher`. After deploy, the login page loses its CSS and images. Why?"
+    explanation: "Without a matcher, Proxy runs on every request, including `_next/static`, `_next/image` and files in `public/`. The redirect then hits the static assets for anonymous users. Use a negative-matching matcher to exclude those paths."
+    theoryUrl: https://nextjs.org/docs/app/api-reference/file-conventions/proxy
+    options:
+      - {
+          text: "Proxy blocks all CSS files by default, so they need explicit headers set to load",
+          correct: false,
+        }
+      - {
+          text: "Static files are redirected too, so use a matcher that excludes `_next` and assets",
+          correct: true,
+        }
+      - {
+          text: "Redirects from Proxy are cached by browsers, which then breaks all relative URLs",
+          correct: false,
+        }
+      - {
+          text: "next/image is incompatible with Proxy, so it must be turned off on those routes",
+          correct: false,
+        }
+  - type: multi
+    prompt: "Given this proxy, which request paths run it? Select all that apply."
+    code: |
+      import { NextResponse, type NextRequest } from 'next/server'
+
+      export function proxy(req: NextRequest) {
+        if (!req.cookies.get('session')) {
+          return NextResponse.redirect(new URL('/login', req.url))
+        }
+      }
+
+      export const config = { matcher: ['/dashboard/:path*'] }
+    codeLanguage: typescript
+    explanation: "`:path*` matches zero or more segments, so both `/dashboard` and `/dashboard/settings` match. `/login` and `/settings/dashboard` do not start with `/dashboard`. Keeping `/login` out of the matcher also avoids a redirect loop."
+    theoryUrl: https://nextjs.org/docs/app/api-reference/file-conventions/proxy
+    options:
+      - { text: "/dashboard", correct: true }
+      - { text: "/dashboard/settings", correct: true }
+      - { text: "/login", correct: false }
+      - { text: "/settings/dashboard", correct: false }
+  - type: single
+    prompt: "What is the right role for Proxy in an authentication design?"
+    explanation: "Proxy runs on every matched request, including prefetches, so it should be cheap: reading and verifying the session cookie for optimistic redirects. Database session checks belong near the data (a Data Access Layer), because Proxy alone must not be your only line of defence."
+    theoryUrl: https://nextjs.org/docs/app/guides/authentication
+    options:
+      - { text: "Full authorization with a database lookup on every request", correct: false }
+      - {
+          text: "Nothing related to auth, because it cannot read cookies or headers",
+          correct: false,
+        }
+      - {
+          text: "Only a replacement for the session library, and it never needs a DAL",
+          correct: false,
+        }
+      - {
+          text: "Optimistic redirects from the cookie, with real checks next to the data",
+          correct: true,
+        }
+  - type: single
+    prompt: "You need to redirect `/old-pricing` to `/pricing` permanently. There is no dependency on the request's cookies or headers. What is the simplest option?"
+    explanation: "For simple redirects, the docs suggest the `redirects` option in `next.config.ts` first. Reach for Proxy when you need request data or more complex logic. A permanent redirect via config is declarative and needs no request-time code."
+    theoryUrl: https://nextjs.org/docs/app/getting-started/proxy
+    options:
+      - {
+          text: "A Client Component that calls router.replace on mount, redirecting in the browser",
+          correct: false,
+        }
+      - {
+          text: "A route handler at /old-pricing that returns the full HTML of the /pricing page",
+          correct: false,
+        }
+      - {
+          text: "A redirect rule in next.config.ts, with Proxy only for request-based logic",
+          correct: true,
+        }
+      - {
+          text: "A page at /old-pricing that renders a meta refresh tag pointing to /pricing",
+          correct: false,
+        }
+  - type: single
+    prompt: "With Cache Components enabled, a `GET` route handler runs a database query on each call and should serve a cached result. Where do you put `use cache`?"
+    explanation: "GET handlers follow the same model as pages: they run at request time by default and can be prerendered when they don't touch uncached or runtime data. `use cache` cannot be placed directly in the handler body, so extract the query into a helper function marked `use cache` and call it from the handler."
+    theoryUrl: https://nextjs.org/docs/app/getting-started/route-handlers
+    options:
+      - { text: "At the top of the GET function body, before the query", correct: false }
+      - {
+          text: "In a helper function that the handler calls, not in the handler body",
+          correct: true,
+        }
+      - {
+          text: "At the top of the route.ts file, which caches only the GET export",
+          correct: false,
+        }
+      - { text: "It is not possible, Route Handlers cannot use the cache at all", correct: false }
+  - type: single
+    prompt: "You expose `app/api/orders/route.ts` for your own React frontend. A colleague says it is private because only your app calls it. How should you treat it?"
+    explanation: "Route Handlers are public HTTP endpoints that any client can call. You must authenticate and authorize inside them, validate the input, avoid leaking details in error messages and consider rate limiting. Being unlinked from other sites does not make an endpoint private."
+    theoryUrl: https://nextjs.org/docs/app/guides/backend-for-frontend
+    options:
+      - {
+          text: "As public, so authenticate, authorize and validate the input inside it",
+          correct: true,
+        }
+      - {
+          text: "As private, because Next.js restricts Route Handlers to same-origin calls",
+          correct: false,
+        }
+      - { text: "As private, as long as the URL is not included in the sitemap", correct: false }
+      - {
+          text: "As public, but authentication is only possible in Proxy, not in the handler",
+          correct: false,
+        }
+  - type: single
+    prompt: "A Server Component needs the list of posts. A teammate proposes `fetch('/api/posts')` against your own route handler. What is the problem?"
+    explanation: "A Server Component can read the data source directly, so an extra HTTP hop to your own handler adds latency and code with no benefit. During prerendering at build time there is no server listening, so such a call can even fail the build. Fetch from the source (a function or database) instead."
+    theoryUrl: https://nextjs.org/docs/app/guides/backend-for-frontend
+    options:
+      - {
+          text: "Route handlers cannot return JSON to Server Components for security reasons",
+          correct: false,
+        }
+      - {
+          text: "fetch with a relative URL always resolves to the browser's origin and fails",
+          correct: false,
+        }
+      - {
+          text: "It adds a needless hop, and at build time there is no server to answer it",
+          correct: true,
+        }
+      - {
+          text: "It works, but Next.js blocks the cache for any request to the same origin",
+          correct: false,
+        }
+  - type: single
+    prompt: "Where can you use the `metadata` object and `generateMetadata` function?"
+    explanation: "They are supported in Server Components only, in `layout` and `page` files. A Client Component page cannot export them; for the same reason `error.tsx` and `global-error.tsx` cannot. Use static `metadata` when values are fixed and `generateMetadata` when they depend on data."
+    theoryUrl: https://nextjs.org/docs/app/getting-started/metadata-and-og-images
+    options:
+      - {
+          text: "In any component, since they are collected at build time by the compiler",
+          correct: false,
+        }
+      - { text: "Only in route handlers, where the head tags are written manually", correct: false }
+      - {
+          text: "Only in Client Components, because they need access to the document head",
+          correct: false,
+        }
+      - {
+          text: "In Server Components in layout and page files, not in Client Components",
+          correct: true,
+        }
+  - type: single
+    prompt: "`generateMetadata` and the page component both need the same blog post. How do you avoid two database queries per request?"
+    explanation: "Memoize the data function with React's `cache`, so the call from `generateMetadata` and the call from the page in the same render share one result. A function cached with `use cache` also works, but `cache` is the simple per-render answer for non-`fetch` data sources."
+    theoryUrl: https://nextjs.org/docs/app/getting-started/metadata-and-og-images
+    options:
+      - {
+          text: "Store the post in a module-level variable shared by both functions",
+          correct: false,
+        }
+      - {
+          text: "Pass the post from generateMetadata to the page through its return value",
+          correct: false,
+        }
+      - { text: "Make the page a Client Component to read the cached metadata", correct: false }
+      - {
+          text: "Memoize the data function with React's `cache` and call it from both",
+          correct: true,
+        }
+  - type: single
+    prompt: "A social crawler such as Slackbot requests a dynamic page. Where does Next.js put the metadata for it?"
+    explanation: "For dynamic pages Next.js streams metadata for browsers, injecting it after `generateMetadata` resolves. For bots that expect tags in the `<head>` (detected by user agent), streaming is disabled and the metadata is in the initial HTML. The `htmlLimitedBots` config customises the list."
+    theoryUrl: https://nextjs.org/docs/app/getting-started/metadata-and-og-images
+    options:
+      - {
+          text: "It is streamed after the body, same as for browsers, and crawlers wait for it",
+          correct: false,
+        }
+      - {
+          text: "Streaming is disabled for such bots, so the tags are in the initial head",
+          correct: true,
+        }
+      - {
+          text: "The metadata is omitted, since bots must run JavaScript to find it",
+          correct: false,
+        }
+      - {
+          text: "It is sent in an HTTP header called Link instead of the HTML head",
+          correct: false,
+        }
+  - type: single
+    prompt: "Which file generates `/sitemap.xml` with the App Router's file-based metadata?"
+    explanation: "A `sitemap.ts` (or `sitemap.js`) file at the app root, exporting a function that returns the entries, is the metadata file convention for `/sitemap.xml`. These special route handlers stay static by default unless they use request-time APIs. `robots.ts` and `opengraph-image` follow the same idea."
+    theoryUrl: https://nextjs.org/docs/app/getting-started/metadata-and-og-images
+    options:
+      - { text: "app/sitemap.xml/page.tsx rendering XML strings through JSX", correct: false }
+      - {
+          text: "app/sitemap.ts exporting a default function that returns the entries",
+          correct: true,
+        }
+      - { text: "next.config.ts with a sitemap key listing every URL", correct: false }
+      - { text: "public/sitemap.ts, since public files are executed at build time", correct: false }
+  - type: single
+    prompt: "You load product photos from `https://cdn.shop.example/images/...` with `next/image`. What must you configure, and how specific should it be?"
+    explanation: "Remote images need `remotePatterns` (protocol, hostname, optionally pathname) in `next.config`, because the optimizer would otherwise be an open proxy. Be as specific as possible so only intended hosts and paths can be optimized. For remote images you also pass `width` and `height` (or `fill`), because they are unknown at build time."
+    theoryUrl: https://nextjs.org/docs/app/getting-started/images
+    options:
+      - { text: "Add remotePatterns for that host and path, as narrowly as you can", correct: true }
+      - { text: "Nothing is needed, any URL is accepted for `src` in next/image", correct: false }
+      - { text: "A wildcard on every hostname so new CDN domains work immediately", correct: false }
+      - { text: "Add the host to a robots.txt allowlist that next/image reads", correct: false }
+  - type: single
+    prompt: "The hero image is your Largest Contentful Paint element, and your code uses `<Image priority />`. What changed in Next.js 16?"
+    explanation: 'In Next.js 16 the `priority` prop is deprecated in favour of `preload`, to make the behaviour explicit (it inserts a preload link in the head). In many cases the docs suggest `loading="eager"` or `fetchPriority="high"` instead of preloading.'
+    theoryUrl: https://nextjs.org/docs/app/api-reference/components/image
+    options:
+      - {
+          text: "priority is deprecated, and `preload` replaces it, with `fetchPriority` as an alternative",
+          correct: true,
+        }
+      - {
+          text: "Nothing, since priority is still the preferred prop for LCP images in Next 16",
+          correct: false,
+        }
+      - {
+          text: "priority now means lazy loading, so remove it from every above-the-fold image",
+          correct: false,
+        }
+      - {
+          text: "priority was removed and every image is now eager by default, without any prop",
+          correct: false,
+        }
+  - type: single
+    prompt: "What does `next/font/google` change compared with a `<link>` to Google Fonts in the head?"
+    explanation: "Fonts are downloaded at build time and self-hosted with your static assets, so the browser sends no requests to Google. That improves privacy and performance, and the font metrics adjustment avoids layout shift. It is not a client-side loader and does not need a Google API key."
+    theoryUrl: https://nextjs.org/docs/app/getting-started/fonts
+    options:
+      - {
+          text: "It loads the font from Google's CDN at runtime, but through Next.js's image optimizer",
+          correct: false,
+        }
+      - {
+          text: "It self-hosts the font files with your assets, so the browser makes no Google request",
+          correct: true,
+        }
+      - {
+          text: "It fetches the font at runtime on the server and inlines it as base64 CSS",
+          correct: false,
+        }
+      - {
+          text: "It requires a Google API key and falls back to system fonts without one",
+          correct: false,
+        }
+  - type: single
+    prompt: "You build one Docker image and promote it from staging to production. `NEXT_PUBLIC_API_URL` differs per environment, but production shows the staging URL in the browser. Why?"
+    explanation: "`NEXT_PUBLIC_` variables are inlined into the client JavaScript at `next build`, so the value is frozen at build time and promoting the same image does not change it. Build once per environment, or read a plain server environment variable at runtime during dynamic rendering and pass it to the client as a prop."
+    theoryUrl: https://nextjs.org/docs/app/guides/environment-variables
+    options:
+      - {
+          text: "Next.js caches public variables for 24 hours after the container starts up in production",
+          correct: false,
+        }
+      - {
+          text: "Docker overrides NEXT_PUBLIC_ variables with the host's environment at container start",
+          correct: false,
+        }
+      - {
+          text: "Public variables are inlined at build time, so the image carries the staging value",
+          correct: true,
+        }
+      - {
+          text: "The browser reads the .env file shipped inside the image on each load",
+          correct: false,
+        }
+  - type: single
+    prompt: "In client code, what does this produce for a variable declared as `NEXT_PUBLIC_ANALYTICS_ID=abc123`?"
+    code: |
+      const name = 'NEXT_PUBLIC_ANALYTICS_ID'
+      console.log(process.env[name])
+    codeLanguage: typescript
+    explanation: "Next.js inlines `process.env.NEXT_PUBLIC_*` by replacing static references at build time. A dynamic lookup like `process.env[name]` (or destructuring from `env`) is not replaced, so in the browser the value is `undefined`. Write the full property name literally."
+    theoryUrl: https://nextjs.org/docs/app/guides/environment-variables
+    options:
+      - {
+          text: '"abc123", since the prefix makes the variable available everywhere',
+          correct: false,
+        }
+      - { text: "An empty string, as dynamic keys are replaced by a placeholder", correct: false }
+      - {
+          text: "A build error, since process.env cannot be indexed with a variable",
+          correct: false,
+        }
+      - { text: "undefined, because dynamic lookups are not inlined at build time", correct: true }
+  - type: single
+    prompt: "`NODE_ENV` is `development`. `API_URL` is defined in both `.env` and `.env.development.local`. Which value does `process.env.API_URL` have?"
+    explanation: "Next.js looks up variables in a fixed order and stops at the first match, so `.env.development.local` wins over `.env`. `.env*.local` files are meant to stay out of git, and `.env.local` is not loaded when `NODE_ENV` is `test`."
+    theoryUrl: https://nextjs.org/docs/app/guides/environment-variables
+    options:
+      - {
+          text: "The one in .env, because it is the base file and cannot be overridden",
+          correct: false,
+        }
+      - { text: "Both values, joined with a comma in the order of loading", correct: false }
+      - { text: "The one in .env.development.local, which has higher priority", correct: true }
+      - { text: "undefined, because duplicates across files cancel each other out", correct: false }
+  - type: single
+    prompt: "Which cookie attributes does the Next.js authentication guide recommend for a session cookie set on the server?"
+    explanation: "Set the cookie on the server with HttpOnly (not readable from JavaScript), Secure (HTTPS only), a SameSite policy, an expiry (Max-Age or Expires) and a Path. Cookies set client-side can be tampered with, and a readable session token is exposed to XSS."
+    theoryUrl: https://nextjs.org/docs/app/guides/authentication
+    options:
+      - {
+          text: "Only Secure, because HttpOnly would block the server from reading it",
+          correct: false,
+        }
+      - {
+          text: "None, because cookies set by Server Actions are encrypted already",
+          correct: false,
+        }
+      - { text: "HttpOnly, Secure and SameSite, plus an expiry and a path", correct: true }
+      - { text: "HttpOnly turned off, so that client code can refresh the token", correct: false }
+  - type: single
+    prompt: "Product asks for a 'sign out of all devices' button and a list of active sessions. Which session strategy fits best?"
+    explanation: "Stateless sessions (a signed cookie) cannot be revoked server-side before they expire. Database sessions store each session as a row, so you can list them, track devices and delete all of a user's rows. The trade-off is a lookup per verification, which can be cached for the session lifetime."
+    theoryUrl: https://nextjs.org/docs/app/guides/authentication
+    options:
+      - {
+          text: "Stateless signed cookies, because the server can invalidate any of them",
+          correct: false,
+        }
+      - {
+          text: "localStorage tokens, because the client can clear every device's token",
+          correct: false,
+        }
+      - { text: "Database sessions, which can be listed and revoked individually", correct: true }
+      - {
+          text: "Either approach, since revocation is a client concern, not a server one",
+          correct: false,
+        }
+  - type: single
+    prompt: "Your `app/dashboard/layout.tsx` checks the session and redirects to `/login`. A user logs out in another tab, then navigates between dashboard pages in the first tab. Why might they keep seeing protected pages?"
+    explanation: "Layouts do not re-render on navigation between their child pages (partial rendering), so a check placed only in the layout is not re-run on every route change. Do the check in the DAL, next to the data or the component that renders it, so every access verifies the session."
+    theoryUrl: https://nextjs.org/docs/app/guides/authentication
+    options:
+      - {
+          text: "Layouts do not re-render on navigation, so check close to the data instead",
+          correct: true,
+        }
+      - {
+          text: "Redirects in layouts are ignored by the client-side router altogether",
+          correct: false,
+        }
+      - {
+          text: "Pages are cached in the browser forever, so no check ever runs again",
+          correct: false,
+        }
+      - {
+          text: "Logout clears cookies only on the tab where the button was pressed",
+          correct: false,
+        }
+  - type: single
+    prompt: "You must host a Next.js app with Server Actions and on-demand revalidation on a plain static host (an S3 bucket with a CDN). Which statement is accurate?"
+    explanation: "A static export produces plain HTML/CSS/JS and does not support features that need a server, such as Server Actions or on-demand revalidation. For all features, deploy a Node.js server, a Docker container, or a platform adapter. You can still start static and move to a server later."
+    theoryUrl: https://nextjs.org/docs/app/getting-started/deploying
+    options:
+      - {
+          text: "It is not possible, since a static export lacks server-only features like actions",
+          correct: true,
+        }
+      - {
+          text: "It works fully, since the CDN executes Server Actions at the edge for the static pages",
+          correct: false,
+        }
+      - {
+          text: "It works if you add a route handler for each action into the exported static files",
+          correct: false,
+        }
+      - {
+          text: "It works, but revalidation needs the Edge Runtime enabled in next.config",
+          correct: false,
+        }
+  - type: single
+    prompt: "You run three containers of the same Next.js app behind a load balancer. Users sporadically get 'Failed to find Server Action' errors. What is the likely cause and fix?"
+    explanation: "Closure variables of Server Functions are encrypted with a key generated per build; if instances use different keys (or different builds) one cannot decrypt another's action. Set the same `NEXT_SERVER_ACTIONS_ENCRYPTION_KEY` across instances, build once, and roll out gradually. A shared cache handler is also needed for consistent revalidation."
+    theoryUrl: https://nextjs.org/docs/app/guides/self-hosting
+    options:
+      - {
+          text: "Instances have different encryption keys, so set one NEXT_SERVER_ACTIONS_ENCRYPTION_KEY",
+          correct: true,
+        }
+      - {
+          text: "The load balancer strips POST bodies, so allow action requests in its configuration",
+          correct: false,
+        }
+      - {
+          text: "Server Actions work with one instance only, so scale down to a single container",
+          correct: false,
+        }
+      - {
+          text: "Actions need sticky sessions at the load balancer in every possible configuration or setup",
+          correct: false,
+        }
+  - type: single
+    prompt: "When self-hosting `next start` on the public internet, what does the Next.js documentation recommend putting in front of it?"
+    explanation: "A reverse proxy such as nginx is recommended in front of the Node server. It handles malformed requests, slow-connection attacks, payload size limits and rate limiting, so the Next.js process can spend its resources on rendering. Exposing it directly pushes all of that onto the app."
+    theoryUrl: https://nextjs.org/docs/app/guides/self-hosting
+    options:
+      - {
+          text: "Nothing, since the Next.js server already includes DDoS protection and rate limiting",
+          correct: false,
+        }
+      - {
+          text: "A second Next.js instance running in Edge Runtime mode, acting as a gateway to the first",
+          correct: false,
+        }
+      - {
+          text: "A service worker in the browser that retries failed requests and hides the outages",
+          correct: false,
+        }
+      - {
+          text: "A reverse proxy such as nginx, to handle slow clients, limits and rate limiting",
+          correct: true,
+        }

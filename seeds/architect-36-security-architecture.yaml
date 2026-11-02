@@ -1,0 +1,344 @@
+version: 1
+title: "Architect Roadmap 36: Security architecture"
+description: OAuth2 and OpenID Connect flows, JWT strengths and limits, zero trust, STRIDE threat modeling, encryption at rest and in transit, and the OWASP Top 10.
+language: en
+tags: [architect-roadmap, cross-cutting, security, oauth2, jwt, owasp]
+run:
+  questionsPerRun: 10
+  maxErrors: 3
+  timePerQuestionSec: 60
+questions:
+  - type: single
+    prompt: "What is the relationship between OAuth 2.0 and OpenID Connect (OIDC)?"
+    explanation: "OAuth 2.0 is a delegated authorization framework: it issues access tokens so a client can call an API. OIDC is an identity layer on top of it that adds an ID token and a userinfo endpoint, so a client learns who the user is. Using a plain OAuth access token as proof of login is a classic mistake."
+    theoryUrl: https://openid.net/specs/openid-connect-core-1_0.html
+    options:
+      - {
+          text: "OIDC replaces OAuth 2.0 entirely and removes the need for access tokens in API calls",
+          correct: false,
+        }
+      - { text: "OAuth 2.0 handles login and OIDC handles API authorization", correct: false }
+      - {
+          text: "OIDC adds authentication on top of OAuth 2.0 by introducing an ID token",
+          correct: true,
+        }
+      - { text: "They are the same protocol published under two names", correct: false }
+  - type: single
+    prompt: "You are building a single-page app and a native mobile app that sign users in against your identity provider. Which OAuth 2.0 flow is recommended?"
+    explanation: "Public clients cannot keep a secret, so they should use the authorization code flow with PKCE. The implicit flow returns tokens in the URL fragment and is discouraged by current best practice, and the client credentials flow has no user at all. The resource owner password flow exposes user credentials to the client."
+    theoryUrl: https://datatracker.ietf.org/doc/html/rfc9700
+    options:
+      - { text: "Implicit flow, because the app has no backend to hold a secret", correct: false }
+      - {
+          text: "Resource owner password flow, to keep the login screen in the app",
+          correct: false,
+        }
+      - { text: "Client credentials flow with a secret embedded in the bundle", correct: false }
+      - { text: "Authorization code flow with PKCE", correct: true }
+  - type: single
+    prompt: "A client generates a PKCE verifier and derives the challenge as shown. Which value is sent where?"
+    code: |
+      import { createHash, randomBytes } from 'node:crypto'
+
+      const verifier = randomBytes(32).toString('base64url')
+      const challenge = createHash('sha256').update(verifier).digest('base64url')
+    codeLanguage: javascript
+    explanation: "The challenge (with `code_challenge_method=S256`) goes in the authorization request, committing the client to a secret without revealing it. The verifier is sent later to the token endpoint together with the code, and the server recomputes the hash. Sending the verifier up front would let an attacker who intercepts the redirect reuse it."
+    theoryUrl: https://datatracker.ietf.org/doc/html/rfc7636
+    options:
+      - { text: "Both are sent in the authorization request URL", correct: false }
+      - {
+          text: "The challenge is sent to the token endpoint; the verifier goes in the authorization request",
+          correct: false,
+        }
+      - {
+          text: "The challenge is sent in the authorization request; the verifier goes to the token endpoint",
+          correct: true,
+        }
+      - { text: "Neither is sent; the server derives both from the client ID", correct: false }
+  - type: single
+    prompt: "Your backend API receives a bearer JWT from the SPA. The SPA used the OIDC login and sends the ID token instead of the access token. Why is this a design flaw?"
+    explanation: "The ID token is meant for the client: its audience is the client application and it states who authenticated. The access token is what a resource server should validate, with its own audience and scopes for that API. Accepting ID tokens at the API conflates authentication and authorization and may accept tokens minted for other clients."
+    theoryUrl: https://openid.net/specs/openid-connect-core-1_0.html#IDToken
+    options:
+      - { text: "ID tokens are always encrypted, so the API cannot read them", correct: false }
+      - { text: "ID tokens expire after a single use, so the second call fails", correct: false }
+      - {
+          text: "ID tokens are intended for the client, not as credentials for an API",
+          correct: true,
+        }
+      - { text: "ID tokens cannot carry the user identifier claim", correct: false }
+  - type: single
+    prompt: "A SPA stores its access and refresh tokens in `localStorage`. A security review flags it. Which architecture reduces the risk of token theft through XSS the most?"
+    explanation: "A backend-for-frontend performs the OAuth flow server-side and keeps tokens there, giving the browser only an httpOnly, Secure, SameSite session cookie, so injected script cannot read the tokens. Moving tokens to `sessionStorage` or a JS-readable cookie is still accessible to XSS, and shortening the key name changes nothing."
+    theoryUrl: https://datatracker.ietf.org/doc/html/draft-ietf-oauth-browser-based-apps
+    options:
+      - { text: "Move the tokens from `localStorage` to `sessionStorage`", correct: false }
+      - {
+          text: "Keep tokens in a regular cookie that JavaScript can read, with the Secure flag set",
+          correct: false,
+        }
+      - { text: "Encrypt the tokens with a key bundled in the JavaScript", correct: false }
+      - {
+          text: "A backend-for-frontend holds the tokens and issues an httpOnly session cookie",
+          correct: true,
+        }
+  - type: single
+    prompt: "What is the purpose of the `state` parameter in the OAuth 2.0 authorization request?"
+    explanation: "The client sends an unguessable `state` value and verifies that the same value comes back on the redirect, which binds the response to the browser session that started the flow and prevents login CSRF. It is not a scope, not a session identifier on the server side, and does not carry the user profile."
+    theoryUrl: https://datatracker.ietf.org/doc/html/rfc6749#section-10.12
+    options:
+      - { text: "To list the permissions the client is asking for", correct: false }
+      - { text: "To bind the response to the original request and prevent CSRF", correct: true }
+      - { text: "To carry the user's profile claims to the client", correct: false }
+      - {
+          text: "To tell the server which signing algorithm to use for the ID token",
+          correct: false,
+        }
+  - type: single
+    prompt: "A nightly batch service must call an internal API with no user involved. Which OAuth 2.0 grant fits?"
+    explanation: "The client credentials grant authenticates the service itself and issues an access token for its own identity, which suits machine-to-machine calls. Authorization code needs a user and a browser, and the device code flow targets input-constrained devices with a user present."
+    theoryUrl: https://datatracker.ietf.org/doc/html/rfc6749#section-4.4
+    options:
+      - { text: "Authorization code with PKCE", correct: false }
+      - { text: "Device authorization grant", correct: false }
+      - { text: "Client credentials grant", correct: true }
+      - { text: "Implicit grant", correct: false }
+  - type: single
+    prompt: "A developer runs this snippet on a JWT copied from the browser, without any key. What does it show, and what does that imply?"
+    code: |
+      const token =
+        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.' +
+        'eyJzdWIiOiJ1XzQyIiwicm9sZSI6ImFkbWluIiwiZW1haWwiOiJhbmFAZXhhbXBsZS5jb20ifQ.' +
+        'c2lnbmF0dXJl'
+
+      const [, payload] = token.split('.')
+      console.log(JSON.parse(Buffer.from(payload, 'base64url').toString()))
+    codeLanguage: javascript
+    explanation: "It prints `{ sub: 'u_42', role: 'admin', email: 'ana@example.com' }`. A signed JWT (JWS) is only encoded, not encrypted, so anyone holding it can read the claims. The signature protects integrity, not confidentiality, so secrets and sensitive data must not go into the payload unless using JWE."
+    theoryUrl: https://datatracker.ietf.org/doc/html/rfc7519
+    options:
+      - { text: "It throws, because decoding requires the signing key", correct: false }
+      - { text: "It prints the claims in clear text; a signed JWT is not encrypted", correct: true }
+      - { text: "It prints only the header, because the payload is hashed", correct: false }
+      - { text: "It prints the claims, but only because the algorithm is HS256", correct: false }
+  - type: single
+    prompt: 'A user clicks "log out everywhere" after their laptop is stolen, but the stolen access JWT (1 hour lifetime, stateless validation) still works for 40 more minutes. What is the underlying limit, and the usual mitigation?'
+    explanation: "Self-contained JWTs are valid until `exp` and the API does not consult any state, so they cannot be revoked immediately. Mitigate with short access-token lifetimes plus rotating refresh tokens that the server can revoke, or accept a small denylist or introspection check for high-risk APIs. Encrypting the JWT or rotating the key for everyone is a blunt tool."
+    theoryUrl: https://datatracker.ietf.org/doc/html/rfc9700
+    options:
+      - {
+          text: "Stateless JWTs can't be revoked early; use short lifetimes and revocable refresh tokens",
+          correct: true,
+        }
+      - {
+          text: "JWTs are revoked automatically when the browser deletes its cookies or the user's session ends",
+          correct: false,
+        }
+      - { text: "Encrypting the JWT makes it revocable by the server", correct: false }
+      - { text: "Switch from HS256 to RS256, which supports revocation", correct: false }
+  - type: single
+    prompt: 'A verifier trusts the `alg` field of the incoming token header to decide how to validate it. An attacker submits a token with `"alg": "none"` and an unsigned payload claiming admin rights. What is the correct defence?'
+    explanation: "The server must decide the allowed algorithm(s) itself and reject anything else, including `none`, rather than trusting the attacker-controlled header. Similarly, an RS256 public key must never be accepted as an HS256 secret. Hiding the header or lengthening the token does not remove the trust issue."
+    theoryUrl: https://datatracker.ietf.org/doc/html/rfc8725
+    options:
+      - { text: "Base64-encode the header twice so it cannot be forged", correct: false }
+      - {
+          text: "Pin the accepted algorithms in server configuration and reject the rest",
+          correct: true,
+        }
+      - { text: "Check that the token is longer than 100 characters", correct: false }
+      - {
+          text: "Accept `none` only when the request comes from a trusted IP range or internal network",
+          correct: false,
+        }
+  - type: single
+    prompt: "A platform has 30 microservices that each need to validate tokens issued by a central identity provider. Which signing setup is best?"
+    explanation: "Asymmetric signing (RS256 or ES256) lets the provider keep the private key while services verify with the public key published at a JWKS endpoint, so a compromised service cannot mint tokens. A shared HS256 secret would have to be copied to all 30 services, and any one of them could forge tokens."
+    theoryUrl: https://datatracker.ietf.org/doc/html/rfc7517
+    options:
+      - { text: "HS256 with one shared secret distributed to every service", correct: false }
+      - { text: "RS256 or ES256, with services verifying against a JWKS endpoint", correct: true }
+      - { text: "Unsigned tokens inside a private network", correct: false }
+      - { text: "Each service signs its own tokens with a different HS256 secret", correct: false }
+  - type: single
+    prompt: "An admin back-office needs instant session revocation when an employee leaves, plus the ability to see and kill active sessions. Which approach fits best?"
+    explanation: "Server-side sessions keep state the server controls, so deleting a session ends access immediately and active sessions can be listed. Pure stateless JWTs trade that control for scalability. For a small-audience, high-risk admin tool, the control is worth more than the stateless benefit."
+    theoryUrl: https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html
+    options:
+      - { text: "Server-side sessions with an opaque identifier in a secure cookie", correct: true }
+      - { text: "Stateless JWTs with a 24-hour lifetime and no refresh", correct: false }
+      - { text: "Stateless JWTs signed with a long-lived key", correct: false }
+      - { text: "Basic authentication on every request", correct: false }
+  - type: single
+    prompt: "Which statement best captures the zero trust principle?"
+    explanation: "Zero trust means no implicit trust based on network location: every request is authenticated, authorized and evaluated against context (identity, device, policy), whether it comes from the internet or the internal network. A perimeter firewall plus a VPN is the traditional model it moves away from."
+    theoryUrl: https://csrc.nist.gov/pubs/sp/800/207/final
+    options:
+      - {
+          text: "Never trust, always verify: location alone never makes a request trusted",
+          correct: true,
+        }
+      - { text: "Trust everything inside the VPN and verify everything outside it", correct: false }
+      - { text: "Remove authentication on internal services to reduce latency", correct: false }
+      - {
+          text: "Authenticate users once at login and trust them for the whole session, even across services",
+          correct: false,
+        }
+  - type: single
+    prompt: 'Your internal services call each other over plain HTTP because "the VPC is private". A compromised container in one subnet starts calling the billing service freely. What is the zero-trust fix?'
+    explanation: "Give each workload a verifiable identity and require mutual TLS and per-service authorization policies, so the billing service accepts only specific callers. Network location is no longer enough. A firewall rule on the outer edge or hiding the service name does not stop lateral movement."
+    theoryUrl: https://csrc.nist.gov/pubs/sp/800/207/final
+    options:
+      - {
+          text: "Add one more firewall at the VPC edge and tighten the inbound security group rules",
+          correct: false,
+        }
+      - { text: "Rename the billing service so it is harder to guess", correct: false }
+      - {
+          text: "Require mutual TLS and per-service authorization policies between workloads",
+          correct: true,
+        }
+      - { text: "Move the billing service into a larger subnet", correct: false }
+  - type: multi
+    prompt: "Which of these are typical building blocks of a zero trust architecture? Select all that apply."
+    explanation: "Strong identity for users and workloads, least-privilege authorization evaluated per request, and microsegmentation with continuous monitoring are core elements. A shared admin account used across the team is the opposite of per-identity accountability."
+    theoryUrl: https://csrc.nist.gov/pubs/sp/800/207/final
+    options:
+      - { text: "Strong identity for both users and workloads", correct: true }
+      - { text: "A single shared administrator account for convenience", correct: false }
+      - { text: "Least-privilege access decided per request", correct: true }
+      - { text: "Network segmentation with continuous logging and monitoring", correct: true }
+  - type: single
+    prompt: "In a threat model of an order API, an attacker intercepts a request and changes the `amount` field before it reaches the server, which does not verify its integrity. Which STRIDE category is this?"
+    explanation: "Modifying data in transit or at rest is Tampering, and the countermeasure is integrity protection (TLS, signatures, server-side validation of authoritative values). Spoofing is impersonating an identity, Repudiation is denying an action, and Information disclosure is about reading data."
+    theoryUrl: https://learn.microsoft.com/en-us/azure/security/develop/threat-modeling-tool-threats
+    options:
+      - { text: "Spoofing", correct: false }
+      - { text: "Repudiation", correct: false }
+      - { text: "Tampering", correct: true }
+      - { text: "Elevation of privilege", correct: false }
+  - type: single
+    prompt: "A customer disputes a large transfer, claiming they never made it, and the system has no reliable audit trail linking actions to identities. Which STRIDE threat has materialised and what mitigates it?"
+    explanation: "Repudiation is the ability to deny an action because nothing proves who did it. Mitigate with tamper-evident audit logs tied to authenticated identities and, for high-value actions, signatures or step-up confirmation. Denial of service is about availability and Spoofing is impersonation."
+    theoryUrl: https://learn.microsoft.com/en-us/azure/security/develop/threat-modeling-tool-threats
+    options:
+      - { text: "Denial of service; add rate limiting", correct: false }
+      - {
+          text: "Repudiation; keep tamper-evident audit logs linked to authenticated identities",
+          correct: true,
+        }
+      - {
+          text: "Information disclosure; encrypt the transfer table and restrict database access to admins",
+          correct: false,
+        }
+      - { text: "Spoofing; require longer passwords", correct: false }
+  - type: single
+    prompt: "When threat modeling a new system, what is a trust boundary and why does it matter?"
+    explanation: "A trust boundary is a place in the data flow diagram where data or control passes between components with different privilege or trust levels (browser to API, API to database, your service to a third party). Threats concentrate there, so you apply STRIDE to each flow that crosses one. It is not an encryption key or a physical datacenter wall."
+    theoryUrl: https://owasp.org/www-community/Threat_Modeling_Process
+    options:
+      - { text: "The boundary of the datacenter, where physical security applies", correct: false }
+      - { text: "The maximum size of a request the load balancer will accept", correct: false }
+      - {
+          text: "A point where data crosses between different trust levels; threats cluster there",
+          correct: true,
+        }
+      - { text: "The key used to encrypt data inside one service", correct: false }
+  - type: single
+    prompt: "How does envelope encryption work in a cloud KMS?"
+    explanation: "A data key encrypts the data locally, and a master key held in the KMS encrypts (wraps) that data key; only the wrapped data key is stored beside the data. This avoids sending large data to the KMS, enables cheap key rotation of the master key and keeps the master key from leaving the KMS. Encrypting everything directly with the master key does not scale."
+    theoryUrl: https://docs.aws.amazon.com/kms/latest/developerguide/concepts.html#enveloping
+    options:
+      - {
+          text: "The master key encrypts all data directly, one request per object",
+          correct: false,
+        }
+      - { text: "Data is encrypted twice with the same key for extra safety", correct: false }
+      - {
+          text: "A data key encrypts the data and a KMS-held master key encrypts the data key",
+          correct: true,
+        }
+      - { text: "The data key is stored in plaintext next to the data", correct: false }
+  - type: boolean
+    prompt: "Enabling encryption at rest on a managed database protects against an attacker who exfiltrates data through a SQL injection vulnerability in your application."
+    answer: false
+    explanation: "Encryption at rest protects against threats like stolen disks or snapshots. The database decrypts transparently for any authorised connection, including the one your vulnerable application uses, so injected queries still return plaintext. Parameterised queries and least-privilege DB roles are the controls for this threat."
+    theoryUrl: https://owasp.org/www-project-top-ten/
+  - type: single
+    prompt: "TLS terminates at the load balancer and traffic to the application instances inside the VPC is plain HTTP. The service handles payment data. What is the most appropriate change?"
+    explanation: "Sensitive data should be protected on every hop: re-encrypt from the load balancer to the backend, or use mutual TLS between services. Terminating TLS at the edge leaves internal traffic exposed to anyone with a foothold on the network, and compliance regimes for payment data typically require encryption of cardholder data in transit."
+    theoryUrl: https://cheatsheetseries.owasp.org/cheatsheets/Transport_Layer_Security_Cheat_Sheet.html
+    options:
+      - {
+          text: "No change; the VPC is private so plain HTTP is acceptable inside the network perimeter",
+          correct: false,
+        }
+      - {
+          text: "Encrypt the traffic between the load balancer and the instances as well",
+          correct: true,
+        }
+      - { text: "Compress the traffic so it is harder to read", correct: false }
+      - { text: "Move the load balancer to a different subnet", correct: false }
+  - type: single
+    prompt: "A user lookup builds SQL from input as shown. For the given `name`, which rows does the query return?"
+    code: |
+      const name = "x' OR '1'='1"
+      const query =
+        `SELECT * FROM users WHERE name = '${name}' AND active = true`
+
+      console.log(query)
+      // SELECT * FROM users WHERE name = 'x' OR '1'='1' AND active = true
+    codeLanguage: javascript
+    explanation: "`AND` binds tighter than `OR`, so the condition is `name = 'x' OR ('1'='1' AND active = true)`. That returns every active user plus any user named x, even inactive ones. Either way the attacker rewrote the logic. Use parameterised queries so input is never parsed as SQL."
+    theoryUrl: https://owasp.org/www-community/attacks/SQL_Injection
+    options:
+      - { text: "No rows, because the quotes make the statement a syntax error", correct: false }
+      - { text: "Only users whose name is exactly `x' OR '1'='1`", correct: false }
+      - { text: "All users, including inactive ones", correct: false }
+      - { text: "All active users, plus any user named x regardless of active", correct: true }
+  - type: single
+    prompt: "An endpoint `GET /api/orders/1042` returns the order for any authenticated user who requests that ID, including orders of other customers. Which OWASP Top 10 category is this, and what is the fix?"
+    explanation: "This is Broken Access Control (an insecure direct object reference). The fix is to enforce authorization on the server for every object access, for example checking that the order belongs to the caller. Hiding the ID or making it unguessable helps a little but is not a control, and authentication alone proves identity, not permission."
+    theoryUrl: https://owasp.org/Top10/A01_2021-Broken_Access_Control/
+    options:
+      - {
+          text: "Cryptographic failures; encrypt the order ID in the URL and rotate the keys regularly",
+          correct: false,
+        }
+      - { text: "Injection; sanitise the ID with a regular expression", correct: false }
+      - { text: "Security misconfiguration; disable verbose error pages", correct: false }
+      - {
+          text: "Broken access control; verify on the server that the caller owns the order",
+          correct: true,
+        }
+  - type: single
+    prompt: "An image-import feature fetches any URL a user supplies. After launch, a researcher shows it can read the cloud instance metadata service and obtain role credentials. What is this vulnerability, and what is the best mitigation?"
+    explanation: "This is Server-Side Request Forgery (SSRF): the server is tricked into making requests to internal resources such as the link-local metadata address. Mitigate with an allow-list of destinations, blocking private and link-local ranges after DNS resolution, and hardening the metadata service (for example IMDSv2). Client-side validation and HTTPS-only checks do not stop it."
+    theoryUrl: https://owasp.org/Top10/A10_2021-Server-Side_Request_Forgery_%28SSRF%29/
+    options:
+      - {
+          text: "CSRF; add an anti-forgery token to the form and validate the Origin header on every request",
+          correct: false,
+        }
+      - { text: "XSS; escape the URL when rendering it in HTML", correct: false }
+      - {
+          text: "SSRF; allow-list destinations, block internal ranges, harden the metadata service",
+          correct: true,
+        }
+      - { text: "Open redirect; require the URL to use HTTPS", correct: false }
+  - type: single
+    prompt: "Which approach is appropriate for storing user passwords?"
+    explanation: "Use a slow, salted, memory-hard password hashing function such as Argon2id, scrypt or bcrypt, tuned so one guess is expensive. Fast general-purpose hashes like SHA-256 allow billions of guesses per second on GPUs, and reversible encryption lets an attacker with the key recover every password."
+    theoryUrl: https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html
+    options:
+      - { text: "Encrypt passwords with AES so support can recover them", correct: false }
+      - {
+          text: "Hash with SHA-256 and a global pepper stored in the database next to the hashes",
+          correct: false,
+        }
+      - { text: "Hash with plain MD5 and store the result in a separate table", correct: false }
+      - {
+          text: "Hash with Argon2id, scrypt or bcrypt using a unique salt per password",
+          correct: true,
+        }

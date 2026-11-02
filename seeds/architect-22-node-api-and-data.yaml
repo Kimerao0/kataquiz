@@ -1,0 +1,456 @@
+version: 1
+title: "Architect Roadmap 22: APIs and data in Node.js services"
+description: REST vs GraphQL vs gRPC, idempotency, pagination, Redis caching, connection pooling, and transactions and consistency across services.
+language: en
+tags: [architect-roadmap, nodejs, api-design, caching, databases, consistency]
+run:
+  questionsPerRun: 10
+  maxErrors: 3
+  timePerQuestionSec: 90
+questions:
+  - type: single
+    prompt: "A mobile app has twelve screens, each needing a different slice of the same user, order and product data. With the current REST API, screens make 4 to 6 calls each and download many unused fields on slow networks. Which change fits best?"
+    explanation: "This is the classic over-fetching and under-fetching case that GraphQL (or a backend-for-frontend aggregating endpoints) addresses: the client asks for exactly the fields it needs in one request. gRPC is not a good fit for mobile-to-API in most setups and does not change what gets fetched, and adding more fine-grained REST endpoints increases the round trips."
+    theoryUrl: https://graphql.org/learn/
+    options:
+      - {
+          text: "Expose a GraphQL layer or a BFF so each screen gets one tailored response",
+          correct: true,
+        }
+      - {
+          text: "Add one extra REST endpoint per screen and per field combination, and version each as the screens evolve",
+          correct: false,
+        }
+      - { text: "Replace the REST API with gRPC so the payloads are smaller", correct: false }
+      - {
+          text: "Compress the responses with gzip so that unused fields cost nothing",
+          correct: false,
+        }
+  - type: single
+    prompt: "Forty internal services written in Go, Java and Node.js call each other thousands of times per second. You want strict typed contracts, code generation for every language, and server-side streaming for some calls. Which protocol do you choose between them?"
+    explanation: "gRPC uses Protocol Buffers over HTTP/2, which gives compact binary messages, generated clients in many languages, deadlines and native streaming, a good fit for internal polyglot service-to-service traffic. REST with JSON can do the job but has no enforced contract or streaming model, and GraphQL is designed for flexible client queries, not for internal RPC."
+    theoryUrl: https://grpc.io/docs/what-is-grpc/introduction/
+    options:
+      - {
+          text: "GraphQL, since each service can then query exactly the fields it needs",
+          correct: false,
+        }
+      - { text: "REST with JSON, because every language has an HTTP client", correct: false }
+      - {
+          text: "SOAP, because it has the strictest contract definition of the options",
+          correct: false,
+        }
+      - {
+          text: "gRPC with Protocol Buffers, since it gives typed contracts and streaming",
+          correct: true,
+        }
+  - type: single
+    prompt: "You are designing a public read-heavy API for third-party developers (catalog data that changes a few times a day). You want CDN and browser caching to absorb most of the traffic. Which style benefits most out of the box?"
+    explanation: "REST over HTTP maps resources to URLs, and `GET` responses can be cached by browsers, proxies and CDNs using standard headers (`Cache-Control`, `ETag`). GraphQL typically sends queries as `POST` to a single endpoint, so HTTP caching does not apply without extra work (persisted queries, GET queries). gRPC is not cacheable by generic HTTP intermediaries."
+    theoryUrl: https://developer.mozilla.org/en-US/docs/Web/HTTP/Caching
+    options:
+      - {
+          text: "GraphQL, because the clients choose their fields and so every response is small",
+          correct: false,
+        }
+      - { text: "gRPC, since binary messages are cached more efficiently by CDNs", correct: false }
+      - {
+          text: "REST with `GET` on resource URLs, using `Cache-Control` and `ETag`",
+          correct: true,
+        }
+      - {
+          text: "All three styles cache equally, as caching is independent of the protocol",
+          correct: false,
+        }
+  - type: single
+    prompt: "A GraphQL endpoint returns a list of 50 posts, each with its author. The database log shows 1 query for the posts and then 50 queries for authors, one per post. What is the standard fix?"
+    explanation: "This is the N+1 problem: each `author` resolver runs its own query. A batching layer such as DataLoader collects all the author ids requested in the same tick and loads them with one query (`WHERE id IN (...)`), also caching per request. Raising the pool size or adding an HTTP cache does not remove the extra queries."
+    theoryUrl: https://graphql.org/learn/execution/
+    options:
+      - {
+          text: "Increase the connection pool size so the 50 queries run in parallel",
+          correct: false,
+        }
+      - {
+          text: "Batch the author lookups with DataLoader so that one query fetches all the ids",
+          correct: true,
+        }
+      - {
+          text: "Add `Cache-Control` headers to the GraphQL response so clients and CDNs stop asking the server for authors again",
+          correct: false,
+        }
+      - {
+          text: "Return at most 5 posts per request so that the number of queries drops",
+          correct: false,
+        }
+  - type: boolean
+    prompt: "Browsers can call a gRPC service directly with `fetch`, with no proxy or special client library, because gRPC runs over HTTP/2."
+    answer: false
+    explanation: "gRPC needs trailers and fine-grained control of HTTP/2 framing that browser APIs do not expose, so browsers use gRPC-Web through a proxy (such as Envoy) or a Connect-style protocol. That is one reason gRPC is mostly used between backend services."
+    theoryUrl: https://grpc.io/docs/platforms/web/basics/
+  - type: multi
+    prompt: "According to the HTTP specification, which methods are defined as idempotent? Select all that apply."
+    explanation: "`PUT` (replace), `DELETE` (remove) and `GET` have the same intended effect on the server whether you send them once or many times. `POST` is not idempotent: each call may create a new resource. `PATCH` is not guaranteed to be idempotent, because it may describe a relative change (for example 'increment')."
+    theoryUrl: https://developer.mozilla.org/en-US/docs/Glossary/Idempotent
+    options:
+      - { text: "`POST`", correct: false }
+      - { text: "`PUT`", correct: true }
+      - { text: "`DELETE`", correct: true }
+      - { text: "`PATCH`", correct: false }
+      - { text: "`GET`", correct: true }
+  - type: single
+    prompt: "What does this script print?"
+    code: |
+      const seen = new Map()
+      function handle(key, amount) {
+        if (seen.has(key)) return seen.get(key)
+        const result = { charged: amount }
+        seen.set(key, result)
+        console.log('charging', amount)
+        return result
+      }
+      const a = handle('k1', 10)
+      const b = handle('k1', 99)
+      console.log(a === b, b.charged)
+    codeLanguage: javascript
+    explanation: "The second call finds the key already stored and returns the first result without charging, so only `charging 10` is logged, and `a === b` is `true` with `charged` still 10. This is the core of an idempotency key. In a real service the store must be durable and shared, and you should also check that the payload matches."
+    theoryUrl: https://developer.mozilla.org/en-US/docs/Glossary/Idempotent
+    options:
+      - { text: "charging 10, then charging 99, then false 99", correct: false }
+      - { text: "charging 10, then true 99", correct: false }
+      - { text: "charging 10, then false 10", correct: false }
+      - { text: "charging 10, then true 10", correct: true }
+  - type: single
+    prompt: "A mobile client calls `POST /payments`, the network drops before it receives the response, and the client retries. You must guarantee the customer is charged once, even if the two requests arrive at the same time on different instances. What do you implement?"
+    explanation: "Require an `Idempotency-Key` header and store the key with the outcome in a shared database, protected by a unique constraint so that concurrent duplicates cannot both proceed: the second one waits or receives the stored result. A per-instance in-memory check fails across instances, and disabling retries leaves the client unable to recover from timeouts."
+    theoryUrl: https://datatracker.ietf.org/doc/draft-ietf-httpapi-idempotency-key-header/
+    options:
+      - { text: "An in-memory `Map` of recent request bodies in each instance", correct: false }
+      - { text: "A rule that clients must never retry a `POST` request", correct: false }
+      - {
+          text: "A short delay before processing the payment, so that a duplicate request has time to arrive and be merged",
+          correct: false,
+        }
+      - {
+          text: "An `Idempotency-Key` stored in the shared DB under a unique constraint, with the result kept",
+          correct: true,
+        }
+  - type: single
+    prompt: "Your payments API stores idempotency keys. A client sends `POST /payments` with key `abc` and amount 10, then later sends key `abc` again with amount 500. How should the API respond?"
+    explanation: "Reusing a key with a different payload is a client bug that could silently cause the wrong money movement, so the API should reject it with an error (commonly 422 or 409) rather than replaying the old response or processing the new one. Replaying the first result would hide the mistake, and processing it would break the guarantee."
+    theoryUrl: https://datatracker.ietf.org/doc/draft-ietf-httpapi-idempotency-key-header/
+    options:
+      - {
+          text: "Process the 500 payment, since the newest request reflects the client's intent, and overwrite the stored key and result",
+          correct: false,
+        }
+      - { text: "Return the stored response for amount 10 and ignore the new body", correct: false }
+      - {
+          text: "Reject it with an error, as the same key must not be used for a different request",
+          correct: true,
+        }
+      - { text: "Delete the stored key and handle the request as a brand new one", correct: false }
+  - type: single
+    prompt: "An `/orders` endpoint uses `LIMIT 20 OFFSET n` on a table with 50 million rows. Deep pages (offset in the hundreds of thousands) are slow, and users scrolling a live feed see some orders twice when new ones are inserted. What do you change?"
+    explanation: "Offset pagination makes the database scan and discard all the skipped rows, so cost grows with the page number, and inserts shift the offsets, causing duplicates or gaps. Keyset (cursor) pagination filters with `WHERE (created_at, id) < (last values)` on an index, which stays fast and stable. Caching the pages or raising `LIMIT` does not remove the shifting."
+    theoryUrl: https://use-the-index-luke.com/no-offset
+    options:
+      - {
+          text: "Keyset pagination on an indexed, unique sort key, returned as an opaque cursor",
+          correct: true,
+        }
+      - {
+          text: "Cache each page in Redis for an hour so that deep pages are served from memory",
+          correct: false,
+        }
+      - { text: "Raise `LIMIT` to 1000 so that clients need fewer pages", correct: false }
+      - { text: "Add an index on every column so the offset scan is faster", correct: false }
+  - type: single
+    prompt: "Orders are listed newest first, `ORDER BY created_at DESC, id DESC`. The last row of the previous page had `created_at = $1` and `id = $2`. Which query fetches the next page correctly with keyset pagination?"
+    code: |
+      -- A
+      SELECT * FROM orders WHERE created_at < $1
+      ORDER BY created_at DESC, id DESC LIMIT 20;
+      -- B
+      SELECT * FROM orders WHERE (created_at, id) < ($1, $2)
+      ORDER BY created_at DESC, id DESC LIMIT 20;
+      -- C
+      SELECT * FROM orders WHERE id < $2
+      ORDER BY created_at DESC, id DESC LIMIT 20;
+      -- D
+      SELECT * FROM orders WHERE (created_at, id) > ($1, $2)
+      ORDER BY created_at DESC, id DESC LIMIT 20;
+    codeLanguage: sql
+    explanation: "B compares the sort key as a row value, so ties on `created_at` are broken by `id` and no row is skipped or repeated. A skips every other order with the same timestamp as the last one. C ignores the primary sort column, and D uses the wrong direction for a descending sort."
+    theoryUrl: https://www.postgresql.org/docs/current/functions-comparisons.html#ROW-WISE-COMPARISON
+    options:
+      - { text: "A", correct: false }
+      - { text: "B", correct: true }
+      - { text: "C", correct: false }
+      - { text: "D", correct: false }
+  - type: single
+    prompt: "Why do most public APIs return pagination cursors as opaque strings (for example a base64 token) rather than documenting the raw `(created_at, id)` values?"
+    explanation: "An opaque cursor lets the server change the sort keys, add filters or switch implementation without breaking clients, and discourages clients from building or editing cursors. It is not about security: base64 is trivially decoded, so a cursor that carries sensitive data should be signed or encrypted."
+    theoryUrl: https://docs.github.com/en/graphql/guides/using-pagination-in-the-graphql-api
+    options:
+      - {
+          text: "Base64 encoding makes the cursor tamper-proof, so clients cannot forge pages",
+          correct: false,
+        }
+      - {
+          text: "It lets the server change its pagination internals without breaking clients",
+          correct: true,
+        }
+      - {
+          text: "Opaque cursors are required by the HTTP specification for paginated lists",
+          correct: false,
+        }
+      - {
+          text: "Raw values cannot be put in a URL, so they must always be encoded",
+          correct: false,
+        }
+  - type: single
+    prompt: "A product page is served with a Redis cache-aside layer (read cache, else read DB and fill cache). When an admin edits a product, customers keep seeing the old price for up to an hour, the TTL. Which change gives fresh data with the least added complexity?"
+    explanation: "On write, update the database and then delete (invalidate) the cache key, so the next read refills it with fresh data, and keep the TTL as a safety net. Writing the cache first risks inconsistency if the database write fails, and lowering the TTL to a few seconds gives up the benefit of the cache."
+    theoryUrl: https://learn.microsoft.com/en-us/azure/architecture/patterns/cache-aside
+    options:
+      - { text: "Lower the TTL to 2 seconds so that stale data barely matters", correct: false }
+      - {
+          text: "Update the DB, then delete the product's cache key, keeping the TTL as a fallback",
+          correct: true,
+        }
+      - { text: "Update the cache first, and write to the DB in the background", correct: false }
+      - { text: "Remove the cache for products and rely on the DB indexes alone", correct: false }
+  - type: single
+    prompt: "What does this script print?"
+    code: |
+      const cache = new Map()
+      let loads = 0
+      async function load(id) {
+        loads++
+        await new Promise((r) => setTimeout(r, 10))
+        return 'v' + id
+      }
+      async function get(id) {
+        if (cache.has(id)) return cache.get(id)
+        const v = await load(id)
+        cache.set(id, v)
+        return v
+      }
+      Promise.all([get(1), get(1), get(1)]).then(() => console.log('loads', loads))
+    codeLanguage: javascript
+    explanation: "All three calls run before the first `load` finishes, so each finds the cache empty and triggers its own load: `loads 3`. This is a cache stampede in miniature. Caching the promise itself (`cache.set(id, load(id))`) makes concurrent callers share one load, which would print `loads 1`."
+    theoryUrl: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise
+    options:
+      - { text: "loads 3", correct: true }
+      - { text: "loads 1", correct: false }
+      - { text: "loads 0", correct: false }
+      - { text: "loads 2", correct: false }
+  - type: single
+    prompt: "A very popular cache key (the homepage feed) expires, and within a second thousands of concurrent requests miss the cache and hammer the database, which slows down and starts to time out. Which mitigation targets this problem directly?"
+    explanation: "This is a cache stampede (thundering herd). Single-flight or a short lock so only one request recomputes, serving slightly stale data while refreshing, and adding jitter to TTLs so hot keys do not expire together all prevent the herd. A bigger pool or more database replicas just lets more of the herd through."
+    theoryUrl: https://learn.microsoft.com/en-us/azure/architecture/patterns/cache-aside
+    options:
+      - {
+          text: "Let one request recompute the value while the others wait or get the stale copy",
+          correct: true,
+        }
+      - {
+          text: "Increase the database connection pool so that all requests can reach it",
+          correct: false,
+        }
+      - {
+          text: "Set the TTL of every key to exactly the same value to keep it predictable",
+          correct: false,
+        }
+      - { text: "Disable the cache for the homepage so that load is evenly spread", correct: false }
+  - type: single
+    prompt: "A lookup endpoint `/users/:id` is cached with Redis. An attacker requests millions of random non-existent ids. Every request misses the cache and queries the database, which returns nothing. What mitigates this best?"
+    explanation: "This is cache penetration: results that do not exist are never cached, so the cache gives no protection. Cache the 'not found' result with a short TTL, and/or filter impossible ids with a Bloom filter or input validation, and rate-limit the abuser. Increasing the TTL of existing entries does nothing for keys that are never stored."
+    theoryUrl: https://learn.microsoft.com/en-us/azure/architecture/patterns/cache-aside
+    options:
+      - { text: "Raise the TTL of all positive entries to 24 hours", correct: false }
+      - {
+          text: "Cache negative results briefly, validate ids and add rate limiting or a Bloom filter",
+          correct: true,
+        }
+      - { text: "Make the cache larger so it can store every possible id", correct: false }
+      - { text: "Return a 500 error for unknown ids so the clients retry later", correct: false }
+  - type: single
+    prompt: "Postgres allows 100 connections. You run 20 Node.js instances, each with a pool configured with `max: 10`. Under load you see `too many clients already` errors. What is the best fix?"
+    explanation: "Twenty instances times 10 connections can open 200 connections, twice what Postgres allows. Size the pools so that the total (instances times max, plus admin headroom) stays within the limit, or put a pooler such as PgBouncer in front so many app connections share few server connections. Raising `max` makes it worse."
+    theoryUrl: https://node-postgres.com/features/pooling
+    options:
+      - {
+          text: "Raise `max` to 50 so each instance rarely has to wait for a connection",
+          correct: false,
+        }
+      - {
+          text: "Create a new connection per query so that the pool never runs out",
+          correct: false,
+        }
+      - {
+          text: "Budget the pool size per instance against the DB limit, or add PgBouncer",
+          correct: true,
+        }
+      - {
+          text: "Restart the instances every hour so that idle connections are cleaned up",
+          correct: false,
+        }
+  - type: single
+    prompt: "An API runs as serverless functions that scale to hundreds of concurrent invocations, each opening its own database connection. The database is overwhelmed by connections although the query load is small. What is the appropriate fix?"
+    explanation: "Each function instance holds its own connection, so concurrency multiplies connections. A connection pooler between the functions and the database (PgBouncer, RDS Proxy, a serverless driver or an HTTP data API) multiplexes many clients onto few server connections. A bigger database instance only raises the limit a little, and a cache does not reduce the number of connections opened."
+    theoryUrl: https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/rds-proxy.html
+    options:
+      - {
+          text: "Upgrade to a larger database instance class to get more memory for connections",
+          correct: false,
+        }
+      - {
+          text: "Place a connection pooler or proxy between the functions and the database",
+          correct: true,
+        }
+      - {
+          text: "Increase the idle timeout so each function holds its connection for longer",
+          correct: false,
+        }
+      - {
+          text: "Add a Redis cache for all queries so the database sees no connections",
+          correct: false,
+        }
+  - type: single
+    prompt: "A handler uses a `pg` pool. Under errors, the service gradually stops responding: new requests hang waiting for a connection. Which version of the handler avoids the problem?"
+    code: |
+      // A
+      const client = await pool.connect()
+      const res = await client.query(sql, params)
+      client.release()
+      return res.rows
+
+      // B
+      const client = await pool.connect()
+      try {
+        const res = await client.query(sql, params)
+        return res.rows
+      } finally {
+        client.release()
+      }
+
+      // C
+      const client = await pool.connect()
+      const res = await client.query(sql, params).catch(() => null)
+      return res?.rows
+
+      // D
+      const client = new Client()
+      await client.connect()
+      return (await client.query(sql, params)).rows
+    codeLanguage: javascript
+    explanation: "In A, if `query` throws, `release()` never runs and the connection is leaked until the pool is exhausted. B releases it in `finally` in every case. C never releases at all, and D opens a new connection per call and never closes it, bypassing the pool. For a single query, `pool.query()` does the acquire and release for you."
+    theoryUrl: https://node-postgres.com/features/pooling#checkout-use-and-return
+    options:
+      - { text: "A", correct: false }
+      - { text: "B", correct: true }
+      - { text: "C", correct: false }
+      - { text: "D", correct: false }
+  - type: single
+    prompt: "Placing an order must reserve stock in the Inventory service, charge the customer in the Payments service and create the order in the Orders service. Each has its own database. If the payment fails, the stock reservation must be undone. What approach is the standard fit?"
+    explanation: "With a database per service you cannot use one ACID transaction. A saga runs a sequence of local transactions and, if a step fails, runs compensating actions (release the stock) for the steps already done, accepting eventual consistency. Two-phase commit across services is fragile and blocks, and wrapping the calls in one local transaction does not span other services' databases."
+    theoryUrl: https://microservices.io/patterns/data/saga.html
+    options:
+      - {
+          text: "A saga of local transactions with compensating actions for failed steps",
+          correct: true,
+        }
+      - {
+          text: "One database transaction opened by the Orders service around the three HTTP calls",
+          correct: false,
+        }
+      - {
+          text: "Let each service retry forever until all three steps happen to be successful",
+          correct: false,
+        }
+      - {
+          text: "Merge the three databases into one so that a single transaction can cover them",
+          correct: false,
+        }
+  - type: single
+    prompt: "A service saves an order in its database and then publishes `OrderCreated` to a message broker. Sometimes the process crashes between the two steps, so the order exists but no event is ever sent. What pattern solves this dual-write problem?"
+    explanation: "The transactional outbox writes the event into an outbox table in the same local transaction as the order, and a separate relay (poller or CDC) publishes it to the broker, with at-least-once delivery. Publishing first and saving second just flips the failure mode, and a retry loop inside the handler is lost when the process crashes."
+    theoryUrl: https://microservices.io/patterns/data/transactional-outbox.html
+    options:
+      - {
+          text: "Publish the event first, and only then save the order in the database",
+          correct: false,
+        }
+      - {
+          text: "Wrap both operations in `try/catch` and retry the publish in a loop",
+          correct: false,
+        }
+      - {
+          text: "Write the event to an outbox table in the same transaction and relay it afterwards",
+          correct: true,
+        }
+      - {
+          text: "Use a longer broker timeout and a bigger connection pool, so the publish call is much less likely to fail",
+          correct: false,
+        }
+  - type: single
+    prompt: "Two concurrent requests withdraw 80 from an account with a balance of 100. Your code does `SELECT balance`, checks `balance >= 80` in Node, then `UPDATE accounts SET balance = balance - 80`. Occasionally the balance goes negative. What is the most robust fix?"
+    explanation: "This is a lost-update or check-then-act race: both transactions read 100 before either writes. Lock the row with `SELECT ... FOR UPDATE`, or do the check and update atomically with `UPDATE ... SET balance = balance - 80 WHERE balance >= 80`, or use SERIALIZABLE isolation with retries. An in-process mutex fails across instances, and re-reading in JavaScript leaves the window open."
+    theoryUrl: https://www.postgresql.org/docs/current/transaction-iso.html
+    options:
+      - { text: "Add a JavaScript mutex around the withdrawal function", correct: false }
+      - { text: "Check the balance a second time in Node just before the update", correct: false }
+      - {
+          text: "Make the check part of the SQL, with a row lock or `WHERE balance >= 80` on the update",
+          correct: true,
+        }
+      - {
+          text: "Use `READ UNCOMMITTED` so each transaction sees the other's change",
+          correct: false,
+        }
+  - type: boolean
+    prompt: "A two-phase commit (distributed XA transaction) across all your microservices' databases is the recommended default for keeping them consistent."
+    answer: false
+    explanation: "Two-phase commit couples the availability of all participants, holds locks while waiting for the coordinator, and is unsupported by many modern datastores and brokers. Most microservice systems prefer sagas, outbox and idempotent consumers, accepting eventual consistency."
+    theoryUrl: https://microservices.io/patterns/data/saga.html
+  - type: single
+    prompt: "Your read-heavy API sends reads to a replica with some replication lag. A user updates their profile, the page redirects to the profile view, and the old data appears for a second or two. What is a pragmatic fix?"
+    explanation: "The user needs read-your-writes consistency. Route that user's reads to the primary for a short window after a write (or until the replica has reached their write's position). Disabling replicas or waiting with `setTimeout` before redirecting is wasteful and brittle, and caching the stale profile longer makes it worse."
+    theoryUrl: https://www.postgresql.org/docs/current/warm-standby.html
+    options:
+      - {
+          text: "Read from the primary for that user for a short time after they write",
+          correct: true,
+        }
+      - {
+          text: "Add a 3 second `setTimeout` before the redirect so the replica has caught up",
+          correct: false,
+        }
+      - { text: "Remove the replicas and send every read to the primary", correct: false }
+      - {
+          text: "Increase the cache TTL of the profile so that the page loads faster",
+          correct: false,
+        }
+  - type: single
+    prompt: "Two admins open the same product in an editor, and both save changes. The second save silently overwrites the first admin's edits. The API is REST over HTTP. Which mechanism prevents this lost update?"
+    explanation: "Optimistic concurrency with a version: the `GET` returns an `ETag` (or a version field), and the client sends it back in `If-Match` on `PUT`. If the resource changed, the server responds `412 Precondition Failed` and the client must merge. Locks held across a human editing session are fragile, and last-write-wins is the problem itself."
+    theoryUrl: https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/If-Match
+    options:
+      - {
+          text: "Use `ETag` on reads and `If-Match` on writes, answering 412 when stale",
+          correct: true,
+        }
+      - {
+          text: "Switch the update from `PUT` to `PATCH`, because patches never overwrite data",
+          correct: false,
+        }
+      - {
+          text: "Hold a database row lock for as long as an admin has the editor open",
+          correct: false,
+        }
+      - {
+          text: "Cache the product for a minute so that two admins cannot save at once",
+          correct: false,
+        }

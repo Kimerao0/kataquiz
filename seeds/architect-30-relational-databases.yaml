@@ -1,0 +1,327 @@
+version: 1
+title: "Architect Roadmap 30: Relational databases in depth"
+description: Indexes and query plans, transaction isolation levels, locks and deadlocks, normalization versus denormalization, and zero-downtime schema migrations.
+language: en
+tags: [architect-roadmap, data, postgresql, sql, transactions]
+run:
+  questionsPerRun: 10
+  maxErrors: 3
+  timePerQuestionSec: 60
+questions:
+  - type: single
+    prompt: "A table `orders(customer_id, status, created_at)` has a composite B-tree index on `(customer_id, status)`. Which query can use the index for an efficient seek?"
+    explanation: "A composite B-tree index is ordered by its leftmost column first, so it supports filters on a leading prefix: `customer_id`, or `customer_id` and `status`. A filter only on `status` cannot seek into it. The same principle holds in PostgreSQL, MySQL and SQLite."
+    theoryUrl: https://www.postgresql.org/docs/current/indexes-multicolumn.html
+    options:
+      - { text: "WHERE status = 'paid'", correct: false }
+      - { text: "WHERE created_at > now() - interval '1 day'", correct: false }
+      - { text: "WHERE customer_id = 42", correct: true }
+      - { text: "WHERE status = 'paid' ORDER BY created_at", correct: false }
+  - type: single
+    prompt: "What do these queries return on tables `a(id)` = {1,2,3} and `b(id)` = {1, NULL}?"
+    code: |
+      -- Q1
+      SELECT id FROM a WHERE id NOT IN (SELECT id FROM b);
+      -- Q2
+      SELECT id FROM a WHERE NOT EXISTS (
+        SELECT 1 FROM b WHERE b.id = a.id
+      );
+    codeLanguage: sql
+    explanation: "`NOT IN` against a set containing NULL yields UNKNOWN for every non-matching row, so Q1 returns no rows. `NOT EXISTS` compares row by row and ignores the NULL, so Q2 returns 2 and 3. Prefer `NOT EXISTS` for anti-joins."
+    theoryUrl: https://www.postgresql.org/docs/current/functions-subquery.html
+    options:
+      - { text: "Q1 returns 2 and 3, Q2 returns 2 and 3", correct: false }
+      - { text: "Q1 returns 2 and 3, Q2 returns nothing", correct: false }
+      - { text: "Q1 returns nothing, Q2 returns 2 and 3", correct: true }
+      - { text: "Both return nothing", correct: false }
+  - type: single
+    prompt: "A query is slow. In PostgreSQL you run `EXPLAIN (ANALYZE, BUFFERS)` and see a `Seq Scan` over 5 million rows that returns 12 rows, with `Rows Removed by Filter: 4999988`. What is the most likely fix?"
+    explanation: "Filtering out almost every row after scanning the entire table signals a missing, or unusable, index on the filter column. Adding a suitable index lets the planner use an index scan. More work_mem helps sorts and hashes, not filtering, and VACUUM FULL does not change the access path."
+    theoryUrl: https://www.postgresql.org/docs/current/using-explain.html
+    options:
+      - { text: "Increase `work_mem`", correct: false }
+      - {
+          text: "Run VACUUM FULL on the table to reclaim dead space and force the planner to choose an index scan",
+          correct: false,
+        }
+      - { text: "Add an index on the filtered column, if the predicate can use it", correct: true }
+      - { text: "Convert the table to unlogged", correct: false }
+  - type: single
+    prompt: "An index exists on `users(email)`, but `WHERE lower(email) = 'a@b.com'` still performs a sequential scan in PostgreSQL. Why?"
+    explanation: "The index stores raw `email` values, and the predicate applies a function to the column, so the planner cannot use it. An expression index on `lower(email)` (or a citext column) solves it. Statistics and index size are not the cause here."
+    theoryUrl: https://www.postgresql.org/docs/current/indexes-expressional.html
+    options:
+      - { text: "B-tree indexes cannot be used for equality", correct: false }
+      - { text: "The planner statistics are always wrong for text columns", correct: false }
+      - {
+          text: "Indexes are ignored by the planner whenever the table has fewer than about a million rows, whatever the predicate",
+          correct: false,
+        }
+      - {
+          text: "The function applied to the column means a plain index on `email` cannot match",
+          correct: true,
+        }
+  - type: single
+    prompt: "A covering index lets PostgreSQL answer a query with an index-only scan. What does it require?"
+    explanation: "All columns the query needs must be present in the index (for example with `INCLUDE`), and the visibility map must show the pages as all-visible, which VACUUM maintains. Otherwise the executor still visits the heap."
+    theoryUrl: https://www.postgresql.org/docs/current/indexes-index-only-scans.html
+    options:
+      - { text: "The index must be unique", correct: false }
+      - {
+          text: "The query must have an ORDER BY clause matching the index order, otherwise the planner never uses the index alone",
+          correct: false,
+        }
+      - { text: "The table must be partitioned", correct: false }
+      - {
+          text: "The index must hold every column the query reads, and pages must be all-visible",
+          correct: true,
+        }
+  - type: single
+    prompt: "In PostgreSQL's default READ COMMITTED level, a transaction runs `SELECT balance FROM accounts WHERE id = 1` twice. Between the two reads another transaction commits an update to that row. What does the first transaction see?"
+    explanation: "READ COMMITTED takes a new snapshot for each statement, so the second SELECT sees the committed update (a non-repeatable read). REPEATABLE READ would keep the same snapshot for the whole transaction and return the same value twice."
+    theoryUrl: https://www.postgresql.org/docs/current/transaction-iso.html
+    options:
+      - { text: "The same balance twice, because reads are always repeatable", correct: false }
+      - { text: "An error on the second read for a serialization failure", correct: false }
+      - { text: "The old balance, then the new balance", correct: true }
+      - { text: "The new balance, then the old balance", correct: false }
+  - type: single
+    prompt: "Two concurrent transactions at REPEATABLE READ in PostgreSQL both read 'on-call doctors = 2' and each removes a different doctor from the roster (an UPDATE of a different row each). Both commit. Zero doctors are on call. What anomaly is this?"
+    explanation: "This is write skew: each transaction made a decision based on a snapshot and wrote disjoint rows, so no row-level conflict is detected. Snapshot isolation allows it. SERIALIZABLE (SSI in PostgreSQL), or explicit locking such as `SELECT ... FOR UPDATE` on the rows read, prevents it."
+    theoryUrl: https://www.postgresql.org/docs/current/transaction-iso.html
+    options:
+      - { text: "Dirty read", correct: false }
+      - { text: "Lost update", correct: false }
+      - { text: "Phantom read caused by READ UNCOMMITTED", correct: false }
+      - { text: "Write skew", correct: true }
+  - type: single
+    prompt: "Which isolation level in PostgreSQL prevents write skew without manual locking?"
+    explanation: "SERIALIZABLE uses Serializable Snapshot Isolation, detecting dangerous dependency patterns and aborting one transaction with a serialization failure, so applications must be ready to retry. REPEATABLE READ is snapshot isolation and allows write skew, and READ UNCOMMITTED behaves like READ COMMITTED in PostgreSQL."
+    theoryUrl: https://www.postgresql.org/docs/current/transaction-iso.html
+    options:
+      - { text: "READ COMMITTED", correct: false }
+      - { text: "SERIALIZABLE, with retries on serialization failures", correct: true }
+      - { text: "READ UNCOMMITTED", correct: false }
+      - {
+          text: "REPEATABLE READ, because its snapshot blocks every concurrent anomaly including write skew",
+          correct: false,
+        }
+  - type: single
+    prompt: "Transaction A updates row 1 then row 2. Transaction B updates row 2 then row 1. Both run concurrently and each waits for the other. What happens in PostgreSQL?"
+    explanation: "This is a deadlock. PostgreSQL detects it after `deadlock_timeout` and aborts one transaction with an error, so the other continues. The application should retry the aborted one. Consistent lock ordering (always update rows in the same order) avoids it."
+    theoryUrl: https://www.postgresql.org/docs/current/explicit-locking.html#LOCKING-DEADLOCKS
+    options:
+      - { text: "Both wait forever until an admin kills one", correct: false }
+      - {
+          text: "PostgreSQL detects the deadlock and aborts one transaction with an error",
+          correct: true,
+        }
+      - {
+          text: "Both commit, since PostgreSQL uses MVCC to avoid row locks on updates and lets the last writer win",
+          correct: false,
+        }
+      - { text: "The later transaction silently skips its update", correct: false }
+  - type: single
+    prompt: "How do you best reduce deadlocks between transactions that each update several account rows?"
+    explanation: "Acquire locks in a consistent global order (for example sort by account id before updating), and keep transactions short. Longer timeouts and higher isolation do not break a circular wait."
+    theoryUrl: https://www.postgresql.org/docs/current/explicit-locking.html#LOCKING-DEADLOCKS
+    options:
+      - { text: "Increase the lock timeout so transactions wait longer", correct: false }
+      - { text: "Use SERIALIZABLE for every transaction", correct: false }
+      - { text: "Update rows in a consistent order and keep transactions short", correct: true }
+      - { text: "Disable autovacuum during peak hours", correct: false }
+  - type: single
+    prompt: "A job needs to pick the next pending task and mark it as running. Ten workers do this concurrently. Which query pattern avoids workers blocking each other or taking the same task?"
+    explanation: "`SELECT ... FOR UPDATE SKIP LOCKED` lets each worker lock a different pending row, skipping rows locked by others, which is the standard way to build a queue in PostgreSQL. Plain `FOR UPDATE` makes workers queue behind one row, and an unlocked SELECT then UPDATE lets two workers pick the same task."
+    theoryUrl: https://www.postgresql.org/docs/current/sql-select.html#SQL-FOR-UPDATE-SHARE
+    options:
+      - {
+          text: "SELECT the first pending row, then UPDATE it by id in a separate statement",
+          correct: false,
+        }
+      - {
+          text: "SELECT the first pending row FOR UPDATE, without any other options",
+          correct: false,
+        }
+      - { text: "SELECT ... FOR UPDATE SKIP LOCKED LIMIT 1", correct: true }
+      - { text: "LOCK TABLE tasks IN ACCESS EXCLUSIVE MODE for each pick", correct: false }
+  - type: single
+    prompt: "What does this query return?"
+    code: |
+      CREATE TABLE u (g int, v int);
+      INSERT INTO u VALUES (1, 10), (1, NULL), (2, NULL);
+
+      SELECT g, count(*) AS n, count(v) AS nv, sum(v) AS s
+      FROM u GROUP BY g ORDER BY g;
+    codeLanguage: sql
+    explanation: "`count(*)` counts rows, `count(v)` ignores NULLs, and `sum` ignores NULLs but returns NULL when no non-null value exists. Group 1 gives n=2, nv=1, s=10 and group 2 gives n=1, nv=0, s=NULL."
+    theoryUrl: https://www.postgresql.org/docs/current/functions-aggregate.html
+    options:
+      - { text: "(1, 2, 2, 10) and (2, 1, 1, 0)", correct: false }
+      - { text: "(1, 2, 1, 10) and (2, 1, 0, NULL)", correct: true }
+      - { text: "(1, 1, 1, 10) and (2, 0, 0, NULL)", correct: false }
+      - { text: "(1, 2, 1, 10) and (2, 1, 0, 0)", correct: false }
+  - type: single
+    prompt: "An `orders` table stores `customer_name` and `customer_address` in every row, and a customer moved house. Which normalization problem does this show?"
+    explanation: "Repeating customer facts across many rows creates update anomalies: changing the address means updating many rows, and partial updates leave inconsistent data. Moving customers to their own table (3NF) and referencing it removes the redundancy."
+    theoryUrl: https://en.wikipedia.org/wiki/Database_normalization
+    options:
+      - { text: "An update anomaly, caused by redundant non-key attributes", correct: true }
+      - { text: "A phantom read, caused by missing index locks", correct: false }
+      - { text: "A deadlock, caused by wide rows", correct: false }
+      - {
+          text: "A hot partition, caused by uneven key distribution across the rows of the table",
+          correct: false,
+        }
+  - type: single
+    prompt: "A reporting query joins 7 tables to show an order summary and runs 500 times per second. Reads dominate and the data changes rarely. Which approach is the most reasonable?"
+    explanation: "Denormalise deliberately for read performance: a materialized view or summary table kept up to date by the write path or a refresh job trades redundancy and complexity for fewer joins. Keep the normalised tables as the source of truth. Removing foreign keys does not speed up reads."
+    theoryUrl: https://www.postgresql.org/docs/current/rules-materializedviews.html
+    options:
+      - {
+          text: "Keep normalised tables as the source and add a materialized view or summary table for reads",
+          correct: true,
+        }
+      - { text: "Drop all the foreign keys to make the join faster", correct: false }
+      - { text: "Merge all seven tables into one and delete the originals", correct: false }
+      - {
+          text: "Move the tables to a NoSQL store so the joins disappear, without measuring the current bottleneck first",
+          correct: false,
+        }
+  - type: single
+    prompt: "You need to add `NOT NULL` column `plan` with a default to a 300M-row table in PostgreSQL 16, with zero downtime. What is the best-known behaviour?"
+    explanation: "Since PostgreSQL 11, adding a column with a constant default is a metadata-only change and does not rewrite the table, so it is fast. Volatile defaults (such as `random()`) still rewrite. Older versions rewrote the table under an ACCESS EXCLUSIVE lock."
+    theoryUrl: https://www.postgresql.org/docs/current/sql-altertable.html
+    options:
+      - { text: "It always rewrites the table, so schedule downtime", correct: false }
+      - {
+          text: "A fast metadata change with a constant default; a volatile default rewrites the table",
+          correct: true,
+        }
+      - {
+          text: "It is impossible online, because adding a NOT NULL column requires dropping and recreating the table",
+          correct: false,
+        }
+      - { text: "It locks the table only for reads, never for writes", correct: false }
+  - type: single
+    prompt: "You rename a column `fullname` to `name` in one migration and deploy the app in the next step. Old app instances still run during the rollout. What breaks?"
+    explanation: "While old instances are still running, they reference the old column name and fail. Zero-downtime migrations use expand and contract: add the new column, write to both, backfill, switch reads, then drop the old column in a later release."
+    theoryUrl: https://martinfowler.com/bliki/ParallelChange.html
+    options:
+      - { text: "Nothing, since renames are applied lazily by the database", correct: false }
+      - { text: "Old instances fail because they still query the old column name", correct: true }
+      - {
+          text: "Only the new instances fail, because they cache the old schema and cannot see the renamed column",
+          correct: false,
+        }
+      - { text: "The database rolls back the rename automatically", correct: false }
+  - type: single
+    prompt: "Which sequence follows the expand and contract (parallel change) pattern for replacing a column's meaning?"
+    explanation: "Expand first (add the new column and write to both), migrate data, move readers, then contract (remove the old column) once nothing uses it. Each step is deployable on its own and reversible, which is what keeps the rollout safe."
+    theoryUrl: https://martinfowler.com/bliki/ParallelChange.html
+    options:
+      - { text: "Drop the old column, add the new column, deploy the app", correct: false }
+      - {
+          text: "Add the new column, dual-write and backfill, switch reads, then drop the old one",
+          correct: true,
+        }
+      - {
+          text: "Deploy the app first, then run the migration during a maintenance window with the app stopped",
+          correct: false,
+        }
+      - { text: "Add the new column and drop the old one in the same migration", correct: false }
+  - type: single
+    prompt: "In PostgreSQL, creating an index on a busy 200M-row table with a plain `CREATE INDEX` causes write traffic to stall. What do you use instead?"
+    explanation: "`CREATE INDEX CONCURRENTLY` builds the index without blocking writes (taking longer and not allowed inside a transaction block). A failed concurrent build leaves an invalid index that must be dropped."
+    theoryUrl: https://www.postgresql.org/docs/current/sql-createindex.html#SQL-CREATEINDEX-CONCURRENTLY
+    options:
+      - { text: "CREATE UNLOGGED INDEX", correct: false }
+      - { text: "CREATE INDEX CONCURRENTLY", correct: true }
+      - { text: "CREATE INDEX inside a SERIALIZABLE transaction", correct: false }
+      - { text: "CREATE INDEX ... WITH (fillfactor = 100)", correct: false }
+  - type: multi
+    prompt: "Which of these can cause an index to be ignored by the PostgreSQL planner even though it exists? Select all that apply."
+    explanation: "A function or cast applied to the indexed column, a leading wildcard in LIKE, and a predicate that matches most of the table (so a sequential scan is cheaper) all make the planner skip a B-tree index. An index being unique does not prevent its use."
+    theoryUrl: https://www.postgresql.org/docs/current/indexes-types.html
+    options:
+      - { text: "The predicate wraps the column in a function", correct: true }
+      - { text: "A LIKE pattern with a leading wildcard such as '%abc'", correct: true }
+      - { text: "The condition matches most rows of the table", correct: true }
+      - { text: "The index is declared UNIQUE", correct: false }
+  - type: single
+    prompt: "What does MVCC in PostgreSQL give you for concurrency?"
+    explanation: "Multi-version concurrency control keeps multiple versions of rows so readers see a consistent snapshot and do not block writers (and vice versa). The cost is dead tuples that VACUUM must clean up."
+    theoryUrl: https://www.postgresql.org/docs/current/mvcc-intro.html
+    options:
+      - {
+          text: "Readers do not block writers, since they read a snapshot of row versions",
+          correct: true,
+        }
+      - {
+          text: "Writers never block each other on the same row, because each gets its own private version",
+          correct: false,
+        }
+      - { text: "Deleted rows are removed instantly with no cleanup", correct: false }
+      - { text: "All transactions run one at a time", correct: false }
+  - type: boolean
+    prompt: "True or false: a long-running idle-in-transaction session in PostgreSQL can prevent VACUUM from removing dead rows and cause table bloat."
+    explanation: "True. VACUUM cannot remove row versions that might still be visible to an open snapshot, so a transaction left open for hours holds back cleanup and bloat grows. Set `idle_in_transaction_session_timeout` and monitor long transactions."
+    theoryUrl: https://www.postgresql.org/docs/current/routine-vacuuming.html
+    answer: true
+  - type: single
+    prompt: "A migration adds a foreign key to a large table with `ALTER TABLE ... ADD CONSTRAINT ... FOREIGN KEY`. It validates all existing rows while blocking writes. How do you limit the lock time in PostgreSQL?"
+    explanation: "Add the constraint as `NOT VALID` (only checks new writes and takes a short lock), then run `VALIDATE CONSTRAINT`, which scans existing rows with a weaker lock that does not block normal reads and writes."
+    theoryUrl: https://www.postgresql.org/docs/current/sql-altertable.html
+    options:
+      - {
+          text: "Add it as NOT VALID first and then run VALIDATE CONSTRAINT separately",
+          correct: true,
+        }
+      - { text: "Run it inside a SERIALIZABLE transaction", correct: false }
+      - {
+          text: "Drop all indexes on the table first so the validation scan runs faster, then recreate them",
+          correct: false,
+        }
+      - { text: "Add the constraint on the replicas only", correct: false }
+  - type: single
+    prompt: "A team wants to avoid migrations that hold long locks in production. Which setting protects the rest of the traffic if a migration has to wait for a lock?"
+    explanation: "Setting a short `lock_timeout` makes the migration fail fast instead of queueing behind a long transaction while blocking all later queries on the table behind its pending lock request. The migration can then be retried."
+    theoryUrl: https://www.postgresql.org/docs/current/runtime-config-client.html#GUC-LOCK-TIMEOUT
+    options:
+      - { text: "A high `statement_timeout` for the migration role", correct: false }
+      - {
+          text: "A short `lock_timeout` so the migration fails fast and can be retried",
+          correct: true,
+        }
+      - { text: "Turning off autovacuum during the migration", correct: false }
+      - {
+          text: "Running the migration with `synchronous_commit = off` so commits never wait for lock holders",
+          correct: false,
+        }
+  - type: single
+    prompt: "When is it justified to denormalise a relational schema?"
+    explanation: "Denormalise when measurements show read patterns that joins cannot serve fast enough and the write-side complexity of keeping copies in sync is acceptable. Doing it upfront for imagined performance sacrifices integrity for no proven gain."
+    theoryUrl: https://en.wikipedia.org/wiki/Denormalization
+    options:
+      - {
+          text: "As the default design, since joins are always slow and normalised schemas cannot scale",
+          correct: false,
+        }
+      - { text: "When the schema has more than ten tables", correct: false }
+      - {
+          text: "When measured read patterns require it and the copies can stay consistent",
+          correct: true,
+        }
+      - { text: "Whenever developers find the schema hard to read", correct: false }
+  - type: single
+    prompt: "A query `SELECT * FROM events WHERE user_id = 5 ORDER BY created_at DESC LIMIT 20` is slow on 100M rows with an index only on `user_id`. Which index gives the best improvement?"
+    explanation: "A composite index on `(user_id, created_at DESC)` lets the planner seek to the user and read the first 20 entries already in order, avoiding a sort of all the user's rows. An index on created_at alone cannot narrow by user."
+    theoryUrl: https://www.postgresql.org/docs/current/indexes-ordering.html
+    options:
+      - { text: "An index on `(created_at)` only", correct: false }
+      - { text: "A hash index on `user_id`", correct: false }
+      - {
+          text: "An index on `(created_at, user_id)`, so rows come back already sorted by date",
+          correct: false,
+        }
+      - { text: "An index on `(user_id, created_at DESC)`", correct: true }

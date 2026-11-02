@@ -1,0 +1,513 @@
+version: 1
+title: "Architect Roadmap 13: Next.js as a backend [SCENARIO]"
+description: Choosing between route handlers, Server Actions and a separate API, the BFF pattern, Zod validation at the boundary, error handling, and database access with ORMs and connection pooling in serverless.
+language: en
+tags: [architect-roadmap, nextjs, backend, bff, zod, database, serverless, scenario]
+run:
+  questionsPerRun: 10
+  maxErrors: 3
+  timePerQuestionSec: 90
+questions:
+  - type: single
+    prompt: "Your product has a Next.js web app and a native mobile app. Both must create and list orders through the same endpoints, and a partner will integrate later. Where should the order API live?"
+    explanation: "A multi-client, partner-facing API needs stable, documented HTTP contracts, so use Route Handlers (or a separate API service). Server Actions are an internal mechanism for the Next.js UI: they are POST-only, identified by build-generated action IDs and not meant to be called by other clients."
+    theoryUrl: https://nextjs.org/docs/app/guides/backend-for-frontend
+    options:
+      - {
+          text: "Server Actions, since they are the recommended way to mutate data",
+          correct: false,
+        }
+      - {
+          text: "Server Components, which can return JSON when requested with an Accept header",
+          correct: false,
+        }
+      - { text: "Proxy, because it intercepts every request before any route", correct: false }
+      - { text: "Route Handlers with a versioned, documented HTTP contract", correct: true }
+  - type: single
+    prompt: "Only your Next.js web UI creates support tickets through a form, and after submit the user must see the ticket list updated. You want the least code and it should work before hydration. What do you choose?"
+    explanation: "A Server Action fits: forms with `action` work without JavaScript through progressive enhancement, and when the action calls `updateTag` or `revalidatePath` the response carries the re-rendered route in a single round trip. A Route Handler would need client fetch code, manual state refresh and loses that behaviour."
+    theoryUrl: https://nextjs.org/docs/app/getting-started/mutating-data
+    options:
+      - {
+          text: "A Route Handler plus a Client Component that calls fetch and refreshes",
+          correct: false,
+        }
+      - {
+          text: "A separate REST service, so that the UI never depends on server code",
+          correct: false,
+        }
+      - {
+          text: "A Server Action on the form, which can revalidate and re-render in one trip",
+          correct: true,
+        }
+      - {
+          text: "A Client Component that writes to the database through an ORM in useEffect",
+          correct: false,
+        }
+  - type: single
+    prompt: "Stripe must notify your app of successful payments. Stripe signs each request body and retries on non-2xx responses. Which mechanism do you expose?"
+    explanation: "Webhooks need a stable public URL and access to the raw request body to verify the signature, so they belong in a Route Handler. Server Actions cannot be called by a third party, and the action ID changes with builds. Read the body once, for example with `req.text()`, then verify and parse it."
+    theoryUrl: https://nextjs.org/docs/app/guides/backend-for-frontend
+    options:
+      - {
+          text: "A Route Handler that reads the raw body, verifies the signature and returns 2xx",
+          correct: true,
+        }
+      - {
+          text: "A Server Action, with its action ID configured as the webhook URL",
+          correct: false,
+        }
+      - {
+          text: "A Server Component page that processes the payment when it is rendered",
+          correct: false,
+        }
+      - {
+          text: "A Client Component that Stripe loads in an iframe to confirm the payment",
+          correct: false,
+        }
+  - type: single
+    prompt: "A company has Java microservices with their own authentication and a separate backend team. A new Next.js frontend must show customer data from them. What is the sensible approach?"
+    explanation: "With existing APIs and a separate backend team, the data-security guide recommends a Zero Trust model: Server Components call the existing HTTP APIs with `fetch`, forwarding the user's credentials, and the services keep enforcing authorization. Re-implementing the business logic or database access in Next.js would duplicate the backend."
+    theoryUrl: https://nextjs.org/docs/app/guides/data-security
+    options:
+      - {
+          text: "Let Server Components call the existing HTTP APIs, with the services still enforcing auth",
+          correct: true,
+        }
+      - {
+          text: "Copy the data model into Next.js and query the services' own database directly from pages",
+          correct: false,
+        }
+      - {
+          text: "Expose each microservice's endpoint to the browser and call it with fetch from Client Components",
+          correct: false,
+        }
+      - {
+          text: "Replace the Java services with Route Handlers to remove one network hop for every request",
+          correct: false,
+        }
+  - type: single
+    prompt: "A dashboard page needs data from three internal services and SEO does not matter. A colleague wants to write `/api/dashboard` that aggregates them and then call it from the page. What is a better design?"
+    explanation: "A Server Component can call the services directly and in parallel (start all requests, then `Promise.all`), with `<Suspense>` for slow parts. Calling your own Route Handler from a Server Component adds a hop and fails at build time because no server is listening. Route Handlers are useful when a browser or external client needs the aggregate."
+    theoryUrl: https://nextjs.org/docs/app/getting-started/fetching-data
+    options:
+      - {
+          text: "Keep the aggregator, but call it with a relative URL from the Server Component",
+          correct: false,
+        }
+      - {
+          text: "Fetch the three services in parallel inside the Server Component, with Suspense",
+          correct: true,
+        }
+      - {
+          text: "Make the page a Client Component, so each fetch runs in the browser's tabs",
+          correct: false,
+        }
+      - {
+          text: "Use Server Actions for the three reads, so the requests are dispatched in parallel",
+          correct: false,
+        }
+  - type: single
+    prompt: "A product search box sends a request on every keystroke, and several requests are in flight at once. Someone implemented it with a Server Action called from `onChange`. What goes wrong, and what is the better tool?"
+    explanation: "Next.js dispatches Server Actions one at a time per client, so keystroke requests queue instead of running concurrently, and actions are POSTs (no HTTP caching). Reads like search are better served by a `GET` Route Handler (cacheable and parallel) or a URL-driven server-rendered page."
+    theoryUrl: https://nextjs.org/docs/app/guides/server-actions
+    options:
+      - {
+          text: "Actions cannot be called from onChange, so move the call to onSubmit instead",
+          correct: false,
+        }
+      - {
+          text: "Actions are dispatched sequentially, so use a GET Route Handler or URL params",
+          correct: true,
+        }
+      - {
+          text: "Actions run in parallel but responses arrive in random order, so add a lock",
+          correct: false,
+        }
+      - { text: "Nothing goes wrong, actions are the preferred way to read data", correct: false }
+  - type: single
+    prompt: "Users can export a report that takes about 10 minutes to generate. The first version runs it inside a Server Action, and requests time out. What is the right architecture?"
+    explanation: "Long-running work should not live in a request-response cycle bounded by function duration. The action should enqueue a job (queue or workflow service) and return immediately; a background worker generates the report, and the UI polls or is notified. This also gives retries and observability."
+    theoryUrl: https://nextjs.org/docs/app/guides/backend-for-frontend
+    options:
+      - {
+          text: "Raise the function timeout to 15 minutes and keep the action synchronous",
+          correct: false,
+        }
+      - {
+          text: "Enqueue a job from the action, process it in a worker and notify the UI later",
+          correct: true,
+        }
+      - {
+          text: "Split it into ten Server Actions that the client calls in a Promise.all",
+          correct: false,
+        }
+      - {
+          text: "Run it inside `after()` so it continues after the response without limits",
+          correct: false,
+        }
+  - type: single
+    prompt: "A Server Action validates a signup form with Zod. The user leaves the optional quantity field empty. What does this do?"
+    code: |
+      const schema = z.object({
+        qty: z.coerce.number().int().min(0),
+        email: z.email(),
+      })
+
+      const parsed = schema.safeParse(Object.fromEntries(formData))
+      // formData: qty = '' (left empty), email = 'a@b.co'
+      // parsed.success ?
+    codeLanguage: typescript
+    explanation: "`z.coerce.number()` runs `Number('')`, which is `0`, so the blank field passes and `qty` becomes 0 (verified with Zod 4). That is a classic trap with FormData: an empty string is not 'missing'. If you want blank to be invalid, validate the string first or preprocess empty strings to `undefined`."
+    theoryUrl: https://zod.dev/api
+    options:
+      - {
+          text: "success is false, because an empty string cannot be coerced to a number",
+          correct: false,
+        }
+      - {
+          text: "success is false with a 'required' error for the missing qty field",
+          correct: false,
+        }
+      - { text: "success is true and qty is 0, because Number('') is 0", correct: true }
+      - {
+          text: "It throws a ZodError, because safeParse does not accept FormData objects",
+          correct: false,
+        }
+  - type: single
+    prompt: "A partner's webhook payload is typed in TypeScript as `interface OrderEvent { id: string; total: number }`, and the handler does `const body = (await req.json()) as OrderEvent`. A teammate says this validates the input. Is that right?"
+    explanation: "A cast only silences the compiler: types are erased at runtime, so nothing checks the real payload. Validate at the boundary with a schema library such as Zod (`safeParse`), and derive the TypeScript type from the schema with `z.infer` so the two cannot drift."
+    theoryUrl: https://nextjs.org/docs/app/guides/authentication
+    options:
+      - {
+          text: "Yes, TypeScript throws at runtime if the JSON does not match the interface",
+          correct: false,
+        }
+      - {
+          text: "Yes, but only in strict mode, where assertions are checked at runtime",
+          correct: false,
+        }
+      - {
+          text: "No, because req.json() always returns the string form of the body",
+          correct: false,
+        }
+      - {
+          text: "No, a cast is not a runtime check, so parse with a schema at the boundary",
+          correct: true,
+        }
+  - type: boolean
+    prompt: "Validating a Server Action's `FormData` with a Zod schema is enough to guarantee that the caller is allowed to modify the targeted record."
+    answer: false
+    explanation: "Schema validation only checks the shape of the input. A well-formed object can still refer to a row the caller does not own, so you must also authenticate and authorize against the session inside the action."
+    theoryUrl: https://nextjs.org/docs/app/guides/server-actions
+  - type: single
+    prompt: "A public `POST /api/orders` handler receives invalid JSON for one client and hits a database outage for another. How should it respond to each?"
+    explanation: "Client mistakes get a 4xx with a machine-readable body (400 or 422, field errors) so they can fix the request. Server failures get a 5xx with a generic message, while the real error and a correlation id are logged internally. Returning raw error text can leak table names, stack traces or secrets."
+    theoryUrl: https://nextjs.org/docs/app/guides/backend-for-frontend
+    options:
+      - {
+          text: "422 with field errors, then 500 with a generic message and the details logged",
+          correct: true,
+        }
+      - {
+          text: "500 for both, since the client cannot do anything about either failure",
+          correct: false,
+        }
+      - {
+          text: "200 with an `error` field for both, so clients never see failing statuses",
+          correct: false,
+        }
+      - {
+          text: "400 for invalid JSON, then 503 with the database's raw error message",
+          correct: false,
+        }
+  - type: single
+    prompt: "In a Server Action, 'email already registered' is thrown as an `Error`, and users see the full-page `error.tsx` instead of the form with a message. What is the fix?"
+    explanation: "This is an expected error, part of normal operation, so model it as a return value (for example `{ ok: false, errors: { email: '...' } }`) and render it through `useActionState`, keeping the form and the user's input. Throwing is for unexpected failures that an error boundary should catch."
+    theoryUrl: https://nextjs.org/docs/app/getting-started/error-handling
+    options:
+      - {
+          text: "Wrap the form in a custom ErrorBoundary that re-renders the form on error",
+          correct: false,
+        }
+      - {
+          text: "Call `notFound()` so that the not-found UI explains the problem to the user",
+          correct: false,
+        }
+      - {
+          text: "Return an error state from the action and show it with `useActionState`",
+          correct: true,
+        }
+      - {
+          text: "Throw a string instead of an Error, which error boundaries ignore",
+          correct: false,
+        }
+  - type: single
+    prompt: "In production, your `error.tsx` shows a generic message for a failing Server Component. Support asks how to find the real cause of a user's error report. What do you use?"
+    explanation: "In production, errors thrown in Server Components reach the client with a generic message, to avoid leaking sensitive details, plus an `error.digest` hash. Show the digest to the user (or log it) and match it with the server-side logs, where the original error and stack are recorded."
+    theoryUrl: https://nextjs.org/docs/app/api-reference/file-conventions/error
+    options:
+      - {
+          text: "error.message, which contains the original message in every environment",
+          correct: false,
+        }
+      - {
+          text: "error.digest, matched with the server logs that hold the original error",
+          correct: true,
+        }
+      - {
+          text: "The browser console, where production errors print their full stack traces",
+          correct: false,
+        }
+      - {
+          text: "error.stack, which always carries the server's file paths in production",
+          correct: false,
+        }
+  - type: single
+    prompt: "Your app on serverless functions uses Postgres. During a traffic spike the database returns 'too many connections', although each request opens just one connection. What do you do?"
+    explanation: "Each concurrent function instance opens its own connections, so connection count scales with concurrency and quickly exceeds Postgres's `max_connections`. Put a pooler (PgBouncer, RDS Proxy or a managed pooler) between functions and the database, and keep per-instance pools small. Simply raising `max_connections` costs memory and does not scale."
+    theoryUrl: https://www.postgresql.org/docs/current/runtime-config-connection.html
+    options:
+      - {
+          text: "Increase max_connections to match the maximum number of function instances",
+          correct: false,
+        }
+      - {
+          text: "Open and close a new connection inside each query to free the slots as quickly as possible",
+          correct: false,
+        }
+      - {
+          text: "Move the queries to Client Components, so that the browser holds all the connections",
+          correct: false,
+        }
+      - {
+          text: "Add a connection pooler in front of the database and keep per-instance pools small",
+          correct: true,
+        }
+  - type: single
+    prompt: "In `next dev`, your server logs warn about too many ORM clients after many hot reloads. The client is created at module top level in `lib/db.ts`. What is the usual fix?"
+    explanation: "Hot reloading re-evaluates modules, so each reload creates a new client and its pool, until the database runs out of connections. The common fix is to cache the instance on `globalThis` in development, so reloads reuse it, while production creates it once per process."
+    theoryUrl: https://nextjs.org/docs/app/guides/data-security
+    options:
+      - {
+          text: "Call `client.disconnect()` at the end of every Server Component render",
+          correct: false,
+        }
+      - {
+          text: "Create the client inside every function so that it is garbage collected",
+          correct: false,
+        }
+      - { text: "Disable hot reloading for server files in next.config.ts", correct: false }
+      - {
+          text: "Store the client on `globalThis` in development so reloads reuse it",
+          correct: true,
+        }
+  - type: single
+    prompt: "After you put PgBouncer in transaction pooling mode in front of Postgres, some code that uses session-level `SET` statements, advisory locks and server-side prepared statements starts failing randomly. Why?"
+    explanation: "In transaction pooling, a client is bound to a server connection only for the duration of one transaction, and consecutive transactions may use different backend connections. Anything that relies on session state (session `SET`, session advisory locks, prepared statements created on a connection) can land on a connection that does not have it."
+    theoryUrl: https://www.pgbouncer.org/features.html
+    options:
+      - {
+          text: "PgBouncer blocks every statement that is not a plain SELECT or an INSERT in transaction mode",
+          correct: false,
+        }
+      - {
+          text: "Transaction mode disables TLS on the connection, so the server rejects the session statements",
+          correct: false,
+        }
+      - {
+          text: "Session state does not follow the client, since each transaction can use a different connection",
+          correct: true,
+        }
+      - {
+          text: "Prepared statements are always slower in pooled mode, which causes the sessions to time out",
+          correct: false,
+        }
+  - type: single
+    prompt: "A route handler uses an ORM that connects to Postgres over TCP. A teammate adds `export const runtime = 'edge'` to 'make it faster'. What happens, and what is the recommendation?"
+    explanation: "The Edge Runtime supports only a limited set of APIs, and many database drivers and ORMs need Node.js APIs such as TCP sockets. Node.js is the default and recommended runtime for Next.js servers (Proxy also defaults to Node.js, and Cache Components require it). Use Edge only for code that is compatible, such as HTTP-based drivers."
+    theoryUrl: https://nextjs.org/docs/app/api-reference/edge
+    options:
+      - {
+          text: "It is faster, because the code moves closer to the user and drivers adapt",
+          correct: false,
+        }
+      - {
+          text: "It works, but only for GET handlers, since the others need Node.js",
+          correct: false,
+        }
+      - {
+          text: "It is required for serverless deployments to reuse database connections",
+          correct: false,
+        }
+      - { text: "It breaks for TCP drivers, so stay on the Node.js runtime", correct: true }
+  - type: single
+    prompt: "A public `POST /api/login` handler is being brute-forced. You deploy on several serverless instances. How do you implement rate limiting?"
+    explanation: "Rate limiting is an application concern you can add in code, ideally together with limits at the host or CDN. With many ephemeral instances the counter must live in a shared store (Redis or a managed rate-limit service) keyed by IP and/or account. An in-memory `Map` is per instance and gets reset on cold start."
+    theoryUrl: https://nextjs.org/docs/app/guides/backend-for-frontend
+    options:
+      - {
+          text: "An in-memory Map of counters in the route module, shared by every request",
+          correct: false,
+        }
+      - { text: "A CAPTCHA only, since rate limiting cannot be done in Next.js", correct: false }
+      - {
+          text: "A shared store such as Redis keyed by IP and account, plus host-level limits",
+          correct: true,
+        }
+      - {
+          text: "A longer password hashing time, which removes the need for any limits",
+          correct: false,
+        }
+  - type: single
+    prompt: "A single-page app at `https://app.example.com` calls `POST https://api.example.com/orders` (a Next.js Route Handler) with an `Authorization` header and JSON. The browser blocks it. What do you need?"
+    explanation: "That request triggers a CORS preflight (`OPTIONS`). Next.js adds an `OPTIONS` handler automatically (setting `Allow`), but you must return the CORS headers yourself, such as `Access-Control-Allow-Origin`, `-Methods` and `-Headers`, with an allowlist of origins. Proxy or the handler can set them."
+    theoryUrl: https://nextjs.org/docs/app/api-reference/file-conventions/route
+    options:
+      - {
+          text: "Nothing, because Next.js sends permissive CORS headers on every Route Handler it serves",
+          correct: false,
+        }
+      - {
+          text: "Switch the call to a Server Action, which has no same-origin restrictions at all for browsers",
+          correct: false,
+        }
+      - {
+          text: "CORS response headers for the allowed origin, including for the OPTIONS preflight",
+          correct: true,
+        }
+      - {
+          text: "Send the request with mode 'no-cors', which also makes the response body readable by the app",
+          correct: false,
+        }
+  - type: single
+    prompt: "A webhook handler must verify an HMAC signature over the raw body, then parse the JSON. What happens with this code?"
+    code: |
+      export async function POST(req: Request) {
+        const payload = await req.json()
+        const raw = await req.text()
+        verifySignature(raw, req.headers.get('x-signature'))
+        return Response.json({ ok: true })
+      }
+    codeLanguage: typescript
+    explanation: "A request body is a stream that can be read once. After `req.json()` consumed it, `req.text()` throws `TypeError: Body is unusable: Body has already been read` (verified in Node). Read the raw text first, verify the signature, then `JSON.parse` it, or `clone()` the request before reading."
+    theoryUrl: https://nextjs.org/docs/app/guides/backend-for-frontend
+    options:
+      - {
+          text: "It works, since text() returns the body from an internal copy kept by Next.js",
+          correct: false,
+        }
+      - {
+          text: "It throws a TypeError, because the body was already read by json()",
+          correct: true,
+        }
+      - {
+          text: "It returns an empty string for raw, so the signature never matches",
+          correct: false,
+        }
+      - {
+          text: "It works only when the Content-Type is text/plain instead of JSON",
+          correct: false,
+        }
+  - type: single
+    prompt: "A public `GET /api/products` handler hits the database on every call and gets heavy traffic, but products change a few times a day. With Cache Components, how do you cache it and keep it fresh?"
+    explanation: "Move the query into a helper marked `use cache` with `cacheLife` and `cacheTag('products')` (the directive cannot sit in the handler body). When an admin changes a product, call `revalidateTag('products', 'max')` from the mutation's Route Handler, or `updateTag` from a Server Action. Responses are then served from cache and refresh on demand."
+    theoryUrl: https://nextjs.org/docs/app/getting-started/route-handlers
+    options:
+      - {
+          text: "Cache in a `use cache` helper with a tag, and revalidate the tag after admin changes",
+          correct: true,
+        }
+      - {
+          text: "Put `use cache` at the top of the GET function and call `updateTag` from admin handlers",
+          correct: false,
+        }
+      - {
+          text: "Add a Cache-Control header manually and rely on the browser to refresh later",
+          correct: false,
+        }
+      - {
+          text: "Convert the handler to a Server Action, which is cached by default in Next 16",
+          correct: false,
+        }
+  - type: single
+    prompt: "A mobile client retries `POST /api/payments` after a network timeout, and some customers were charged twice. What is the architectural fix?"
+    explanation: "Networks make retries unavoidable, so the operation must be idempotent. The client sends an idempotency key, and the server stores it with a unique constraint and returns the original result on repeats. The same applies to webhooks (providers retry) and double-clicked forms. Disabling the button only hides one source of duplicates."
+    theoryUrl: https://nextjs.org/docs/app/guides/backend-for-frontend
+    options:
+      - {
+          text: "Disable the submit button after the first tap, which prevents every possible duplicate payment",
+          correct: false,
+        }
+      - {
+          text: "Require an idempotency key stored under a unique constraint, returning the first result",
+          correct: true,
+        }
+      - {
+          text: "Increase the client timeout so that retries never happen at all on slow mobile networks",
+          correct: false,
+        }
+      - {
+          text: "Check for an existing payment with the same amount and customer before inserting a new one",
+          correct: false,
+        }
+  - type: single
+    prompt: "A handler does `return Response.json(await db.user.findUnique({ where: { id } }))`. The `user` table has `passwordHash` and `internalNotes` columns. What is wrong, and what is the fix?"
+    explanation: "Returning a raw ORM entity serializes every column, leaking internal fields and coupling the API to the schema. Select the columns you need or map to a response DTO in the data access layer, ideally validated with a response schema, so that adding a column never exposes it by accident."
+    theoryUrl: https://nextjs.org/docs/app/guides/data-security
+    options:
+      - {
+          text: "It leaks every column, so return a mapped DTO with only the needed fields",
+          correct: true,
+        }
+      - {
+          text: "It is fine, since Response.json removes fields that start with an underscore",
+          correct: false,
+        }
+      - {
+          text: "It is a type error, because ORM entities cannot be passed to Response.json",
+          correct: false,
+        }
+      - {
+          text: "It only leaks to logged-in users, so add an auth check and keep the shape",
+          correct: false,
+        }
+  - type: single
+    prompt: "The product needs live chat with tens of thousands of concurrent WebSocket connections and presence. A teammate suggests implementing it with Next.js Route Handlers on your serverless deployment. What do you recommend?"
+    explanation: "Serverless functions are short-lived request handlers, which suit stateless HTTP but not tens of thousands of long-lived stateful connections. Run a dedicated realtime service (a WebSocket server or managed pub/sub) and let Next.js render the UI and issue auth tokens. Splitting a service out is justified by a different scaling and lifecycle profile."
+    theoryUrl: https://nextjs.org/docs/app/guides/backend-for-frontend
+    options:
+      - {
+          text: "Use a dedicated realtime service, and keep Next.js for the UI and auth tokens",
+          correct: true,
+        }
+      - {
+          text: "Yes, Route Handlers can hold WebSockets open for as long as the user stays",
+          correct: false,
+        }
+      - {
+          text: "Use Server Actions with polling every 100 ms, which scales on serverless",
+          correct: false,
+        }
+      - {
+          text: "Switch the handlers to the Edge Runtime, which keeps connections open",
+          correct: false,
+        }
+  - type: single
+    prompt: "After a checkout Server Action finishes, you want to send an analytics event and an email without making the user wait. What is the appropriate Next.js primitive?"
+    explanation: "`after()` schedules a callback to run once the response (or prerender) is finished, so it does not delay the user. It works in Server Components, Server Functions, Route Handlers and Proxy, and runs even if the response fails. For critical or slow work that must not be lost, a queue is safer."
+    theoryUrl: https://nextjs.org/docs/app/api-reference/functions/after
+    options:
+      - {
+          text: "Fire the promises without await and hope they finish after the return",
+          correct: false,
+        }
+      - {
+          text: "`connection()`, which defers the work until the next incoming request",
+          correct: false,
+        }
+      - { text: "`refresh()`, which re-runs the action in the background", correct: false }
+      - {
+          text: "`after()`, which runs the callback after the response has been sent",
+          correct: true,
+        }

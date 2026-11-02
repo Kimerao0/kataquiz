@@ -1,0 +1,345 @@
+version: 1
+title: "Architect Roadmap 37: Costs and FinOps"
+description: Scenario-driven cloud cost decisions covering pricing models, hidden costs such as egress and NAT gateways, reserved versus spot capacity, and cost per request as an architectural metric.
+language: en
+tags: [architect-roadmap, cross-cutting, finops, cloud-costs, scenario]
+run:
+  questionsPerRun: 10
+  maxErrors: 3
+  timePerQuestionSec: 90
+questions:
+  - type: single
+    prompt: "An API costs $18,000 per month all-in (compute, database, network, observability) and serves 150 million requests per month. Why is the resulting figure of $0.12 per 1,000 requests more useful to architects than the $18,000 bill?"
+    explanation: "Cost per request normalises spend by value delivered, so you can see whether the architecture scales economically as traffic grows, compare design options and relate cost to revenue per request. The absolute bill grows with success and cannot tell you if you are becoming more or less efficient."
+    theoryUrl: https://www.finops.org/framework/
+    options:
+      - { text: "It is the number the cloud provider uses to invoice usage", correct: false }
+      - {
+          text: "It shows whether cost grows in step with the value delivered as traffic changes",
+          correct: true,
+        }
+      - { text: "It removes fixed costs, so only variable costs are optimised", correct: false }
+      - {
+          text: "It proves the service is correctly sized for peak traffic and the committed capacity is fully used",
+          correct: false,
+        }
+  - type: single
+    prompt: "Last quarter the service handled 100M requests at a $20,000 bill. This quarter, after a marketing campaign, it handles 200M requests and the bill is $24,000. Finance is alarmed by the 20% increase. What is the best reading?"
+    explanation: "Cost per request fell from $0.0002 to $0.00012, a 40% improvement, so unit economics got better: fixed capacity was amortised over more traffic. A rising total bill is not a problem when the unit cost falls and revenue rises faster. It would be a warning only if unit cost had risen."
+    theoryUrl: https://www.finops.org/framework/
+    options:
+      - {
+          text: "Costs are out of control; cap the budget at last quarter's level until the campaign is analysed",
+          correct: false,
+        }
+      - {
+          text: "Unit cost fell by about 40%, so efficiency improved while the total grew",
+          correct: true,
+        }
+      - {
+          text: "The numbers cannot be compared without knowing the instance types",
+          correct: false,
+        }
+      - { text: "Unit cost rose by 20%, so the architecture is scaling badly", correct: false }
+  - type: single
+    prompt: "A SaaS company has a stable baseline of 40 vCPUs of compute running 24/7 for the next two years, plus unpredictable peaks up to 100 vCPUs. How should it buy capacity?"
+    explanation: "Commit to the predictable baseline with Savings Plans or Reserved Instances, which gives a significant discount, and cover the variable peak with on-demand (or spot where tolerant). Committing for the peak wastes money when it is idle, and running the baseline on-demand pays full price for something certain."
+    theoryUrl: https://aws.amazon.com/savingsplans/
+    options:
+      - { text: "Everything on-demand, to stay flexible", correct: false }
+      - { text: "Everything on spot instances, to get the lowest unit price", correct: false }
+      - {
+          text: "Reserved capacity for the 100 vCPU peak, so it is always available",
+          correct: false,
+        }
+      - {
+          text: "Commit to the 40 vCPU baseline and cover peaks with on-demand or spot",
+          correct: true,
+        }
+  - type: single
+    prompt: "A nightly job transcodes 50,000 images. It is idempotent, splits into independent chunks, and finishing 30 minutes late is acceptable. Which capacity model gives the best cost?"
+    explanation: "Interruption-tolerant, restartable, flexible-deadline batch work is the classic fit for Spot, which can be much cheaper than on-demand. With idempotent chunks, an interruption just means a retry. Reserved capacity would pay for idle hours 23 hours a day, and on-demand leaves the savings on the table."
+    theoryUrl: https://aws.amazon.com/ec2/spot/
+    options:
+      - { text: "Spot instances, retrying interrupted chunks", correct: true }
+      - { text: "A 3-year reserved instance running continuously", correct: false }
+      - {
+          text: "On-demand instances, because batch jobs must never be interrupted",
+          correct: false,
+        }
+      - { text: "A dedicated host, so nobody else shares the hardware", correct: false }
+  - type: multi
+    prompt: "Which of these workloads are reasonable candidates for Spot capacity? Select all that apply."
+    explanation: "Stateless, fault-tolerant, or checkpointed work tolerates interruptions: CI runners that retry and stateless worker pools behind a queue qualify. A single primary database node with no replica, and a latency-critical service with no spare capacity, would suffer outages when the capacity is reclaimed."
+    theoryUrl: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/spot-best-practices.html
+    options:
+      - { text: "CI build runners where failed jobs are retried", correct: true }
+      - { text: "The only primary node of a production database", correct: false }
+      - { text: "Queue-driven stateless workers that can be restarted at any time", correct: true }
+      - {
+          text: "A latency-critical checkout service with exactly two instances and no fallback",
+          correct: false,
+        }
+  - type: single
+    prompt: "A web tier must stay up at all times and has traffic that doubles during the day. The team wants low cost without taking risk of capacity loss. Which design fits?"
+    explanation: "A mixed-instances Auto Scaling group keeps a committed on-demand base for guaranteed capacity and adds spot (diversified across instance types and AZs) or on-demand for scaling, with on-demand fallback. All-spot risks simultaneous reclamation, and all-reserved at peak size wastes idle capacity."
+    theoryUrl: https://docs.aws.amazon.com/autoscaling/ec2/userguide/ec2-auto-scaling-mixed-instances-groups.html
+    options:
+      - {
+          text: "A fleet of spot instances of one type in a single AZ, with a manual restart when interrupted",
+          correct: false,
+        }
+      - { text: "Reserved instances sized for the daily peak", correct: false }
+      - { text: "A manually resized fleet of on-demand instances", correct: false }
+      - {
+          text: "Mixed fleet: committed base, diversified spot for scale-out, on-demand fallback",
+          correct: true,
+        }
+  - type: single
+    prompt: "A company signs a 3-year, instance-family-specific reservation for a large fleet. Eight months later it migrates the workload to ARM instances and to a serverless platform. What is the lesson?"
+    explanation: "Commitments are bets on stability: an instance-family-specific reservation is stranded if you change family or move off VMs. Prefer more flexible commitments (compute-level savings plans), shorter terms, or commit to a share of the baseline you are sure about, and factor in the roadmap before locking in."
+    theoryUrl: https://docs.aws.amazon.com/savingsplans/latest/userguide/what-is-savings-plans.html
+    options:
+      - {
+          text: "Reservations can always be resold at full price on the provider's marketplace",
+          correct: false,
+        }
+      - {
+          text: "Commitments apply automatically to any service the company moves to",
+          correct: false,
+        }
+      - {
+          text: "Commit to what is stable and prefer flexible, shorter commitments when architecture may change",
+          correct: true,
+        }
+      - {
+          text: "Never use commitments, since on-demand is always the cheapest in total",
+          correct: false,
+        }
+  - type: single
+    prompt: "A one-year commitment makes the effective hourly price 35% lower than on-demand, but you pay it for every hour of the year whether or not you use the instance. Roughly what utilization makes the commitment break even?"
+    explanation: "You pay 0.65 of the on-demand hourly price for all hours; on-demand costs 1.0 per hour used. Break-even is when used hours x 1.0 = 0.65 x total hours, so at 65% utilization. Above that the commitment is cheaper, below it you would have saved money with on-demand."
+    theoryUrl: https://aws.amazon.com/ec2/pricing/reserved-instances/
+    options:
+      - { text: "About 35% utilization", correct: false }
+      - { text: "About 50% utilization", correct: false }
+      - { text: "About 65% utilization", correct: true }
+      - { text: "About 85% utilization", correct: false }
+  - type: single
+    prompt: "A data-processing job in a private subnet reads about 20,000 GB per month from S3 through a NAT gateway. Assume the NAT gateway charges $0.045 per GB processed. What is the monthly processing cost, and what is the best fix?"
+    explanation: "20,000 GB x $0.045 = $900 per month in processing charges alone, on top of the hourly fee. An S3 gateway VPC endpoint routes S3 traffic privately at no per-GB charge, so the cost disappears. Larger NAT gateways do not change per-GB pricing, and moving the job to a public subnet weakens security for no reason."
+    theoryUrl: https://docs.aws.amazon.com/vpc/latest/privatelink/vpce-gateway.html
+    options:
+      - { text: "$90 per month; add a second NAT gateway to share the load", correct: false }
+      - { text: "$900 per month; move the job to a public subnet with a public IP", correct: false }
+      - { text: "$9,000 per month; replace S3 with an on-premises store", correct: false }
+      - { text: "$900 per month; add an S3 gateway VPC endpoint", correct: true }
+  - type: single
+    prompt: "Your video platform serves 50,000 GB per month directly from EC2 instances to the public internet at an assumed $0.09 per GB of data transfer out. A colleague proposes a CDN in front. What is the most accurate evaluation?"
+    explanation: "Direct egress costs 50,000 x $0.09 = $4,500 per month before compute. A CDN caches popular content near viewers, reduces origin egress and usually offers cheaper per-GB transfer at volume, plus better latency. The real trade-off is CDN fees and cache-invalidation complexity, not that CDNs make egress free."
+    theoryUrl: https://aws.amazon.com/blogs/architecture/overview-of-data-transfer-costs-for-common-architectures/
+    options:
+      - { text: "Egress costs about $450; a CDN would not matter at this scale", correct: false }
+      - {
+          text: "Egress costs about $4,500; a CDN cuts origin traffic and usually lowers per-GB cost",
+          correct: true,
+        }
+      - { text: "Egress is free when traffic stays inside the same Region", correct: false }
+      - {
+          text: "A CDN is more expensive in all cases because it adds a second bill on top of origin egress",
+          correct: false,
+        }
+  - type: single
+    prompt: "Two chatty microservices exchange 30,000 GB per month across Availability Zones. Assume each GB costs $0.02 in total for inter-AZ transfer. The team wants to cut this cost. What is the sound approach?"
+    explanation: "The cost is 30,000 x $0.02 = $600 per month. Topology-aware routing that prefers same-AZ endpoints while keeping other AZs as fallback reduces the bill without sacrificing availability. Putting everything in one AZ saves the most but removes AZ fault tolerance, which is a business decision and not a free optimisation."
+    theoryUrl: https://aws.amazon.com/blogs/architecture/overview-of-data-transfer-costs-for-common-architectures/
+    options:
+      - {
+          text: "Use zone-aware routing that prefers same-AZ traffic but fails over across AZs",
+          correct: true,
+        }
+      - {
+          text: "Move everything into one AZ, since availability is already handled by retries",
+          correct: false,
+        }
+      - {
+          text: "Compress nothing and accept the cost, because inter-AZ traffic cannot be influenced",
+          correct: false,
+        }
+      - {
+          text: "Route the traffic through the NAT gateway, which is cheaper than inter-AZ transfer",
+          correct: false,
+        }
+  - type: multi
+    prompt: "Which of these are commonly overlooked costs that appear on cloud bills? Select all that apply."
+    explanation: "NAT gateway processing, cross-AZ and internet egress transfer, log ingestion and retention, and idle resources such as unattached volumes and unused load balancers all surprise teams that only estimate compute. A larger instance type is the visible cost, not a hidden one."
+    theoryUrl: https://docs.aws.amazon.com/wellarchitected/latest/cost-optimization-pillar/welcome.html
+    options:
+      - { text: "Per-GB processing charges on NAT gateways", correct: true }
+      - { text: "The hourly price of the EC2 instance type you selected", correct: false }
+      - { text: "Log ingestion and long retention in the observability stack", correct: true }
+      - {
+          text: "Idle resources such as unattached volumes and unused load balancers",
+          correct: true,
+        }
+  - type: single
+    prompt: "A service logs every request at DEBUG level, ingesting 2,000 GB per month into a managed log service charging an assumed $0.50 per GB ingested, and nobody reads the logs older than a week. What is the best response?"
+    explanation: "Ingestion alone is 2,000 x $0.50 = $1,000 per month, plus storage. The fix is to log at INFO in production, sample verbose logs, drop noisy fields, and shorten retention (archiving to cheap storage if required). Deleting logging entirely removes your ability to debug incidents."
+    theoryUrl: https://aws.amazon.com/cloudwatch/pricing/
+    options:
+      - {
+          text: "Disable logging entirely; metrics are enough for incidents and cost nothing to store",
+          correct: false,
+        }
+      - { text: "Ingestion is about $100; ignore it", correct: false }
+      - {
+          text: "Ingestion is about $1,000; reduce levels, sample, and shorten retention",
+          correct: true,
+        }
+      - { text: "Double the retention so logs are safe, since storage is cheap", correct: false }
+  - type: single
+    prompt: "A team runs a steady API on Lambda at 100 million requests per month. Assume a fully loaded Lambda cost of about $1.87 per million requests at this configuration, and two always-on containers that could serve the same load for a fixed $120 per month. Roughly at which monthly volume does Lambda stop being cheaper?"
+    explanation: "Break-even is 120 / 1.87, about 64 million requests per month. Above that, the fixed-cost containers are cheaper for a steady load; below it, pay-per-use wins, and it also wins for spiky or idle workloads. At 100 million steady requests Lambda would cost about $187, so the containers win, ignoring operational effort."
+    theoryUrl: https://aws.amazon.com/lambda/pricing/
+    options:
+      - { text: "About 6 million requests per month", correct: false }
+      - { text: "About 64 million requests per month", correct: true }
+      - { text: "About 640 million requests per month", correct: false }
+      - { text: "Never; Lambda is always cheaper than containers", correct: false }
+  - type: single
+    prompt: "Development and staging environments run 24/7 but are used only during working hours, 10 hours a day on 5 days a week. What is the approximate saving from shutting them down outside those hours?"
+    explanation: "A week has 168 hours and the environments are needed for 50, so running only then saves 1 - 50/168, about 70% of the compute cost. Storage and fixed charges continue, so the real saving is slightly lower. Idle non-production environments are one of the easiest wins in cloud cost reviews."
+    theoryUrl: https://docs.aws.amazon.com/wellarchitected/latest/cost-optimization-pillar/welcome.html
+    options:
+      - { text: "About 70% of compute cost", correct: true }
+      - { text: "About 30% of compute cost", correct: false }
+      - { text: "About 50% of compute cost", correct: false }
+      - { text: "Nothing, because instances are billed per month anyway", correct: false }
+  - type: single
+    prompt: "Several teams share one Kubernetes cluster and the finance department asks which team caused last month's 40% cost rise. The bill shows a single line for the cluster. What should the platform team put in place?"
+    explanation: "Cost allocation needs consistent metadata: tags or labels (team, service, environment) and tooling that attributes shared cluster cost, for example per-namespace requests, back to teams. Without it, showback or chargeback is guesswork. Splitting the bill evenly punishes efficient teams and gives no incentive to optimise."
+    theoryUrl: https://docs.aws.amazon.com/awsaccountbilling/latest/aboutv2/cost-alloc-tags.html
+    options:
+      - { text: "Split the cluster bill equally among all teams", correct: false }
+      - {
+          text: "Consistent tagging and labelling, with per-namespace cost attribution",
+          correct: true,
+        }
+      - { text: "Give each team its own cloud provider to avoid sharing", correct: false }
+      - { text: "Ask each team to estimate its own share and sum the answers", correct: false }
+  - type: single
+    prompt: "A misconfigured data pipeline looped overnight and generated a $30,000 charge that nobody noticed for three days. Which guardrails would have limited the damage most?"
+    explanation: "Budgets with alerts and anomaly detection on spend, ideally routed to an on-call channel, catch unusual growth within hours. Monthly invoices arrive too late. Rightsizing and commitments reduce baseline cost but do not detect a runaway process."
+    theoryUrl: https://docs.aws.amazon.com/cost-management/latest/userguide/ce-what-is.html
+    options:
+      - {
+          text: "Review the invoice at the end of every month and compare it with the budget forecast",
+          correct: false,
+        }
+      - { text: "Buy a Savings Plan to lower the unit price", correct: false }
+      - {
+          text: "Budgets and cost anomaly detection alerting an on-call channel within hours",
+          correct: true,
+        }
+      - { text: "Move the pipeline to a larger instance type", correct: false }
+  - type: single
+    prompt: "Monitoring shows a fleet of general-purpose instances at 12% average CPU. A teammate proposes immediately halving every instance size. What should you check first?"
+    explanation: "CPU is only one dimension: memory, network, disk I/O and peak (not average) utilisation may be the binding constraint, and some workloads need headroom for bursts or failover. Rightsize using peak and multi-metric data, change gradually and measure. Blindly halving can cause outages, while ignoring the waste leaves money on the table."
+    theoryUrl: https://docs.aws.amazon.com/wellarchitected/latest/cost-optimization-pillar/welcome.html
+    options:
+      - { text: "Nothing; low average CPU always means the instance is oversized", correct: false }
+      - {
+          text: "Peak CPU, memory, network and I/O, to be sure CPU is the binding resource",
+          correct: true,
+        }
+      - { text: "Only the instance price; cheaper types are always equivalent", correct: false }
+      - {
+          text: "Whether the team uses reserved capacity, since that prevents resizing",
+          correct: false,
+        }
+  - type: single
+    prompt: "Compliance requires keeping application logs for seven years, but they are queried only during the first 30 days. They sit in the standard storage class. What is the best cost optimisation?"
+    explanation: "A lifecycle policy that transitions objects to colder, cheaper classes after 30 days and expires them after seven years matches cost to access pattern. Check minimum storage durations and retrieval fees, since archive tiers charge for early deletion and reads. Deleting after 30 days breaks compliance."
+    theoryUrl: https://aws.amazon.com/s3/storage-classes/
+    options:
+      - { text: "Delete the logs after 30 days and rely on backups", correct: false }
+      - {
+          text: "Keep everything in standard storage, since moving objects costs money",
+          correct: false,
+        }
+      - { text: "Compress every log file twice before upload", correct: false }
+      - { text: "Add a lifecycle rule moving logs to colder storage after 30 days", correct: true }
+  - type: single
+    prompt: "An origin service costs $0.0004 per request to serve. At 10 million requests per month, a CDN cache hit ratio improves from 50% to 90%. Ignoring CDN fees, how much does the origin cost fall per month?"
+    explanation: "Origin requests drop from 5 million to 1 million, saving 4 million x $0.0004 = $1,600 per month. Caching improves cost per request and latency at once, which is why cache-hit ratio is an architectural lever for both."
+    theoryUrl: https://aws.amazon.com/cloudfront/pricing/
+    options:
+      - { text: "About $400", correct: false }
+      - { text: "About $4,000", correct: false }
+      - { text: "About $160", correct: false }
+      - { text: "About $1,600", correct: true }
+  - type: boolean
+    prompt: "The goal of FinOps is to reduce cloud spend to the lowest possible amount."
+    answer: false
+    explanation: "FinOps is about making informed trade-offs between cost, speed and quality so spend is tied to business value. Cutting to the minimum would hurt reliability and delivery speed; the aim is efficient, accountable spend."
+    theoryUrl: https://www.finops.org/introduction/what-is-finops/
+  - type: single
+    prompt: "A team can self-host Kafka and save $2,000 per month compared with a managed offering, but it would need roughly 0.3 of an engineer for patching, upgrades and on-call. Engineer fully loaded cost is $15,000 per month. What does the comparison show?"
+    explanation: "Total cost of ownership includes people time: 0.3 x $15,000 = $4,500, more than the $2,000 saved, before counting incident risk. Self-hosting can still win at large scale or with special requirements, but not on the infrastructure line alone."
+    theoryUrl: https://docs.aws.amazon.com/wellarchitected/latest/cost-optimization-pillar/welcome.html
+    options:
+      - {
+          text: "Self-hosting wins, since people costs sit in a separate budget from the platform bill",
+          correct: false,
+        }
+      - { text: "The managed service costs more only if it is billed per hour", correct: false }
+      - {
+          text: "Self-hosting loses: the $4,500 of engineering time exceeds the $2,000 saved",
+          correct: true,
+        }
+      - { text: "Both are equal because the engineer is already on payroll", correct: false }
+  - type: single
+    prompt: "An active-active deployment in two Regions is proposed for an internal tool that tolerates one hour of downtime and 15 minutes of data loss. It would roughly double compute and add cross-Region replication transfer. What is the best architectural response?"
+    explanation: "Match the solution to the requirement: with an RTO of one hour and an RPO of 15 minutes, a cheaper warm-standby or backup-and-restore strategy meets the goals. Active-active is justified only when downtime and data loss tolerance are near zero, because it multiplies compute, data transfer and complexity."
+    theoryUrl: https://docs.aws.amazon.com/whitepapers/latest/disaster-recovery-workloads-on-aws/disaster-recovery-options-in-the-cloud.html
+    options:
+      - { text: "Approve it; double the cost is the price of reliability", correct: false }
+      - { text: "Reject all multi-Region designs for any workload", correct: false }
+      - {
+          text: "Choose a cheaper warm-standby or backup-and-restore that meets the RTO and RPO",
+          correct: true,
+        }
+      - {
+          text: "Run active-active but in a single Region to save transfer fees and still keep two copies",
+          correct: false,
+        }
+  - type: single
+    prompt: "In a Kubernetes cluster, pods request 4 CPUs each but average 0.5 CPUs of real usage. Node count keeps growing and the cluster looks 'full' while nodes are mostly idle. What is the cause, and the fix?"
+    explanation: "The scheduler places pods based on requests, not actual usage, so over-requesting reserves capacity nobody uses and drives the node count. Rightsize requests from observed usage (with the Vertical Pod Autoscaler recommendations or metrics) and leave headroom. Adding nodes only deepens the waste."
+    theoryUrl: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+    options:
+      - {
+          text: "Pods are scheduled by actual CPU usage, so the nodes are mis-sized; add more nodes",
+          correct: false,
+        }
+      - { text: "The scheduler is broken; restart the control plane", correct: false }
+      - {
+          text: "Requests drive scheduling, so over-requesting wastes capacity; rightsize the requests",
+          correct: true,
+        }
+      - { text: "Idle nodes are billed less, so the situation is acceptable", correct: false }
+  - type: single
+    prompt: "A new AI feature calls a paid model API at about $0.02 per call. Users on the $10 per month plan average 800 calls per month. What is the architectural conclusion?"
+    explanation: "800 x $0.02 = $16 per user per month, which exceeds the $10 plan price, so each average user loses money. Cost per request is a design constraint here: reduce calls with caching, batching or a cheaper model, add quotas or usage tiers, or reprice. Scaling traffic makes the loss bigger."
+    theoryUrl: https://www.finops.org/framework/
+    options:
+      - {
+          text: "The feature is profitable, because the infrastructure bill is small compared with the subscription revenue",
+          correct: false,
+        }
+      - { text: "It costs $1.60 per user, which is a healthy margin", correct: false }
+      - { text: "More users will lower the cost per call automatically", correct: false }
+      - {
+          text: "It costs $16 per user, above the $10 price; add caching, quotas or a cheaper model",
+          correct: true,
+        }

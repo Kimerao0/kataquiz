@@ -1,0 +1,505 @@
+version: 1
+title: "Architect Roadmap 15: System design of a production Next.js app [SCENARIO]"
+description: Authentication and sessions, multi-tenancy, rate limiting, background jobs and queues, observability, monorepos and micro-frontends, and serverless versus self-hosted containers.
+language: en
+tags:
+  [
+    architect-roadmap,
+    nextjs,
+    system-design,
+    multi-tenancy,
+    queues,
+    observability,
+    deployment,
+    scenario,
+  ]
+run:
+  questionsPerRun: 10
+  maxErrors: 3
+  timePerQuestionSec: 90
+questions:
+  - type: single
+    prompt: "Your B2B admin console must cut off a dismissed employee within seconds, while ordinary customer sessions last 30 days. You currently use a stateless signed cookie for everyone. What do you change for admins?"
+    explanation: "A stateless cookie is valid until it expires and cannot be revoked server-side. For admins use server-side sessions: an opaque session id in an HttpOnly cookie that maps to a row (or Redis key), so revoking is a delete, with the lookup cached for a short time. Keep stateless sessions where instant revocation is not required."
+    theoryUrl: https://nextjs.org/docs/app/guides/authentication
+    options:
+      - {
+          text: "Shorten the cookie to five seconds and refresh it on every single request",
+          correct: false,
+        }
+      - {
+          text: "Keep stateless cookies and ask the browser to delete them on logout",
+          correct: false,
+        }
+      - {
+          text: "Put the admin role in the JWT payload, so that it is rechecked on each request",
+          correct: false,
+        }
+      - {
+          text: "Store the session server-side behind an opaque id, so revoking means deleting it",
+          correct: true,
+        }
+  - type: single
+    prompt: "Your `proxy.ts` looks the session up in Postgres and redirects anonymous users. Under load, the database melts even though page traffic is modest. Why, and what is the fix?"
+    explanation: "Proxy runs for every matched request, including prefetches triggered by each `<Link>` entering the viewport, so one page view can cause many session lookups. Keep Proxy cheap: verify the signed cookie (optimistic check) and do the authoritative database check in the Data Access Layer, close to the data. Proxy should not be the only line of defence."
+    theoryUrl: https://nextjs.org/docs/app/guides/authentication
+    options:
+      - {
+          text: "Proxy cannot access databases at all, so the lookup silently retries until it finally succeeds",
+          correct: false,
+        }
+      - {
+          text: "Move the lookup into the root layout, which runs only once per browser session or tab",
+          correct: false,
+        }
+      - {
+          text: "Proxy runs on every route and prefetch, so verify the cookie there and check the DB in the DAL",
+          correct: true,
+        }
+      - {
+          text: "Disable prefetching globally, as it is the only source of extra Proxy calls",
+          correct: false,
+        }
+  - type: single
+    prompt: "With Cache Components, a shared header shows the user's avatar on every page. You want the header and navigation in the static shell, while still personalising the avatar. How do you build it?"
+    explanation: "Do not read the session at the top of the layout, which would block the subtree. Render the header statically and put the avatar in a small component that reads the session (cookies) inside its own `<Suspense>` boundary with a fallback. The shell is prerendered and only the avatar streams in per request."
+    theoryUrl: https://nextjs.org/docs/app/guides/authentication-with-cache-components
+    options:
+      - {
+          text: "Read cookies() at the top of the root layout and pass the user to the header",
+          correct: false,
+        }
+      - {
+          text: "Put the avatar in a component under Suspense that reads the session itself",
+          correct: true,
+        }
+      - {
+          text: "Wrap the whole layout in `use cache`, passing the session cookie as an argument",
+          correct: false,
+        }
+      - {
+          text: "Make every page a Client Component so the avatar can be read from document.cookie",
+          correct: false,
+        }
+  - type: single
+    prompt: "You place the app behind a corporate reverse proxy. Since then, every Server Action fails with a rejected-origin error. The proxy forwards requests with its own internal hostname in `Host`. What do you do?"
+    explanation: "Next.js protects Server Actions against CSRF by comparing the `Origin` host with the app's host taken from `x-forwarded-host` or `host`. Make the proxy forward the public host in `x-forwarded-host`, and only if that is impossible list the public host in `serverActions.allowedOrigins`. Disabling the check is not an option."
+    theoryUrl: https://nextjs.org/docs/app/api-reference/config/next-config-js/serverActions
+    options:
+      - {
+          text: "Forward the public host in x-forwarded-host, or list it in allowedOrigins",
+          correct: true,
+        }
+      - {
+          text: "Switch the actions to GET, because the origin check applies only to POST",
+          correct: false,
+        }
+      - {
+          text: "Set the encryption key to the same value on both, which fixes origin checks",
+          correct: false,
+        }
+      - {
+          text: "Remove the Origin header at the proxy, so that the comparison is skipped",
+          correct: false,
+        }
+  - type: single
+    prompt: "You are building a SaaS where each customer gets `acme.yourapp.com`. All tenants share one codebase and deployment. How do you route requests to tenant-specific pages?"
+    explanation: "Run the same app for every host and resolve the tenant from the hostname: Proxy (or a rewrite) maps `acme.yourapp.com/...` onto an internal dynamic segment such as `/[tenant]/...`, and server code looks the tenant up from that parameter. A deployment per tenant does not scale, and tenant data must never be chosen from client-controlled input."
+    theoryUrl: https://nextjs.org/docs/app/guides/multi-tenant
+    options:
+      - {
+          text: "Deploy a copy of the app per tenant and point each subdomain to its own copy",
+          correct: false,
+        }
+      - {
+          text: "Read the tenant from a client-side localStorage value on first load of the page",
+          correct: false,
+        }
+      - {
+          text: "Create one folder per tenant under app/ at build time, and redeploy for each new one",
+          correct: false,
+        }
+      - {
+          text: "Rewrite the host to an internal [tenant] segment, resolved server-side from that value",
+          correct: true,
+        }
+  - type: single
+    prompt: "Your SaaS has 5,000 small tenants and 10 large enterprise customers who demand strong data isolation. Which data-isolation model is the most reasonable?"
+    explanation: "A hybrid is common: pool the small tenants in shared tables with a `tenant_id` on every row enforced by row-level security (cheap, easy to operate), and give the few enterprise tenants dedicated schemas or databases for isolation, noisy-neighbour control and per-tenant backup. A database per tenant for all 5,000 multiplies operational cost; no isolation at all fails the enterprise requirement."
+    theoryUrl: https://www.postgresql.org/docs/current/ddl-rowsecurity.html
+    options:
+      - {
+          text: "A separate database for every single tenant, with no exceptions made even for the small ones",
+          correct: false,
+        }
+      - {
+          text: "Shared tables for all tenants, filtering by tenant_id in application code only",
+          correct: false,
+        }
+      - {
+          text: "Shared tables with row-level security for small tenants, dedicated storage for enterprise",
+          correct: true,
+        }
+      - {
+          text: "Separate Next.js deployments per tenant, and one shared database for all of them",
+          correct: false,
+        }
+  - type: single
+    prompt: "A developer sets a module-level `let currentTenant` in `proxy.ts`/a helper per request and reads it in Server Components and cached functions. In production, tenants occasionally see each other's data. Why?"
+    explanation: "A Node.js process serves many requests concurrently, and module-level variables are shared by all of them, so one request can overwrite another's value. Proxy is also designed to run separately from the render code, so you should not rely on shared modules or globals. Pass the tenant through the URL or a header, derive it per request, and make it an explicit argument (and therefore a cache key) of cached functions."
+    theoryUrl: https://nextjs.org/docs/app/api-reference/file-conventions/proxy
+    options:
+      - {
+          text: "Server Components are rendered in separate processes, which don't see the variable",
+          correct: false,
+        }
+      - {
+          text: "Next.js resets module-level variables after every response, but too late for some",
+          correct: false,
+        }
+      - {
+          text: "Concurrent requests share the module variable, so pass tenant explicitly per request",
+          correct: true,
+        }
+      - {
+          text: "`let` variables are hoisted differently in the Edge Runtime, causing the mix-up",
+          correct: false,
+        }
+  - type: single
+    prompt: "One large tenant starts a huge CSV import every morning, and all other tenants see slow responses. The app and database are shared. What is the right architectural response?"
+    explanation: "This is a noisy-neighbour problem. Move the import to background jobs, limit concurrency per tenant so that one tenant cannot take all workers, apply per-tenant rate limits and quotas on the API, and consider a dedicated pool for that tenant. Scaling everything up just raises the bill without fairness."
+    theoryUrl: https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/welcome.html
+    options:
+      - {
+          text: "Run the import faster by raising the function memory for every request",
+          correct: false,
+        }
+      - {
+          text: "Block imports during business hours for all tenants to protect latency",
+          correct: false,
+        }
+      - {
+          text: "Add an index on tenant_id, since tenant filtering is the only slow part",
+          correct: false,
+        }
+      - {
+          text: "Queue the import, cap per-tenant concurrency and enforce per-tenant quotas",
+          correct: true,
+        }
+  - type: single
+    prompt: "You are designing rate limiting for a public SaaS API and login form. Which layering is most sensible?"
+    explanation: "Layer it. Volumetric abuse is best absorbed at the CDN or WAF before it reaches your app, while application-level limits keyed by account, API key or IP protect specific endpoints (login, expensive queries) with business-aware rules. Next.js lets you implement limits in code, and the docs advise also enabling the host's features."
+    theoryUrl: https://nextjs.org/docs/app/guides/backend-for-frontend
+    options:
+      - {
+          text: "Only in-app limits, because the CDN cannot see which requests are abusive",
+          correct: false,
+        }
+      - {
+          text: "Only a CDN limit, since application code runs too late to throttle clients",
+          correct: false,
+        }
+      - {
+          text: "WAF or CDN for volumetric traffic, plus per-account limits in the app",
+          correct: true,
+        }
+      - {
+          text: "Only a client-side limit, which disables the button after a number of attempts",
+          correct: false,
+        }
+  - type: single
+    prompt: "Your fixed-window limiter allows 100 requests per minute per client. A client sends 100 requests at 12:00:59 and 100 more at 12:01:01, and all of them succeed. What happened, and what is a better algorithm?"
+    explanation: "A fixed window resets at the boundary, so a client can burst up to twice the limit across two adjacent windows (200 requests in two seconds here). A sliding window or a token bucket smooths this: the token bucket allows a bounded burst and refills at a steady rate, using a small amount of state per key."
+    theoryUrl: https://nextjs.org/docs/app/guides/backend-for-frontend
+    options:
+      - {
+          text: "A boundary burst of up to 2x, so use a sliding window or a token bucket",
+          correct: true,
+        }
+      - { text: "Clock skew between servers, so synchronise the clocks with NTP", correct: false }
+      - {
+          text: "A bug in the counter, since a fixed window can never exceed its limit",
+          correct: false,
+        }
+      - {
+          text: "Network retries, so cache each response to answer duplicate requests",
+          correct: false,
+        }
+  - type: single
+    prompt: "You rate-limit a Server Action that sends password reset emails. Your app sits behind a load balancer. What key do you use for anonymous users, and what must you be careful about?"
+    explanation: "For anonymous requests the usual key is the client IP, plus the target account to stop attacks that spread across IPs. Behind a proxy the real IP comes from `X-Forwarded-For`, which a client can spoof, so trust it only from your known proxies (take the entry added by your own load balancer). Keying by a client-supplied header alone is trivial to bypass."
+    theoryUrl: https://nextjs.org/docs/app/guides/server-actions
+    options:
+      - {
+          text: "A client-chosen header such as X-Client-Id, because the client knows who it is",
+          correct: false,
+        }
+      - {
+          text: "The IP plus the target account, taking X-Forwarded-For only from trusted proxies",
+          correct: true,
+        }
+      - {
+          text: "The Server Action ID, because it is unique to each user's browser session",
+          correct: false,
+        }
+      - {
+          text: "The User-Agent string, since it stays stable across a client's requests",
+          correct: false,
+        }
+  - type: single
+    prompt: "After a checkout, you must send a confirmation email and update the CRM. The first version uses `after()`. Sometimes the email provider is down and customers get no email. What do you change?"
+    explanation: "`after()` runs after the response but is best-effort: it lives and dies with the function or server instance, and it has no retry, backoff or visibility. Work that must eventually succeed belongs in a durable queue (or workflow) with retries, a dead-letter queue and monitoring. Use `after()` for non-critical work such as analytics."
+    theoryUrl: https://nextjs.org/docs/app/api-reference/functions/after
+    options:
+      - {
+          text: "Wrap the email call in a try/catch and retry it three times inside after()",
+          correct: false,
+        }
+      - {
+          text: "Publish a job to a durable queue and process it with retries and a dead-letter queue",
+          correct: true,
+        }
+      - {
+          text: "Move the call before the response, so the user waits until it finishes",
+          correct: false,
+        }
+      - {
+          text: "Use `connection()` before the call to make sure the email is sent per request",
+          correct: false,
+        }
+  - type: boolean
+    prompt: "A standard queue with at-least-once delivery guarantees that each message is processed exactly once, so consumers do not need to be idempotent."
+    answer: false
+    explanation: "At-least-once delivery means a message can be delivered more than once, for example after a visibility timeout or a consumer crash before acknowledging. Consumers must be idempotent (deduplicate by message or business key); exactly-once is something you build at the application level."
+    theoryUrl: https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/standard-queues.html
+  - type: single
+    prompt: "A nightly report must run for every tenant. The app is deployed serverless with a function time limit. Which design is appropriate?"
+    explanation: "Use a scheduler (a cron service) to call a protected endpoint or trigger a workflow that only enqueues one job per tenant; workers then process jobs in parallel within time limits, with retries. Doing all tenants inside one request will hit the duration limit and leaves nothing to resume from if it fails halfway."
+    theoryUrl: https://nextjs.org/docs/app/guides/backend-for-frontend
+    options:
+      - {
+          text: "A cron trigger that enqueues one job per tenant, processed by workers with retries",
+          correct: true,
+        }
+      - {
+          text: "A cron-triggered handler that loops over all tenants and generates each report inline",
+          correct: false,
+        }
+      - {
+          text: "A browser tab left open on an admin page that calls the handler every night",
+          correct: false,
+        }
+      - {
+          text: "One Server Action per tenant, called from a Client Component with Promise.all",
+          correct: false,
+        }
+  - type: single
+    prompt: "Your provider sends thousands of webhooks in bursts and retries on any response slower than 5 seconds. Processing each event takes up to 20 seconds. What should the Route Handler do?"
+    explanation: "Acknowledge quickly: verify the signature, persist or enqueue the event (with its id for deduplication) and return 2xx immediately, then process asynchronously in a worker. Processing inline would exceed the provider's timeout, trigger retries and produce duplicates, which is why the worker must also be idempotent."
+    theoryUrl: https://nextjs.org/docs/app/guides/backend-for-frontend
+    options:
+      - {
+          text: "Process inline and return 200 only once everything succeeded, for strict consistency",
+          correct: false,
+        }
+      - {
+          text: "Verify, enqueue the event with its id and return 2xx; process it in a worker",
+          correct: true,
+        }
+      - {
+          text: "Return 500 while processing, so the provider keeps the event and retries later",
+          correct: false,
+        }
+      - {
+          text: "Use `after()` to process inline and ignore failures, since retries come anyway",
+          correct: false,
+        }
+  - type: single
+    prompt: "You want OpenTelemetry traces for Next.js server work. Where do you register the SDK so that it starts once per server instance?"
+    explanation: "Create `instrumentation.ts` at the project root (or in `src`) and export `register()`. Next.js calls it once when a new server instance starts, before it handles requests, which is the place to initialise OpenTelemetry (for example with `@vercel/otel`). Next.js itself is already instrumented, so spans for routes and fetches appear automatically."
+    theoryUrl: https://nextjs.org/docs/app/guides/instrumentation
+    options:
+      - {
+          text: "In the root layout, inside a useEffect that runs on every page view",
+          correct: false,
+        }
+      - { text: "In `instrumentation.ts` with an exported `register()` function", correct: true }
+      - { text: "In proxy.ts, since it runs before every request on the server", correct: false }
+      - {
+          text: "In next.config.ts, which is evaluated for each request at runtime",
+          correct: false,
+        }
+  - type: multi
+    prompt: "Which of these are the four golden signals for monitoring a user-facing service? Select all that apply."
+    explanation: "The Google SRE book names latency, traffic, errors and saturation as the four golden signals. Build count and the number of commits describe the delivery process, not the health of a running service."
+    theoryUrl: https://sre.google/sre-book/monitoring-distributed-systems/
+    options:
+      - { text: "Latency of served requests", correct: true }
+      - { text: "Traffic, the demand placed on the system", correct: true }
+      - { text: "Errors, the rate of failing requests", correct: true }
+      - { text: "Number of commits merged per day", correct: false }
+  - type: single
+    prompt: "Users report a random 'Something went wrong' page. Production errors show a generic message in the browser and the engineers cannot reproduce it. What observability setup lets support find the cause quickly?"
+    explanation: "Server Component errors reach the client with a generic message and an `error.digest`. Show the digest on the error UI, log errors server-side with structured logs that include the digest, request id and trace id, and use distributed traces to follow the request. Then support can search a single identifier from the user report."
+    theoryUrl: https://nextjs.org/docs/app/api-reference/file-conventions/error
+    options:
+      - {
+          text: "Return full stack traces to the browser in production for faster debugging",
+          correct: false,
+        }
+      - {
+          text: "Show the digest, log it with a trace id on the server and search by it",
+          correct: true,
+        }
+      - { text: "Ask users to reproduce the error with the browser console open", correct: false }
+      - {
+          text: "Log only client-side errors, since server errors are hidden by Next.js",
+          correct: false,
+        }
+  - type: single
+    prompt: "Two Next.js apps in a monorepo consume `@acme/ui`, a workspace package that exports TypeScript and JSX source files directly. The build fails with a syntax error pointing inside the package. What is the fix?"
+    explanation: "Packages that ship untranspiled TypeScript or JSX from a monorepo workspace must be compiled by the app that imports them: list them in `transpilePackages` in `next.config`. Alternatively build the package to JavaScript first. Duplicating the files into each app defeats the purpose of the monorepo."
+    theoryUrl: https://nextjs.org/docs/app/api-reference/config/next-config-js/transpilePackages
+    options:
+      - {
+          text: "Add the package name to transpilePackages, or publish compiled output from it",
+          correct: true,
+        }
+      - {
+          text: "Copy the package's source into each app so that Next.js treats it as local code",
+          correct: false,
+        }
+      - {
+          text: "Rename the package files to .mjs, which Next.js always transpiles by default",
+          correct: false,
+        }
+      - {
+          text: "Mark every component in the package with 'use client' to enable compilation",
+          correct: false,
+        }
+  - type: single
+    prompt: "Marketing, a logged-in dashboard and a docs site are owned by three teams that want independent deploys, under one domain. What does Next.js offer, and what is the main trade-off?"
+    explanation: "Multi-Zones: separate Next.js apps each serve a set of paths and are composed under one domain by routing. Teams deploy independently and each build stays small. Navigation within a zone is a soft navigation, but moving between zones is a hard navigation (full page load), so pages visited together should live in the same zone. Each zone sets an `assetPrefix` to avoid asset conflicts."
+    theoryUrl: https://nextjs.org/docs/app/guides/multi-zones
+    options:
+      - {
+          text: "Multi-Zones, and the cost is a hard navigation when moving between zones",
+          correct: true,
+        }
+      - {
+          text: "Parallel routes, and the cost is that all three teams must share one deployment",
+          correct: false,
+        }
+      - {
+          text: "Route groups, and the cost is that each group must be deployed from a different branch",
+          correct: false,
+        }
+      - {
+          text: "Intercepting routes, and the cost is that URLs cannot be shared between teams",
+          correct: false,
+        }
+  - type: single
+    prompt: "An eight-engineer single team proposes splitting the product into five micro-frontends 'to scale'. They deploy together and share the same design system and auth. What is your recommendation?"
+    explanation: "Micro-frontends solve an organisational scaling problem: independent teams and release cadences. For one small team they add overhead (cross-app navigation, shared dependency versions, duplicated tooling, harder end-to-end testing). A modular monolith in a monorepo, with route groups and clear package boundaries, gives most of the benefit at a fraction of the cost."
+    theoryUrl: https://martinfowler.com/articles/micro-frontends.html
+    options:
+      - {
+          text: "Avoid it, and keep a modular monolith with clear package and route boundaries",
+          correct: true,
+        }
+      - {
+          text: "Do it, because splitting early is cheaper than splitting after the product grows",
+          correct: false,
+        }
+      - {
+          text: "Do it, since micro-frontends improve runtime performance for every user",
+          correct: false,
+        }
+      - {
+          text: "Avoid it, because Next.js cannot compose several applications under one domain",
+          correct: false,
+        }
+  - type: single
+    prompt: "A small team with no dedicated ops builds a product with spiky, unpredictable traffic (events and launches). They want to minimise operational work and scale to zero. Which deployment model fits best?"
+    explanation: "A managed serverless platform removes most operations and scales with spikes, and any platform with Node.js and streaming support can run Next.js. Caveats to design for: database connection counts (pooling), cold starts, function duration limits and per-invocation cost, plus ephemeral in-memory caches. Self-managing Kubernetes brings operational load that this team does not need."
+    theoryUrl: https://nextjs.org/docs/app/guides/deploying-to-platforms
+    options:
+      - {
+          text: "A self-managed Kubernetes cluster sized for peak, to keep costs predictable",
+          correct: false,
+        }
+      - {
+          text: "A static export on object storage, since the spikes only ever hit static marketing pages",
+          correct: false,
+        }
+      - {
+          text: "A managed serverless platform, designing for pooling, cold starts and duration limits",
+          correct: true,
+        }
+      - {
+          text: "One large VM running next start, scaled up by hand a few hours before each launch",
+          correct: false,
+        }
+  - type: single
+    prompt: "A regulated company needs on-premises hosting, steady 24/7 traffic, long-lived streaming responses and predictable cost. They run Kubernetes. How do you deploy Next.js, and what must you configure for several replicas?"
+    explanation: "Containerise with `output: 'standalone'` and run several replicas behind a reverse proxy or ingress. With multiple instances, build once and use the same build everywhere, share the cache through a custom cache handler (for ISR and `use cache` tag invalidation), set the same `NEXT_SERVER_ACTIONS_ENCRYPTION_KEY`, and keep the ingress from buffering streamed responses."
+    theoryUrl: https://nextjs.org/docs/app/guides/self-hosting
+    options:
+      - {
+          text: "A static export served by nginx, because containers cannot stream responses",
+          correct: false,
+        }
+      - {
+          text: "Edge Runtime pods, one per user region, each with its own independent cache",
+          correct: false,
+        }
+      - {
+          text: "Independent builds per pod, so each replica can optimise for its own hardware",
+          correct: false,
+        }
+      - {
+          text: "Standalone containers with one shared build, shared cache handler and one action key",
+          correct: true,
+        }
+  - type: single
+    prompt: "During rolling deploys of your containerised app, users on an open tab see errors when submitting forms, such as 'Failed to find Server Action'. What reduces this?"
+    explanation: "Action IDs are tied to the build, so a client from the previous build can call an action the new server no longer knows. Prefer rolling deployments with overlap, set a `deploymentId` for version skew protection (the client then fetches consistent content), keep the encryption key stable, and surface the error as a retry or refresh path in the UI."
+    theoryUrl: https://nextjs.org/docs/app/guides/server-actions
+    options:
+      - {
+          text: "Deploy everything at once at night, so that no user has an open tab",
+          correct: false,
+        }
+      - {
+          text: "Disable Server Actions and use route handlers, which never change between builds",
+          correct: false,
+        }
+      - {
+          text: "Add `no-store` to every response, so clients refresh their code on each click",
+          correct: false,
+        }
+      - {
+          text: "Rolling deploys with deploymentId and a stable key, with a retry path in the UI",
+          correct: true,
+        }
+  - type: single
+    prompt: "Your pods receive SIGTERM during every Kubernetes rollout. Some analytics and audit events scheduled with `after()` are lost. What do you do?"
+    explanation: "When stopping a self-hosted Next.js server, send SIGINT or SIGTERM and wait: it finishes in-flight requests and runs pending `after()` callbacks before exiting. Give the platform a drain period (the docs suggest 10 to 30 seconds), set the pod's termination grace period accordingly, and move events that must not be lost to a durable queue."
+    theoryUrl: https://nextjs.org/docs/app/guides/self-hosting
+    options:
+      - {
+          text: "Handle SIGKILL in the app, since SIGTERM cannot be intercepted in Node.js",
+          correct: false,
+        }
+      - {
+          text: "Run `after()` callbacks before the response, because they cannot survive shutdown",
+          correct: false,
+        }
+      - {
+          text: "Allow a drain period after SIGTERM, and use a durable queue for must-keep events",
+          correct: true,
+        }
+      - {
+          text: "Increase the readiness probe interval, which delays the termination signal",
+          correct: false,
+        }

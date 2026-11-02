@@ -1,0 +1,527 @@
+version: 1
+title: "Architect Roadmap 23: Reliability and security in Node.js"
+description: Graceful shutdown, retries with backoff, circuit breakers, timeouts, rate limiting, secrets management, injection and npm dependency risks.
+language: en
+tags: [architect-roadmap, nodejs, reliability, security, resilience]
+run:
+  questionsPerRun: 10
+  maxErrors: 3
+  timePerQuestionSec: 60
+questions:
+  - type: single
+    prompt: "A Node.js HTTP service receives `SIGTERM` during a rolling deploy. Which shutdown sequence loses the fewest requests?"
+    explanation: "A graceful shutdown first stops accepting new connections (and fails the readiness check so the load balancer stops routing), then lets in-flight requests finish, then closes shared resources such as DB pools and broker connections, and only then exits. Calling `process.exit()` immediately drops in-flight work, and closing the DB first makes the active requests fail."
+    theoryUrl: https://nodejs.org/api/http.html#serverclosecallback
+    options:
+      - {
+          text: "Close the DB pool, then stop the server, then finish the in-flight requests",
+          correct: false,
+        }
+      - {
+          text: "Call `process.exit(0)` at once, because the orchestrator will retry the lost requests",
+          correct: false,
+        }
+      - {
+          text: "Stop accepting connections, drain in-flight requests, close the DB and brokers, then exit",
+          correct: true,
+        }
+      - {
+          text: "Ignore `SIGTERM` and let the orchestrator send `SIGKILL` when it is ready",
+          correct: false,
+        }
+  - type: single
+    prompt: "In what order does this script print its lines (on Node 20 or later)?"
+    code: |
+      const http = require('node:http')
+      const server = http.createServer((req, res) => {
+        setTimeout(() => res.end('done'), 100)
+      })
+      server.listen(0, async () => {
+        const port = server.address().port
+        const p = fetch(`http://localhost:${port}`)
+          .then((r) => r.text())
+          .then((t) => console.log('client got', t))
+        await new Promise((r) => setTimeout(r, 20))
+        server.close(() => console.log('closed'))
+        console.log('close called')
+        await p
+      })
+    codeLanguage: javascript
+    explanation: "`server.close()` stops accepting new connections immediately but lets existing requests finish, and its callback runs only once all connections have ended. So `close called` comes first, then the in-flight response reaches the client, and `closed` is logged last. This is why `close()` is the core of graceful shutdown."
+    theoryUrl: https://nodejs.org/api/http.html#serverclosecallback
+    options:
+      - { text: "close called, closed, client got done", correct: false }
+      - { text: "close called, client got done, closed", correct: true }
+      - { text: "client got done, close called, closed", correct: false }
+      - { text: "close called, then an error, since the request is aborted", correct: false }
+  - type: single
+    prompt: "What does this script print?"
+    code: |
+      process.on('SIGTERM', () => {
+        console.log('term')
+      })
+      const t = setInterval(() => {}, 1000)
+      process.on('SIGTERM', () => {
+        console.log('cleanup')
+        clearInterval(t)
+      })
+      process.kill(process.pid, 'SIGTERM')
+    codeLanguage: javascript
+    explanation: "Signal handlers are ordinary event listeners, so all of them run, in registration order. Because at least one handler exists, Node no longer applies the default behaviour of exiting on `SIGTERM`. Here the process then ends because the only remaining timer was cleared. In a server you must start the shutdown yourself."
+    theoryUrl: https://nodejs.org/api/process.html#signal-events
+    options:
+      - { text: "term, then cleanup", correct: true }
+      - { text: "cleanup, then term", correct: false }
+      - { text: "term only, because the first handler stops the others", correct: false }
+      - {
+          text: "Nothing, because Node kills the process before the handlers can run",
+          correct: false,
+        }
+  - type: single
+    prompt: "In Kubernetes your pod receives `SIGTERM`, but the app needs up to 60 s to drain long requests. The pod's `terminationGracePeriodSeconds` is the default. What happens at the deadline?"
+    explanation: "After `SIGTERM` the kubelet waits for the grace period (30 s by default), then sends `SIGKILL`, which cannot be caught or handled, so unfinished requests are cut. Raise `terminationGracePeriodSeconds` above your longest drain time (and use readiness and `preStop` to stop new traffic first). Node does not get extra time on its own."
+    theoryUrl: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#pod-termination
+    options:
+      - { text: "Kubernetes waits for the process to exit however long that takes", correct: false }
+      - {
+          text: "Kubernetes sends `SIGKILL`, which the app cannot handle, cutting the remaining requests",
+          correct: true,
+        }
+      - {
+          text: "Kubernetes sends `SIGTERM` a second time and waits for a further 30 seconds",
+          correct: false,
+        }
+      - {
+          text: "Node extends the grace period automatically while requests are in flight",
+          correct: false,
+        }
+  - type: boolean
+    prompt: "A Node.js process can register a handler for `SIGKILL` to flush its buffers before it is terminated."
+    answer: false
+    explanation: "`SIGKILL` (and `SIGSTOP`) cannot be caught, blocked or ignored: the kernel ends the process immediately. Cleanup logic belongs in the `SIGTERM` and `SIGINT` handlers, which is why the grace period before `SIGKILL` matters."
+    theoryUrl: https://nodejs.org/api/process.html#signal-events
+  - type: multi
+    prompt: "An API client calls a downstream service. Which failures are generally safe and sensible to retry automatically? Select all that apply."
+    explanation: "Retry transient failures: connection resets, timeouts and `503` or `429` responses (honouring `Retry-After`), provided the operation is idempotent or protected by an idempotency key. A `400` or `422` will fail the same way every time, and retrying a non-idempotent `POST` without a key can duplicate its effect."
+    theoryUrl: https://aws.amazon.com/builders-library/timeouts-retries-and-backoff-with-jitter/
+    options:
+      - { text: "A `503 Service Unavailable` on a `GET` request", correct: true }
+      - {
+          text: "A `422 Unprocessable Entity` for an invalid email address in the body",
+          correct: false,
+        }
+      - { text: "An `ECONNRESET` on an idempotent `PUT`", correct: true }
+      - { text: "A timeout on `POST /charges`, with no idempotency key", correct: false }
+      - { text: "A `429 Too Many Requests` with a `Retry-After` header", correct: true }
+  - type: single
+    prompt: "What does this script print?"
+    code: |
+      function delays(retries) {
+        const out = []
+        for (let attempt = 0; attempt < retries; attempt++) {
+          out.push(Math.min(100 * 2 ** attempt, 1000))
+        }
+        return out
+      }
+      console.log(delays(6))
+    codeLanguage: javascript
+    explanation: "The delay doubles each attempt (100, 200, 400, 800, 1600) but is capped at 1000 by `Math.min`, so the last two values are both 1000. Capping the exponential backoff keeps the wait bounded. In production you would also add jitter."
+    theoryUrl: https://aws.amazon.com/builders-library/timeouts-retries-and-backoff-with-jitter/
+    options:
+      - { text: "[ 100, 200, 400, 800, 1600, 3200 ]", correct: false }
+      - { text: "[ 100, 200, 300, 400, 500, 600 ]", correct: false }
+      - { text: "[ 100, 200, 400, 800, 1000, 1000 ]", correct: true }
+      - { text: "[ 200, 400, 800, 1000, 1000, 1000 ]", correct: false }
+  - type: single
+    prompt: "A downstream service fails and 5,000 clients all retry with the same exponential backoff schedule (1 s, 2 s, 4 s, ...). The service recovers, but gets crushed again at every retry instant. What is the missing ingredient?"
+    explanation: "Clients that fail together and back off identically retry together, producing synchronised waves (a thundering herd). Adding random jitter to each delay spreads the retries over time. A longer base delay or more attempts keeps the waves synchronised and just makes them later."
+    theoryUrl: https://aws.amazon.com/builders-library/timeouts-retries-and-backoff-with-jitter/
+    options:
+      - { text: "A longer base delay, so that the waves are further apart", correct: false }
+      - {
+          text: "More retry attempts per client, so more of the requests eventually succeed",
+          correct: false,
+        }
+      - {
+          text: "Random jitter on each delay, so that clients do not retry at the same moment",
+          correct: true,
+        }
+      - {
+          text: "Linear backoff, since it grows more slowly than the exponential one",
+          correct: false,
+        }
+  - type: single
+    prompt: "A request goes through 3 layers: gateway, service A and service B. Each layer retries a failing call up to 3 times in total. When B is down, roughly how many requests reach B for one user request, and what is the lesson?"
+    explanation: "Retries multiply across layers: 3 x 3 x 3 = 27 attempts against the service that is already struggling (retry amplification). Retry at one layer only (usually the one closest to the failure or the edge), use retry budgets, and fail fast so that an outage is not made worse."
+    theoryUrl: https://sre.google/sre-book/handling-overload/
+    options:
+      - { text: "3, because only the last layer actually calls B", correct: false }
+      - { text: "9, because retries add up across the two lower layers", correct: false }
+      - { text: "27, so retry in one layer only or use a retry budget", correct: true }
+      - { text: "81, because each layer also retries its own timeouts", correct: false }
+  - type: single
+    prompt: "What is the purpose of a circuit breaker around calls to a remote dependency?"
+    explanation: "When failures exceed a threshold, the breaker opens and calls fail immediately without touching the struggling dependency. This gives it room to recover, avoids tying up your sockets and threads on doomed requests, and lets you serve a fallback. It does not make the dependency faster, and it is not a cache or a retry mechanism."
+    theoryUrl: https://martinfowler.com/bliki/CircuitBreaker.html
+    options:
+      - {
+          text: "To retry failed calls automatically until one of them finally succeeds",
+          correct: false,
+        }
+      - {
+          text: "To stop calling a failing dependency quickly, so it can recover and callers fail fast",
+          correct: true,
+        }
+      - {
+          text: "To cache the last successful response so the dependency is rarely called",
+          correct: false,
+        }
+      - {
+          text: "To limit how many requests per second clients may send to your own API",
+          correct: false,
+        }
+  - type: single
+    prompt: "What does this script print?"
+    code: |
+      class Breaker {
+        state = 'closed'
+        failures = 0
+        constructor(threshold) { this.threshold = threshold }
+        async call(fn) {
+          if (this.state === 'open') throw new Error('open')
+          try {
+            const r = await fn()
+            this.failures = 0
+            return r
+          } catch (e) {
+            if (++this.failures >= this.threshold) this.state = 'open'
+            throw e
+          }
+        }
+      }
+      const b = new Breaker(2)
+      const fail = async () => { throw new Error('boom') }
+      async function main() {
+        for (let i = 0; i < 4; i++) {
+          try { await b.call(fail) } catch (e) { console.log(i, e.message, b.state) }
+        }
+      }
+      main()
+    codeLanguage: javascript
+    explanation: "Calls 0 and 1 reach `fail` and throw `boom`. After the second failure the threshold of 2 is reached and the state becomes `open` (logged on call 1). Calls 2 and 3 are rejected immediately with `open` without calling `fail`. This breaker never recovers because it has no half-open state."
+    theoryUrl: https://martinfowler.com/bliki/CircuitBreaker.html
+    options:
+      - { text: "0 boom closed, 1 boom open, 2 open open, 3 open open", correct: true }
+      - { text: "0 boom closed, 1 boom closed, 2 boom open, 3 open open", correct: false }
+      - { text: "0 boom open, 1 open open, 2 open open, 3 open open", correct: false }
+      - { text: "0 boom closed, 1 boom open, 2 boom open, 3 boom open", correct: false }
+  - type: single
+    prompt: "A circuit breaker has been open for 30 seconds, which is its configured reset timeout. What should it do next?"
+    explanation: "After the reset timeout the breaker moves to half-open and lets a limited number of trial calls through. If they succeed it closes again, and if any fails it re-opens for another timeout. Staying open forever means the dependency is never used again, and closing without a probe floods a possibly still-broken service."
+    theoryUrl: https://martinfowler.com/bliki/CircuitBreaker.html
+    options:
+      - {
+          text: "Close immediately and let all traffic through, as the timeout has passed",
+          correct: false,
+        }
+      - { text: "Stay open until an operator restarts the service manually", correct: false }
+      - {
+          text: "Move to half-open, allow a few trial calls, and close or re-open on the result",
+          correct: true,
+        }
+      - {
+          text: "Double the failure threshold and stay open for another 30 seconds",
+          correct: false,
+        }
+  - type: single
+    prompt: "What does this script print, and what is the hidden problem?"
+    code: |
+      const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+      async function slowCall() {
+        await sleep(200)
+        console.log('charge applied')
+        return 'ok'
+      }
+      const timeout = (ms) =>
+        new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), ms))
+      async function main() {
+        try {
+          console.log(await Promise.race([slowCall(), timeout(50)]))
+        } catch (e) {
+          console.log(e.message)
+        }
+        console.log('after')
+      }
+      main()
+    codeLanguage: javascript
+    explanation: "The race rejects after 50 ms, so `timeout` and `after` are logged. But `Promise.race` does not cancel the losing promise: `slowCall` keeps running and logs `charge applied` later, so the caller believes it failed while the side effect still happens. Use an `AbortSignal` so the work is actually cancelled."
+    theoryUrl: https://developer.mozilla.org/en-US/docs/Web/API/AbortSignal/timeout_static
+    options:
+      - {
+          text: "timeout, after, and then charge applied: the slow call is not cancelled",
+          correct: true,
+        }
+      - {
+          text: "timeout, after, and nothing else, since the race cancels the loser",
+          correct: false,
+        }
+      - { text: "charge applied, ok, after, since the slow call finishes first", correct: false }
+      - {
+          text: "timeout, charge applied, after, since the rejection waits for the loser",
+          correct: false,
+        }
+  - type: single
+    prompt: "What does `fetch(url, { signal: AbortSignal.timeout(2000) })` do when the server has not responded after 2 seconds?"
+    explanation: "`AbortSignal.timeout(ms)` creates a signal that aborts after the delay, and the pending `fetch` rejects with a `TimeoutError` (a `DOMException`), so the connection work is actually cancelled. Without any timeout, `fetch` in Node waits for as long as the underlying connection allows (the default headers timeout is 5 minutes in undici), which can tie up resources."
+    theoryUrl: https://developer.mozilla.org/en-US/docs/Web/API/AbortSignal/timeout_static
+    options:
+      - {
+          text: "It keeps waiting, since `AbortSignal.timeout` only affects the request body",
+          correct: false,
+        }
+      - { text: "It resolves with a `408` response object that has an empty body", correct: false }
+      - { text: "It rejects with a `TimeoutError` and cancels the request", correct: true }
+      - { text: "It retries the request once, and then rejects with a `TypeError`", correct: false }
+  - type: single
+    prompt: "A gateway has a 3 s budget for a user request. It calls service A (timeout 5 s), which calls service B (timeout 5 s). When B is slow, the user sees a gateway timeout, but A and B keep working for seconds on abandoned requests. What is the right design rule?"
+    explanation: "Timeouts should shrink as you go down the call chain, and the remaining deadline should be propagated (for example gRPC deadlines or a deadline header) so each layer stops work when the caller has already given up. Setting downstream timeouts longer than the upstream budget wastes capacity on results nobody will read."
+    theoryUrl: https://grpc.io/docs/guides/deadlines/
+    options:
+      - {
+          text: "Make downstream timeouts longer than upstream ones, so slow answers still arrive",
+          correct: false,
+        }
+      - {
+          text: "Propagate a deadline and keep each downstream timeout inside the caller's budget",
+          correct: true,
+        }
+      - {
+          text: "Remove timeouts on internal calls, since internal networks are reliable",
+          correct: false,
+        }
+      - { text: "Use the same 5 s everywhere, so every layer behaves predictably", correct: false }
+  - type: single
+    prompt: "What does this token-bucket rate limiter return? It has capacity 3 and refills 1 token per second, and the numbers are the timestamps in ms of each call."
+    code: |
+      class Bucket {
+        constructor(cap, refillPerSec) {
+          this.tokens = cap
+          this.cap = cap
+          this.rate = refillPerSec
+          this.t = 0
+        }
+        take(now) {
+          const refill = ((now - this.t) / 1000) * this.rate
+          this.tokens = Math.min(this.cap, this.tokens + refill)
+          this.t = now
+          if (this.tokens >= 1) {
+            this.tokens -= 1
+            return true
+          }
+          return false
+        }
+      }
+      const b = new Bucket(3, 1)
+      console.log([0, 0, 0, 0, 500, 1000, 1000].map((t) => b.take(t)))
+    codeLanguage: javascript
+    explanation: "The first three calls drain the bucket (burst of 3), and the fourth is rejected. At 500 ms only 0.5 tokens have refilled, so it is rejected. At 1000 ms there is one full token, so it succeeds and the bucket is empty again, and the last call at the same instant fails. Token buckets allow bursts but enforce the average rate."
+    theoryUrl: https://en.wikipedia.org/wiki/Token_bucket
+    options:
+      - { text: "[true, true, true, false, true, true, false]", correct: false }
+      - { text: "[true, true, true, false, false, true, false]", correct: true }
+      - { text: "[true, true, true, false, false, false, true]", correct: false }
+      - { text: "[true, true, true, true, false, true, false]", correct: false }
+  - type: single
+    prompt: "A fixed-window rate limiter allows 100 requests per minute, counting from the top of each minute. A client sends 100 requests at 12:00:59 and 100 more at 12:01:01. What is the weakness, and which alternative fixes it?"
+    explanation: "A fixed window resets at the boundary, so a client can make 200 requests in about two seconds (double the intended rate). A sliding window (log or counter) or a token bucket smooths this by considering the recent past rather than a hard reset. Making the window longer only moves the boundary problem."
+    theoryUrl: https://cloud.google.com/architecture/rate-limiting-strategies-techniques
+    options:
+      - {
+          text: "Boundary bursts of up to twice the limit, so use a sliding window or token bucket",
+          correct: true,
+        }
+      - {
+          text: "It under-counts slow clients, so lower the limit to 50 per minute",
+          correct: false,
+        }
+      - {
+          text: "It needs more memory than other algorithms, so store counters in a file",
+          correct: false,
+        }
+      - {
+          text: "It cannot be used with several instances, so keep a counter per instance",
+          correct: false,
+        }
+  - type: single
+    prompt: "A client exceeds the API's rate limit. What should the response look like so that well-behaved clients can adapt?"
+    explanation: "Respond with `429 Too Many Requests` and, ideally, a `Retry-After` header (and rate limit headers) so clients know when to try again. `401` and `403` describe authentication and authorisation, not throttling, and a `200` with an error body hides the condition from generic clients and retry logic."
+    theoryUrl: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/429
+    options:
+      - { text: "`403 Forbidden`, because the client is not allowed to continue", correct: false }
+      - { text: "`200 OK` with an `error` field in the JSON body", correct: false }
+      - { text: "`429 Too Many Requests` with a `Retry-After` header", correct: true }
+      - { text: "`401 Unauthorized` so that the client logs in again", correct: false }
+  - type: single
+    prompt: "A developer accidentally pushed a production database password to a public Git repository 10 minutes ago, then force-pushed a commit that removes it. What is the correct first action?"
+    explanation: "Assume the secret is compromised: automated scanners harvest public pushes within minutes and the old commit may still be reachable (forks, caches, reflog). Rotate the credential first, then clean the history and add scanning. Deleting the file or rewriting history does not un-leak a secret that others may have already copied."
+    theoryUrl: https://docs.github.com/en/code-security/secret-scanning/introduction/about-secret-scanning
+    options:
+      - {
+          text: "Rewrite the Git history and consider the problem solved, since the password is gone",
+          correct: false,
+        }
+      - {
+          text: "Make the repository private and wait to see whether anything suspicious happens",
+          correct: false,
+        }
+      - {
+          text: "Rotate the password immediately, then clean the history and add secret scanning",
+          correct: true,
+        }
+      - {
+          text: "Change the file to read the password from an environment variable and redeploy",
+          correct: false,
+        }
+  - type: multi
+    prompt: "Which of these are good practices for handling secrets in a Node.js service? Select all that apply."
+    explanation: "Inject secrets at runtime from a secrets manager or the platform, rotate them and grant each service the least privilege (ideally short-lived credentials). Never log them. Base64 is an encoding, not encryption, so committing a base64 secret to the repository is the same as committing it in plain text."
+    theoryUrl: https://cheatsheetseries.owasp.org/cheatsheets/Secrets_Management_Cheat_Sheet.html
+    options:
+      - {
+          text: "Load them at runtime from a secrets manager or the platform's injected environment",
+          correct: true,
+        }
+      - {
+          text: "Commit `.env` encoded in base64, so that it is not readable at a glance",
+          correct: false,
+        }
+      - {
+          text: "Use short-lived, least-privilege credentials and rotate them regularly",
+          correct: true,
+        }
+      - {
+          text: "Keep them out of logs, error messages and `console.log` of the config object",
+          correct: true,
+        }
+      - {
+          text: "Use one shared admin key for all services, so there is only one thing to rotate",
+          correct: false,
+        }
+  - type: single
+    prompt: "What do these two calls log?"
+    code: |
+      const { exec, execFile } = require('node:child_process')
+      const name = 'x; echo INJECTED'
+      exec(`echo hello ${name}`, (e, out) => {
+        console.log('exec:', JSON.stringify(out))
+      })
+      execFile('echo', ['hello', name], (e, out) => {
+        console.log('execFile:', JSON.stringify(out))
+      })
+    codeLanguage: javascript
+    explanation: "`exec` passes the whole string to a shell, so `;` ends the first command and runs `echo INJECTED`: command injection. `execFile` runs the program directly with an argument array and no shell, so the whole string is just one literal argument and is echoed back unchanged. The order of the two log lines depends on timing."
+    theoryUrl: https://cheatsheetseries.owasp.org/cheatsheets/Nodejs_Security_Cheat_Sheet.html
+    options:
+      - {
+          text: "exec: \"hello x\\nINJECTED\\n\" and execFile: \"hello x; echo INJECTED\\n\"",
+          correct: true,
+        }
+      - {
+          text: "exec: \"hello x; echo INJECTED\\n\" and execFile: \"hello x\\nINJECTED\\n\"",
+          correct: false,
+        }
+      - {
+          text: "Both print \"hello x\\nINJECTED\\n\", since `;` is always a command separator",
+          correct: false,
+        }
+      - {
+          text: "Both print \"hello x; echo INJECTED\\n\", since Node escapes the arguments",
+          correct: false,
+        }
+  - type: single
+    prompt: "Which of these database calls is safe from SQL injection when `email` comes from the request body?"
+    code: |
+      // A
+      db.query(`SELECT * FROM users WHERE email = '${email}'`)
+      // B
+      db.query("SELECT * FROM users WHERE email = '" + email.replace("'", "") + "'")
+      // C
+      db.query('SELECT * FROM users WHERE email = $1', [email])
+      // D
+      db.query(`SELECT * FROM users WHERE email = '${encodeURIComponent(email)}'`)
+    codeLanguage: javascript
+    explanation: "C uses a parameterised query: the SQL text and the value are sent separately, so the value can never change the query structure. A is plain string interpolation. B's `replace` only strips the first quote, and D's URL encoding is not SQL escaping. Hand-rolled escaping is fragile, so always use parameters (or a query builder that does)."
+    theoryUrl: https://cheatsheetseries.owasp.org/cheatsheets/SQL_Injection_Prevention_Cheat_Sheet.html
+    options:
+      - { text: "A", correct: false }
+      - { text: "B", correct: false }
+      - { text: "C", correct: true }
+      - { text: "D", correct: false }
+  - type: multi
+    prompt: "Which measures reduce the risk of a malicious or vulnerable npm dependency reaching production? Select all that apply."
+    explanation: "Committing the lockfile and installing with `npm ci` gives reproducible, reviewed versions. `npm audit` (or an equivalent scanner) in CI finds known vulnerabilities, and `--ignore-scripts` or an allow-list limits install-time code execution, which is a common attack path. Using `^` or `latest` ranges to 'always get the newest' increases exposure to a compromised release."
+    theoryUrl: https://docs.npmjs.com/cli/v10/commands/npm-audit
+    options:
+      - {
+          text: "Commit the lockfile and install with `npm ci` in CI and in the image build",
+          correct: true,
+        }
+      - {
+          text: "Depend on `latest` for every package, so that fixes arrive automatically",
+          correct: false,
+        }
+      - {
+          text: "Run `npm audit` or another scanner in CI and fail on high-severity findings",
+          correct: true,
+        }
+      - {
+          text: "Limit install scripts (`--ignore-scripts` or an allow-list) for packages you do not trust",
+          correct: true,
+        }
+      - {
+          text: "Review only direct dependencies, since transitive ones cannot be a risk",
+          correct: false,
+        }
+  - type: single
+    prompt: "What happens when this script runs on a current Node.js version (15 or later), with no `unhandledRejection` handler?"
+    code: |
+      Promise.reject(new Error('boom'))
+      setTimeout(() => console.log('still running'), 10)
+    codeLanguage: javascript
+    explanation: "Since Node 15 the default `--unhandled-rejections` mode is `throw`: an unhandled rejection is raised as an uncaught exception, so the process prints the error and exits with code 1 before the timer fires. Adding a `process.on('unhandledRejection')` handler changes this, but the better fix is to handle the rejection, as it indicates a bug."
+    theoryUrl: https://nodejs.org/api/process.html#event-unhandledrejection
+    options:
+      - { text: "It prints a warning, then still running, and exits with code 0", correct: false }
+      - {
+          text: "It prints still running, and then a warning when the process exits",
+          correct: false,
+        }
+      - {
+          text: "It prints the error and exits with code 1, so still running never appears",
+          correct: true,
+        }
+      - {
+          text: "Nothing is printed, because Node silently drops unhandled rejections",
+          correct: false,
+        }
+  - type: single
+    prompt: "During shutdown your app starts draining in-flight requests, but the load balancer keeps sending it new ones for a few more seconds, and some of them fail. What should the app do as soon as it receives `SIGTERM`?"
+    explanation: "Fail the readiness check (or deregister) right away so the balancer stops routing new traffic, keep serving the requests already accepted, and close the listener once routing has stopped, often after a short delay. A liveness failure would make the orchestrator restart the pod mid-drain, and returning `500` to new requests just converts the problem into errors."
+    theoryUrl: https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/
+    options:
+      - {
+          text: "Fail the liveness probe, so that the orchestrator replaces the pod quickly",
+          correct: false,
+        }
+      - {
+          text: "Return `500` for every new request until the last in-flight one finishes",
+          correct: false,
+        }
+      - {
+          text: "Close the DB pool immediately so that new requests cannot start any work",
+          correct: false,
+        }
+      - {
+          text: "Report not-ready so traffic stops, keep serving accepted requests, then close the listener",
+          correct: true,
+        }

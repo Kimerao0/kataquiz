@@ -1,0 +1,318 @@
+version: 1
+title: "Architect Roadmap 39: Documenting the architecture"
+description: The C4 model, Architecture Decision Records, RFCs and design docs, fitness functions, and evolutionary architecture.
+language: en
+tags: [architect-roadmap, architect-role, c4, adr, fitness-functions, evolutionary-architecture]
+run:
+  questionsPerRun: 10
+  maxErrors: 3
+  timePerQuestionSec: 60
+questions:
+  - type: single
+    prompt: "What are the four levels of abstraction of the C4 model, from the most zoomed-out to the most zoomed-in?"
+    explanation: "C4 stands for Context, Containers, Components, Code. Each level zooms into one element of the previous one. UML-style class or deployment views are not levels of C4, and the code level is optional."
+    theoryUrl: https://c4model.com/
+    options:
+      - { text: "Context, Containers, Components, Code", correct: true }
+      - { text: "Context, Services, Classes, Methods", correct: false }
+      - { text: "System, Modules, Packages, Classes", correct: false }
+      - { text: "Overview, Logical, Physical, Deployment", correct: false }
+  - type: single
+    prompt: "In the C4 model, what is a 'container'?"
+    explanation: "A container is a separately runnable or deployable unit that holds code or data: a SPA, an API application, a database, a message broker. It is not necessarily a Docker container, and it is not a code module inside a process (that is a component)."
+    theoryUrl: https://c4model.com/abstractions/container
+    options:
+      - { text: "A Docker image built from a Dockerfile", correct: false }
+      - { text: "A package or namespace inside a codebase", correct: false }
+      - {
+          text: "A Kubernetes pod running one or more processes, which C4 treats as the unit of deployment",
+          correct: false,
+        }
+      - {
+          text: "A separately runnable or deployable unit such as a web app, API or database",
+          correct: true,
+        }
+  - type: single
+    prompt: "New engineers joining the team need to understand which deployable pieces make up the system (SPA, API, database, queue) and which technologies they use. Which C4 diagram serves them best?"
+    explanation: "The container diagram shows the high-level technology choices and how the runnable pieces talk to each other. The context diagram is for non-technical audiences and hides internals, the component diagram zooms inside one container, and the code diagram is too fine-grained for an overview."
+    theoryUrl: https://c4model.com/diagrams/container
+    options:
+      - { text: "System context diagram", correct: false }
+      - { text: "Code diagram for every class", correct: false }
+      - { text: "Container diagram", correct: true }
+      - { text: "Component diagram of the API", correct: false }
+  - type: multi
+    prompt: "Which of these make a C4 diagram easier to understand on its own? Select all that apply."
+    explanation: "Every element should carry a name, a type and a short description or technology. Relationships need a label saying what flows and in which direction, and a title plus a legend remove guesswork about notation. Mixing abstraction levels is the opposite of what C4 recommends."
+    theoryUrl: https://c4model.com/diagrams/notation
+    options:
+      - {
+          text: "Each element shows its name, its type and a short description or technology",
+          correct: true,
+        }
+      - { text: "Lines are left unlabelled to keep the picture clean", correct: false }
+      - {
+          text: "Arrows are labelled with the purpose and direction of the interaction",
+          correct: true,
+        }
+      - { text: "A title and a legend explain the diagram and its notation", correct: true }
+  - type: boolean
+    prompt: "In practice, a C4 level 4 (code) diagram should be drawn by hand for every component of the system."
+    answer: false
+    explanation: "Level 4 is optional. If needed it should be generated from the code (for example by an IDE or a tool) for a few important components, because hand-drawn code-level diagrams go stale as soon as the code changes."
+    theoryUrl: https://c4model.com/
+  - type: single
+    prompt: "Which set of sections best matches the classic Architecture Decision Record format?"
+    explanation: "Michael Nygard's format has a title, a status, the context (forces at play), the decision and its consequences. Task lists and meeting notes are project management artifacts, and a bare solution with no context loses the reasoning that makes an ADR useful."
+    theoryUrl: https://cognitect.com/blog/2011/11/15/documenting-architecture-decisions
+    options:
+      - { text: "Summary, assignees, sprint, story points, definition of done", correct: false }
+      - { text: "Title, status, context, decision, consequences", correct: true }
+      - { text: "Problem, solution, benchmark, appendix, sign-off", correct: false }
+      - { text: "Date, attendees, minutes, action items, next meeting", correct: false }
+  - type: single
+    prompt: "A year after ADR-012 chose a message broker, the team decides to replace it. What should they do with ADR-012?"
+    explanation: "ADRs are an append-only log. The old record stays, its status changes to 'Superseded by ADR-047', and the new ADR links back and explains what changed. Editing or deleting history destroys the reasoning for why the first choice made sense at the time."
+    theoryUrl: https://adr.github.io/
+    options:
+      - { text: "Delete it so nobody follows an outdated decision", correct: false }
+      - { text: "Rewrite its decision section so it matches the new choice", correct: false }
+      - { text: "Move it to a wiki page and stop tracking its status", correct: false }
+      - { text: "Mark it as superseded by a new ADR that links back to it", correct: true }
+  - type: single
+    prompt: "Where is the most useful place to keep ADRs for a service?"
+    explanation: "Keeping ADRs in the repository next to the code means they are versioned with it, reviewed in pull requests, found by whoever reads the code, and change when the code changes. A separate wiki drifts out of sync and is easily forgotten."
+    theoryUrl: https://docs.aws.amazon.com/prescriptive-guidance/latest/architectural-decision-records/adr-process.html
+    options:
+      - { text: "In a shared wiki, separate from any repository", correct: false }
+      - { text: "In the chat history of the team channel", correct: false }
+      - { text: "In the repository, reviewed through pull requests like code", correct: true }
+      - { text: "In the architect's personal notes, shared on request", correct: false }
+  - type: single
+    prompt: "Which of these decisions most deserves an ADR?"
+    explanation: "ADRs capture architecturally significant decisions: hard to reverse, affecting several teams or quality attributes. Choosing between async messaging and synchronous calls between core services fits. Renames, patch upgrades and formatting are cheap to change and need no record."
+    theoryUrl: https://martinfowler.com/bliki/ArchitectureDecisionRecord.html
+    options:
+      - {
+          text: "Renaming a module and its public API to match the new product vocabulary across all teams",
+          correct: false,
+        }
+      - { text: "Bumping a dependency from 4.2.1 to 4.2.3", correct: false }
+      - {
+          text: "Choosing async messaging over synchronous REST between Orders and Billing",
+          correct: true,
+        }
+      - { text: "Switching the code formatter from tabs to two spaces", correct: false }
+  - type: multi
+    prompt: "A good ADR should include which of the following? Select all that apply."
+    explanation: "The value of an ADR is the reasoning: the context and constraints, the alternatives considered and why they were rejected, and the consequences including the negative ones. A sprint task list or assignee table belongs in the tracker, not in the decision record."
+    theoryUrl: https://adr.github.io/
+    options:
+      - { text: "The context and constraints that forced a decision", correct: true }
+      - { text: "A sprint-by-sprint task list with assignees", correct: false }
+      - { text: "Alternatives considered and why they were not chosen", correct: true }
+      - { text: "The consequences, including the downsides accepted", correct: true }
+  - type: single
+    prompt: "What is the main difference between an RFC (or design doc) and an ADR?"
+    explanation: "An RFC is a proposal circulated for feedback before a decision, so it is discursive and can be rejected. An ADR is a short record of a decision already made. Many teams use both: RFC to decide, ADR to record the outcome."
+    theoryUrl: https://www.industrialempathy.com/posts/design-docs-at-google/
+    options:
+      - {
+          text: "An RFC is a proposal opened for feedback; an ADR records the decision made",
+          correct: true,
+        }
+      - {
+          text: "An RFC is for frontend decisions and an ADR for backend decisions, each owned by its own guild",
+          correct: false,
+        }
+      - { text: "An RFC is a legally binding contract, an ADR is informal", correct: false }
+      - { text: "They are the same document, the name depends on the team's size", correct: false }
+  - type: single
+    prompt: "An RFC about a new caching layer has been open for six weeks, with long threads about naming and library preferences, and no decision. What is the best fix?"
+    explanation: "Open-ended RFCs need a time-box and a named decision owner who decides after collecting input, with the option to 'disagree and commit'. Waiting for unanimous approval or restarting from scratch only extends the delay."
+    theoryUrl: https://github.com/rust-lang/rfcs
+    options:
+      - { text: "Require every reviewer to approve before it can be merged", correct: false }
+      - {
+          text: "Set a review deadline and a decision owner who decides after input",
+          correct: true,
+        }
+      - { text: "Close it and let each team build its own cache layer", correct: false }
+      - { text: "Start a new RFC with a longer template", correct: false }
+  - type: single
+    prompt: "Why do well-written design docs include a 'non-goals' section?"
+    explanation: "Non-goals state what the design deliberately does not try to solve, which prevents scope creep and sets the boundary for review. They are not a list of risks or a list of rejected technologies, although those can appear in other sections."
+    theoryUrl: https://www.industrialempathy.com/posts/design-docs-at-google/
+    options:
+      - {
+          text: "To list the technologies that were rejected during the design, with benchmark results for each",
+          correct: false,
+        }
+      - { text: "To document the known bugs that will be fixed after launch", correct: false }
+      - { text: "To make the document look longer and more thorough", correct: false }
+      - {
+          text: "To state what is out of scope, so reviewers do not push the design into it",
+          correct: true,
+        }
+  - type: single
+    prompt: "A team wants to try a different linting setup for one repository. It can be reverted in an afternoon and affects nobody else. Should they write a full RFC?"
+    explanation: "RFCs are costly in time and attention, so reserve them for decisions that are hard to reverse or cross team boundaries. Cheap, local, reversible decisions (two-way doors) are better handled with a quick note or a pull request description."
+    theoryUrl: https://www.industrialempathy.com/posts/design-docs-at-google/
+    options:
+      - { text: "Yes, any change to tooling needs organisation-wide approval", correct: false }
+      - { text: "Yes, but only if it requires a new dependency", correct: false }
+      - { text: "No, a full RFC is for costly-to-reverse or cross-team changes", correct: true }
+      - { text: "No, because linting is never an architectural concern", correct: false }
+  - type: boolean
+    prompt: "An RFC process requires every reviewer to agree before the proposal can be accepted."
+    answer: false
+    explanation: "RFCs collect input, but they usually end with a decision by an owner or a defined group. Requiring unanimity gives every reviewer a veto and stalls decisions."
+    theoryUrl: https://github.com/rust-lang/rfcs
+  - type: single
+    prompt: "What is an architectural fitness function?"
+    explanation: "A fitness function is an objective, preferably automated check of an architectural characteristic (coupling, latency, security posture, and so on). It turns a design intention into something that can fail a build or raise an alert. A review checklist or diagram is not an objective measure."
+    theoryUrl: https://evolutionaryarchitecture.com/
+    options:
+      - { text: "A checklist the architect fills in during design review", correct: false }
+      - { text: "A benchmark that only measures raw CPU speed", correct: false }
+      - {
+          text: "An objective, usually automated check that an architectural characteristic holds",
+          correct: true,
+        }
+      - {
+          text: "A diagram that shows how well the code fits the C4 model, generated from the build",
+          correct: false,
+        }
+  - type: single
+    prompt: "A fitness function runs in CI over this dependency list. What does the script print?"
+    code: |
+      const rules = { ui: ['app'], app: ['domain'], domain: [], infra: ['domain', 'app'] };
+      const imports = [
+        ['ui/Cart.ts', 'app/checkout.ts'],
+        ['app/checkout.ts', 'domain/order.ts'],
+        ['domain/order.ts', 'infra/db.ts'],
+        ['infra/db.ts', 'domain/order.ts'],
+        ['ui/Cart.ts', 'domain/order.ts'],
+      ];
+      const layer = (f) => f.split('/')[0];
+      const violations = imports.filter(([from, to]) => {
+        const a = layer(from), b = layer(to);
+        return a !== b && !rules[a].includes(b);
+      });
+      console.log(violations.length, violations.map(([f]) => f).join(','));
+    codeLanguage: javascript
+    explanation: "Only imports across layers are checked against the allowed list. `domain -> infra` is not allowed (domain depends on nothing), and `ui -> domain` skips the app layer, so there are two violations. `infra -> domain` is allowed, and same-layer imports are ignored."
+    theoryUrl: https://www.thoughtworks.com/en-us/insights/articles/fitness-function-driven-development
+    options:
+      - { text: "1 domain/order.ts", correct: false }
+      - { text: "3 domain/order.ts,infra/db.ts,ui/Cart.ts", correct: false }
+      - { text: "2 domain/order.ts,ui/Cart.ts", correct: true }
+      - { text: "0 (no violations)", correct: false }
+  - type: single
+    prompt: "Which of these is a continual (always-on) fitness function rather than a triggered one?"
+    explanation: "Triggered fitness functions run on an event such as a commit or deployment (unit tests, dependency rules in CI, load tests in the pipeline). A continual one runs all the time in production, for example monitoring that alerts when p99 latency or an SLO is violated."
+    theoryUrl: https://evolutionaryarchitecture.com/
+    options:
+      - { text: "A dependency-rule test that runs on every pull request", correct: false }
+      - { text: "A quarterly architecture review meeting", correct: false }
+      - { text: "A load test executed in the pipeline before each release", correct: false }
+      - {
+          text: "Production monitoring that alerts when the checkout p99 breaches its SLO",
+          correct: true,
+        }
+  - type: single
+    prompt: "A team agreed that modules must stay decoupled, but cyclic imports keep creeping in because nobody notices them in review. What is the best response?"
+    explanation: "A rule that is not enforced decays. Encoding it as an automated fitness function (a dependency-cycle check in CI that fails the build) makes the architecture self-defending without relying on reviewer attention."
+    theoryUrl: https://www.thoughtworks.com/radar/techniques/architectural-fitness-function
+    options:
+      - { text: "Ask reviewers to pay more attention to import statements", correct: false }
+      - { text: "Add a CI check that fails the build on dependency cycles", correct: true }
+      - { text: "Merge the modules into one so cycles cannot exist", correct: false }
+      - { text: "Write the rule in the wiki and announce it in the team channel", correct: false }
+  - type: multi
+    prompt: "Which of these are good targets for an automated fitness function? Select all that apply."
+    explanation: "Fitness functions need an objective measure: cycle count, a bundle size budget and a latency percentile all qualify. 'The code feels elegant' is subjective and cannot pass or fail automatically."
+    theoryUrl: https://www.thoughtworks.com/en-us/insights/articles/fitness-function-driven-development
+    options:
+      - { text: "The number of dependency cycles between packages", correct: true }
+      - { text: "Whether the code feels elegant to the lead developer", correct: false }
+      - { text: "The gzipped size of the main JavaScript bundle", correct: true }
+      - { text: "The p95 latency of a key endpoint in a load test", correct: true }
+  - type: single
+    prompt: "In Neal Ford's 'evolutionary architecture', what does the term mean?"
+    explanation: "An evolutionary architecture supports guided, incremental change across multiple dimensions (technical, data, security, performance and so on), with fitness functions providing the guidance. It is not about constant rewrites, and it does not mean having no upfront design."
+    theoryUrl: https://evolutionaryarchitecture.com/
+    options:
+      - { text: "An architecture rewritten from scratch every few years", correct: false }
+      - {
+          text: "An architecture with no upfront design that emerges from the code as features are added",
+          correct: false,
+        }
+      - { text: "An architecture that uses genetic algorithms to optimise itself", correct: false }
+      - {
+          text: "An architecture that supports guided, incremental change using fitness functions",
+          correct: true,
+        }
+  - type: single
+    prompt: "You must replace a legacy monolith without a big-bang rewrite, while it keeps serving production traffic. Which approach fits?"
+    explanation: "The strangler fig pattern puts a routing layer in front of the old system and moves capabilities to the new one piece by piece until the legacy part can be removed. A parallel rewrite with a single cut-over carries the big-bang risk."
+    theoryUrl: https://martinfowler.com/bliki/StranglerFigApplication.html
+    options:
+      - {
+          text: "Freeze the monolith for a year and rewrite everything in parallel",
+          correct: false,
+        }
+      - {
+          text: "Route traffic through a facade and migrate capabilities gradually (strangler fig)",
+          correct: true,
+        }
+      - {
+          text: "Duplicate the database and run both systems writing to it simultaneously, switching on release day",
+          correct: false,
+        }
+      - {
+          text: "Split the monolith by technical layer into three deployable services",
+          correct: false,
+        }
+  - type: single
+    prompt: "You must rename a field in an API response used by consumers you cannot coordinate with. Which change sequence is safest?"
+    explanation: "Parallel change (expand, migrate, contract) first adds the new field alongside the old, lets consumers migrate, and only then removes the old field. Renaming in place breaks every consumer that has not been updated."
+    theoryUrl: https://martinfowler.com/bliki/ParallelChange.html
+    options:
+      - { text: "Rename it and announce the change in the release notes", correct: false }
+      - {
+          text: "Add the new field, keep the old, migrate consumers, then remove the old",
+          correct: true,
+        }
+      - { text: "Version the whole API as v2 and shut down v1 the same day", correct: false }
+      - { text: "Return both fields under the same key as an array", correct: false }
+  - type: single
+    prompt: "A team debates picking a database now, but the product's access patterns are still unknown and the data layer can be wrapped behind an interface. What does the 'last responsible moment' principle suggest?"
+    explanation: "Delay hard-to-reverse decisions until the cost of not deciding exceeds the benefit of waiting, while keeping options open (here an abstraction). Deciding as early as possible commits you blind, and never deciding blocks the work."
+    theoryUrl: https://martinfowler.com/architecture/
+    options:
+      - {
+          text: "Decide as early as possible to remove uncertainty for the team and avoid later rework",
+          correct: false,
+        }
+      - { text: "Postpone the decision until after launch, whatever the cost", correct: false }
+      - { text: "Always pick the most popular database to avoid debates", correct: false }
+      - {
+          text: "Defer it until more is known, keeping options open behind an interface",
+          correct: true,
+        }
+  - type: single
+    prompt: "Why do many teams keep their C4 diagrams as text in the repository (for example Structurizr DSL or Mermaid) instead of in a drawing tool?"
+    explanation: "Text diagrams are diffable, reviewable in pull requests and renderable by tools, so they are updated together with the code and drift less. They are not mandatory for C4, and they do not remove the need to keep content accurate."
+    theoryUrl: https://www.writethedocs.org/guide/docs-as-code/
+    options:
+      - { text: "Because the C4 model forbids graphical tools", correct: false }
+      - {
+          text: "Because text diagrams are automatically always correct once they are committed to the repository",
+          correct: false,
+        }
+      - {
+          text: "Because they can be versioned, reviewed and regenerated like code, so they drift less",
+          correct: true,
+        }
+      - { text: "Because binary diagram files cannot be stored in git", correct: false }

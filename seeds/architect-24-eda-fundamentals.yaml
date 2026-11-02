@@ -1,0 +1,484 @@
+version: 1
+title: "Architect Roadmap 24: Event-driven architecture fundamentals"
+description: Events vs commands vs messages, event notification vs event-carried state transfer, choreography vs orchestration, temporal coupling, and event schemas and versioning.
+language: en
+tags: [architect-roadmap, event-driven, events, choreography, schema-evolution]
+run:
+  questionsPerRun: 10
+  maxErrors: 3
+  timePerQuestionSec: 60
+questions:
+  - type: single
+    prompt: "What is the key difference between a command and an event in a messaging system?"
+    explanation: "A command expresses an intent to make something happen (`PlaceOrder`), is addressed to one handler and can be rejected. An event records something that already happened (`OrderPlaced`), is named in the past tense, and can have zero, one or many subscribers that cannot veto it. Both are messages, and both can be sent through a broker."
+    theoryUrl: https://learn.microsoft.com/en-us/azure/architecture/guide/architecture-styles/event-driven
+    options:
+      - {
+          text: "A command is a request to do something, which can fail, while an event is a fact about the past",
+          correct: true,
+        }
+      - {
+          text: "Commands are synchronous and events are asynchronous, in every system",
+          correct: false,
+        }
+      - {
+          text: "Commands carry data and events never do, because events are only signals that tell consumers to look elsewhere",
+          correct: false,
+        }
+      - {
+          text: "A command goes to many consumers, while an event always goes to exactly one",
+          correct: false,
+        }
+  - type: multi
+    prompt: "Which of these names are well-formed domain events? Select all that apply."
+    explanation: "Events are facts, named in the past tense with business meaning: `OrderPlaced`, `PaymentFailed` and `EmailAddressChanged`. `PlaceOrder` and `SendInvoice` are imperative: they are commands. Such names matter because they tell consumers what they may assume, and a command disguised as an event invites the publisher to depend on a specific reaction."
+    theoryUrl: https://martinfowler.com/articles/201701-event-driven.html
+    options:
+      - { text: "`OrderPlaced`", correct: true }
+      - { text: "`SendInvoice`", correct: false }
+      - { text: "`PaymentFailed`", correct: true }
+      - { text: "`PlaceOrder`", correct: false }
+      - { text: "`EmailAddressChanged`", correct: true }
+  - type: boolean
+    prompt: "Every message that travels through a broker is an event."
+    answer: false
+    explanation: "'Message' is the generic envelope: it can be a command, an event or a reply to a query. They differ in intent and in who is responsible: a command targets a handler, an event announces a fact, and a document message just transfers data."
+    theoryUrl: https://www.enterpriseintegrationpatterns.com/patterns/messaging/Message.html
+  - type: single
+    prompt: "A `CustomerAddressChanged` event only contains `{ customerId, changedAt }`. Each of the 12 subscribers immediately calls the Customer service API to fetch the new address. What is the main downside of this event notification style?"
+    explanation: "With pure notification the event says that something changed, and consumers call back to get the data. The publisher is then synchronously coupled to every consumer's reads, load multiplies (12 callbacks per change), and consumers fail when the source is down. The upside is a small event and a single source of truth."
+    theoryUrl: https://martinfowler.com/articles/201701-event-driven.html
+    options:
+      - {
+          text: "The event is too large, so it will exceed the broker's message size limit",
+          correct: false,
+        }
+      - {
+          text: "The callbacks reintroduce runtime coupling and load on the source service",
+          correct: true,
+        }
+      - {
+          text: "Subscribers can no longer tell which customer changed, so they must poll",
+          correct: false,
+        }
+      - {
+          text: "The broker cannot deliver an event that has no business data in it",
+          correct: false,
+        }
+  - type: single
+    prompt: "The Shipping service needs the customer's delivery address for every order, but the Customer service has outages several times a month, which blocks shipping. Which event design removes that dependency at runtime?"
+    explanation: "Event-carried state transfer includes the data consumers need (the address) in the event, and Shipping keeps its own local copy. It can then work while Customer is down, at the price of duplicated data and eventual consistency. Retrying the callback or caching responses for a short time only reduces the pain."
+    theoryUrl: https://martinfowler.com/articles/201701-event-driven.html
+    options:
+      - { text: "Events that carry only ids, and a callback with 5 retries", correct: false }
+      - {
+          text: "Events that carry the address, kept by Shipping in a local replica",
+          correct: true,
+        }
+      - {
+          text: "A shared database table that both services read from and write to",
+          correct: false,
+        }
+      - {
+          text: "A synchronous call with a 60 second timeout, so outages are tolerated",
+          correct: false,
+        }
+  - type: multi
+    prompt: "Which are real costs of event-carried state transfer? Select all that apply."
+    explanation: "Every consumer keeps a copy, so data is duplicated and only eventually consistent, larger events cost more bandwidth and storage, and sensitive fields travel to every subscriber. It does not require synchronous calls between services: the point is to avoid them."
+    theoryUrl: https://martinfowler.com/articles/201701-event-driven.html
+    options:
+      - { text: "Consumers hold copies of the data that can be stale for a while", correct: true }
+      - {
+          text: "The publisher must call each subscriber synchronously to confirm receipt",
+          correct: false,
+        }
+      - { text: "Events get larger and may spread personal data to more systems", correct: true }
+      - {
+          text: "Consumers must handle events arriving late, duplicated or out of order",
+          correct: true,
+        }
+      - { text: "The data can no longer be queried from the owning service at all", correct: false }
+  - type: single
+    prompt: "A consumer maintains a local copy of customer data from `CustomerUpdated` events that carry the full state. Because of retries, an old event (version 4) sometimes arrives after a newer one (version 5) and overwrites the fresh data. What is the right defence?"
+    explanation: "Put a version or sequence number in each event and apply an update only if it is newer than what is stored, so late or duplicate events are ignored. Sorting by arrival time uses the wrong clock, and just disabling retries trades inconsistency for lost events."
+    theoryUrl: https://martinfowler.com/articles/201701-event-driven.html
+    options:
+      - {
+          text: "Always apply the most recently received event, since it was sent last",
+          correct: false,
+        }
+      - { text: "Apply an event only if its version is newer than the stored one", correct: true }
+      - {
+          text: "Disable retries on the broker, so that no event can be delivered twice",
+          correct: false,
+        }
+      - {
+          text: "Delay processing of every event by 5 seconds so that they can be sorted",
+          correct: false,
+        }
+  - type: single
+    prompt: "An `OrderPlaced` event is consumed by Billing, Shipping, Analytics and a Marketing tool, and it carries the customer's full profile, including date of birth and national id. Only Shipping needs the address. What is the best response?"
+    explanation: "Events reach every subscriber, so including data they do not need breaks data minimisation and spreads sensitive data. Keep the event to what the business fact needs, and let consumers with a legitimate need fetch more through an authorised API (or use separate events or topics with restricted access). More subscribers makes it worse, not better."
+    theoryUrl: https://martinfowler.com/articles/201701-event-driven.html
+    options:
+      - {
+          text: "Keep it, since an event should always be a complete snapshot of the customer, so no consumer ever calls back for more",
+          correct: false,
+        }
+      - { text: "Encrypt the whole event with a key that every consumer has", correct: false }
+      - {
+          text: "Trim the event to what the fact needs, and let authorised consumers fetch extra data",
+          correct: true,
+        }
+      - {
+          text: "Remove Analytics and Marketing from the subscribers, and keep the data as it is",
+          correct: false,
+        }
+  - type: single
+    prompt: "A simple flow has three services: Orders publishes `OrderPlaced`, Payments reacts and publishes `PaymentTaken`, and Shipping reacts to that. Which style is this, and what is its main weakness as the flow grows?"
+    explanation: "This is choreography: each service reacts to events and no one owns the whole process. It keeps services decoupled, but the end-to-end flow is implicit and spread across subscriptions, so it gets hard to understand, monitor and change, and risks cyclic dependencies. Orchestration puts the flow in one place instead."
+    theoryUrl: https://microservices.io/patterns/data/saga.html
+    options:
+      - {
+          text: "Orchestration, whose weakness is that services must call each other synchronously",
+          correct: false,
+        }
+      - {
+          text: "Choreography, whose weakness is that the overall flow is implicit and hard to follow",
+          correct: true,
+        }
+      - {
+          text: "Choreography, whose weakness is that the events cannot be delivered in parallel",
+          correct: false,
+        }
+      - {
+          text: "Orchestration, whose weakness is that the events need to be sent in the past tense",
+          correct: false,
+        }
+  - type: single
+    prompt: "What does this script print?"
+    code: |
+      const handlers = new Map()
+      const on = (t, h) => (handlers.get(t) ?? handlers.set(t, []).get(t)).push(h)
+      const publish = (t, p) => {
+        console.log('publish', t)
+        for (const h of handlers.get(t) ?? []) h(p)
+      }
+      on('OrderPlaced', (o) => {
+        console.log('payment', o.id)
+        publish('PaymentTaken', o)
+      })
+      on('PaymentTaken', (o) => {
+        console.log('shipping', o.id)
+        publish('Shipped', o)
+      })
+      publish('OrderPlaced', { id: 7 })
+      console.log('done')
+    codeLanguage: javascript
+    explanation: "This in-memory bus dispatches synchronously, so each handler runs inside the `publish` that triggered it and the chain nests: publish, payment, publish, shipping, publish (no subscribers), and only then `done`. It shows choreography as a chain of reactions, but a real broker would be asynchronous, so `done` would not wait for them."
+    theoryUrl: https://martinfowler.com/articles/201701-event-driven.html
+    options:
+      - {
+          text: "publish OrderPlaced, done, payment 7, publish PaymentTaken, shipping 7, publish Shipped",
+          correct: false,
+        }
+      - {
+          text: "publish OrderPlaced, payment 7, shipping 7, publish PaymentTaken, publish Shipped, done",
+          correct: false,
+        }
+      - {
+          text: "publish OrderPlaced, payment 7, publish PaymentTaken, shipping 7, publish Shipped, done",
+          correct: true,
+        }
+      - {
+          text: "payment 7, shipping 7, publish OrderPlaced, publish PaymentTaken, publish Shipped, done",
+          correct: false,
+        }
+  - type: single
+    prompt: "A checkout process has 8 steps across 5 services, with compensations when a step fails and business timeouts (cancel if unpaid after 30 minutes). Product wants to see the status of every order in one place. Which style fits best?"
+    explanation: "A long process with compensations, timeouts and a need for visibility benefits from orchestration: a coordinator (saga orchestrator or workflow engine) holds the state, issues commands, handles failures and exposes progress. Pure choreography would scatter this logic and make the timeouts and status hard to implement."
+    theoryUrl: https://microservices.io/patterns/data/saga.html
+    options:
+      - {
+          text: "Orchestration, with a coordinator that owns the process state and compensations",
+          correct: true,
+        }
+      - {
+          text: "Choreography, because a larger number of steps means more decoupling",
+          correct: false,
+        }
+      - {
+          text: "A single shared database transaction that spans all five services",
+          correct: false,
+        }
+      - {
+          text: "Choreography with each service writing its own log that product reads manually",
+          correct: false,
+        }
+  - type: single
+    prompt: "What is the usual risk of orchestration compared with choreography?"
+    explanation: "The orchestrator centralises knowledge of the process, and when it grows to include business rules of the participants it becomes a 'god service' and a coupling point (and potentially a bottleneck or single point of failure if not built to be resilient). Participants stay simple, which is the benefit, but the central component needs care."
+    theoryUrl: https://microservices.io/patterns/data/saga.html
+    options:
+      - { text: "The participants cannot use asynchronous messaging at all", correct: false }
+      - {
+          text: "The process state is distributed across the participants, so nobody knows how far an order has got without tracing events",
+          correct: false,
+        }
+      - {
+          text: "The orchestrator can become a central point that knows too much about every participant",
+          correct: true,
+        }
+      - {
+          text: "Compensations cannot be implemented without a distributed transaction",
+          correct: false,
+        }
+  - type: single
+    prompt: "Service A calls service B over HTTP to record an audit entry before answering the user. B has a 30 minute outage, and A's endpoint fails for the whole period, although the audit entry could have been written later. What is the problem called, and how do you remove it?"
+    explanation: "This is temporal coupling: A can only succeed while B is up at the same moment. Publishing an `AuditEntryRecorded` or `OrderPlaced` event to a durable broker lets A finish now and B catch up when it returns. Longer timeouts keep the coupling, and a cache does not help a write path."
+    theoryUrl: https://martinfowler.com/articles/microservices.html
+    options:
+      - {
+          text: "Temporal coupling, solved by publishing an event to a durable broker that B consumes later",
+          correct: true,
+        }
+      - {
+          text: "Data coupling, solved by giving A and B a shared database for audit entries",
+          correct: false,
+        }
+      - {
+          text: "Temporal coupling, solved by raising the HTTP timeout in A to longer than the 30 minute outage so A keeps waiting",
+          correct: false,
+        }
+      - {
+          text: "Semantic coupling, solved by renaming the audit endpoint in service B",
+          correct: false,
+        }
+  - type: single
+    prompt: "What does this script print?"
+    code: |
+      const { EventEmitter } = require('node:events')
+      const bus = new EventEmitter()
+      bus.on('order.placed', () => console.log('A'))
+      bus.on('order.placed', async () => {
+        await null
+        console.log('B')
+      })
+      bus.on('order.placed', () => console.log('C'))
+      console.log('before')
+      bus.emit('order.placed')
+      console.log('after')
+    codeLanguage: javascript
+    explanation: "`emit` calls the listeners synchronously in registration order, and does not wait for async ones. The async listener runs up to its `await`, then yields, so `C` and `after` come first and `B` is logged afterwards as a microtask. Do not confuse an in-process `EventEmitter` with a broker: there is no durability or isolation of errors."
+    theoryUrl: https://nodejs.org/api/events.html#asynchronous-vs-synchronous
+    options:
+      - { text: "before, A, B, C, after", correct: false }
+      - { text: "before, A, C, B, after", correct: false }
+      - { text: "before, A, C, after, B", correct: true }
+      - { text: "before, after, A, B, C", correct: false }
+  - type: single
+    prompt: "What does this script print?"
+    code: |
+      const { EventEmitter } = require('node:events')
+      const e = new EventEmitter()
+      try {
+        e.emit('error', new Error('x'))
+      } catch (err) {
+        console.log('caught', err.message)
+      }
+      e.emit('ping')
+      console.log('end')
+    codeLanguage: javascript
+    explanation: "`EventEmitter` treats the event named `error` specially: with no listener it throws the error, so `emit` throws synchronously and is caught. Emitting `ping` without listeners is fine and returns `false`. In an event-driven design, a failing consumer must not be able to crash the publisher, which is one reason to use a broker."
+    theoryUrl: https://nodejs.org/api/events.html#error-events
+    options:
+      - { text: "caught x, then end", correct: true }
+      - { text: "end only, because emit ignores events without listeners", correct: false }
+      - {
+          text: "An unhandled exception, since the `catch` cannot intercept `emit`",
+          correct: false,
+        }
+      - { text: "caught x, then an exception when `ping` has no listener", correct: false }
+  - type: single
+    prompt: "What do the two calls print? The producer later added a `coupon` field to its events, and some old events lack `total`."
+    code: |
+      const consumer = (e) => {
+        const { id, total } = e
+        return `${id}:${total}`
+      }
+      console.log(consumer({ id: 1, total: 5, coupon: 'X' }))
+      console.log(consumer({ id: 2 }))
+    codeLanguage: javascript
+    explanation: "The consumer reads only the fields it needs, so the unknown `coupon` field is ignored (a tolerant reader) and the first call prints `1:5`. The missing `total` silently becomes `undefined`, which shows why consumers should also validate and default fields that may be absent. Being strict about unknown fields would break on every compatible change."
+    theoryUrl: https://martinfowler.com/bliki/TolerantReader.html
+    options:
+      - { text: "1:5 and 2:undefined", correct: true }
+      - {
+          text: "It throws on the first call, because of the unexpected `coupon` field",
+          correct: false,
+        }
+      - { text: "1:5 and then a `TypeError`, because `total` is missing", correct: false }
+      - {
+          text: "1:undefined and 2:undefined, since destructuring needs exact shapes",
+          correct: false,
+        }
+  - type: multi
+    prompt: "Which changes to a published event schema are breaking for existing consumers? Select all that apply."
+    explanation: "Removing or renaming a field they read, or changing its type, breaks consumers that have not been updated. Adding a new optional field is compatible with tolerant readers. This is why event contracts are evolved with expand-and-contract and versions."
+    theoryUrl: https://docs.confluent.io/platform/current/schema-registry/fundamentals/schema-evolution.html
+    options:
+      - { text: "Renaming `total` to `amount`", correct: true }
+      - { text: "Adding an optional `couponCode` field", correct: false }
+      - { text: "Changing `total` from a number to a string", correct: true }
+      - { text: "Removing `currency`, which some consumers read", correct: true }
+      - {
+          text: "Adding a new event type that existing consumers do not subscribe to",
+          correct: false,
+        }
+  - type: single
+    prompt: "What does this script print?"
+    code: |
+      function upcast(e) {
+        if (e.version === 1) {
+          return upcast({ ...e, version: 2, data: { ...e.data, currency: 'EUR' } })
+        }
+        return e
+      }
+      const old = { type: 'OrderPlaced', version: 1, data: { total: 10 } }
+      const cur = { type: 'OrderPlaced', version: 2, data: { total: 20, currency: 'USD' } }
+      console.log([old, cur].map(upcast).map((e) => `${e.data.total}${e.data.currency}`))
+      console.log(old.version)
+    codeLanguage: javascript
+    explanation: "The upcaster turns a version 1 event into the current shape at read time, defaulting the missing currency, so the first line is `[ '10EUR', '20USD' ]`. Because it builds a new object with spread, the original `old` event is untouched and its version is still 1. Upcasting lets consumers handle only the latest version while stored events stay immutable."
+    theoryUrl: https://martinfowler.com/articles/201701-event-driven.html
+    options:
+      - { text: "[ '10undefined', '20USD' ] and then 2", correct: false }
+      - { text: "[ '10EUR', '20USD' ] and then 2", correct: false }
+      - { text: "[ '10EUR', '20USD' ] and then 1", correct: true }
+      - { text: "[ '10EUR', '20EUR' ] and then 1", correct: false }
+  - type: single
+    prompt: "30 consumer teams use your `OrderPlaced` event, which you must change by renaming `total` to `amount`. You cannot coordinate a simultaneous release. Which approach is the safest?"
+    explanation: "Use expand and contract: publish both fields (or publish a new version in parallel) while consumers migrate, announce a deprecation period, track who still reads the old one, then remove it. A big-bang rename breaks everyone who has not deployed, and asking consumers to 'just parse both' without a plan leaves no end date."
+    theoryUrl: https://docs.confluent.io/platform/current/schema-registry/fundamentals/schema-evolution.html
+    options:
+      - { text: "Rename the field and announce it in the engineering newsletter", correct: false }
+      - {
+          text: "Send both fields (or a v2 in parallel) with a deprecation date, then remove the old one",
+          correct: true,
+        }
+      - {
+          text: "Keep `total` forever and never add or change any field in the event again",
+          correct: false,
+        }
+      - {
+          text: "Wait until all 30 teams agree on a single release day, then rename the field and break every consumer at once",
+          correct: false,
+        }
+  - type: single
+    prompt: "What is the purpose of a schema registry combined with a compatibility rule such as BACKWARD or FULL in an event platform?"
+    explanation: "The registry stores versioned schemas and rejects a new schema that violates the configured compatibility rule at publish or CI time, so a breaking change is caught before it reaches consumers. It does not transform the data and does not deliver events by itself."
+    theoryUrl: https://docs.confluent.io/platform/current/schema-registry/index.html
+    options:
+      - {
+          text: "It rewrites old events into the new format when consumers start reading them",
+          correct: false,
+        }
+      - {
+          text: "It routes each event to the consumers that understand its schema version",
+          correct: false,
+        }
+      - {
+          text: "It encrypts events so that only consumers holding the right schema can read them",
+          correct: false,
+        }
+      - {
+          text: "It validates new schemas against old ones and blocks breaking changes before release",
+          correct: true,
+        }
+  - type: single
+    prompt: "Consumers of an event stream must ignore duplicates caused by at-least-once delivery. Which field in the event envelope makes this possible in the simplest way?"
+    explanation: "A unique, stable event id lets a consumer record the ids it has already processed (ideally in the same transaction as its side effects) and skip repeats. A timestamp can be equal for different events, the event type is shared by all events of that kind, and the schema version says nothing about identity."
+    theoryUrl: https://www.enterpriseintegrationpatterns.com/patterns/messaging/IdempotentReceiver.html
+    options:
+      - {
+          text: "A unique `eventId`, recorded by the consumer once it has processed it",
+          correct: true,
+        }
+      - {
+          text: "The `occurredAt` timestamp, as no two events can occur at the same millisecond",
+          correct: false,
+        }
+      - { text: "The event `type`, because the same type is never published twice", correct: false }
+      - {
+          text: "The schema `version`, which increases with every delivery attempt",
+          correct: false,
+        }
+  - type: single
+    prompt: "A team publishes `CustomerUpdated` events with a generic diff payload for every change made through its CRUD API. Consumers have to inspect which fields changed to work out what really happened. What would you recommend?"
+    explanation: "Events should capture business facts with intent, such as `EmailAddressChanged` or `CustomerRelocated`, so consumers react to meaning instead of reverse-engineering CRUD diffs. Generic `Updated` events couple consumers to the producer's table structure and are hard to evolve."
+    theoryUrl: https://martinfowler.com/articles/201701-event-driven.html
+    options:
+      - {
+          text: "Add a `changedFields` array so that consumers can parse the diff more easily",
+          correct: false,
+        }
+      - {
+          text: "Publish the whole database row each time, and let consumers compare it themselves",
+          correct: false,
+        }
+      - {
+          text: "Publish intent-revealing business events such as `EmailAddressChanged`",
+          correct: true,
+        }
+      - {
+          text: "Keep the generic event but split it into one topic per database column",
+          correct: false,
+        }
+  - type: single
+    prompt: "Inside the Orders service, aggregates raise domain events using internal class names and entity ids. Another team wants to subscribe to them directly from the broker. Why is publishing these internal events as-is usually a bad idea?"
+    explanation: "Domain events are part of a service's internal model and change with it. Subscribers outside the boundary would depend on private details. Publish a separate, deliberately designed integration event as the public contract, mapped from the internal ones, and version it. Internal events are still fine inside the service."
+    theoryUrl: https://learn.microsoft.com/en-us/dotnet/architecture/microservices/microservice-ddd-cqrs-patterns/domain-events-design-implementation
+    options:
+      - {
+          text: "Brokers reject events whose class names contain internal identifiers",
+          correct: false,
+        }
+      - {
+          text: "It leaks the service's internal model and makes every refactoring a breaking change",
+          correct: true,
+        }
+      - {
+          text: "Domain events cannot be serialised, so they never reach the broker intact",
+          correct: false,
+        }
+      - {
+          text: "Domain events are always larger than integration events and slow down delivery",
+          correct: false,
+        }
+  - type: boolean
+    prompt: "In event-driven communication, the publisher normally knows exactly which services consume its events."
+    answer: false
+    explanation: "Decoupling of the publisher from its consumers is a defining property: it publishes a fact and does not know who, if anyone, listens, so consumers can be added without changing it. The flip side is that you need good documentation, tracing and a schema registry to know who depends on what."
+    theoryUrl: https://martinfowler.com/articles/201701-event-driven.html
+  - type: single
+    prompt: "A user submits a form and the page must immediately show whether the username is available. A teammate wants to model it as `CheckUsername` command, event reply and websocket push, 'because we are event-driven'. What is the best judgement?"
+    explanation: "A query whose answer the caller needs immediately is naturally a synchronous request/response. Events fit when a producer announces something and does not wait. Forcing everything through events adds latency, complexity and eventual consistency without any benefit in this case."
+    theoryUrl: https://martinfowler.com/articles/201701-event-driven.html
+    options:
+      - {
+          text: "Good idea, since all service interactions should be events for consistency",
+          correct: false,
+        }
+      - {
+          text: "Keep the events, and add a polling loop in the browser to read the answer",
+          correct: false,
+        }
+      - {
+          text: "Use a normal synchronous request/response, as the caller needs the answer now",
+          correct: true,
+        }
+      - {
+          text: "Use pub/sub so every service can see which usernames are being checked",
+          correct: false,
+        }

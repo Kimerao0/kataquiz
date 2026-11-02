@@ -1,0 +1,527 @@
+version: 1
+title: "Architect Roadmap 14: Rendering and caching strategies at scale [SCENARIO]"
+description: SSG, SSR, ISR, streaming and Partial Prerendering, the cache layers (browser, CDN, server cache, request memoization), on-demand invalidation, multi-instance coordination, and edge versus Node.js runtime.
+language: en
+tags: [architect-roadmap, nextjs, rendering, caching, ppr, isr, cdn, scenario]
+run:
+  questionsPerRun: 10
+  maxErrors: 3
+  timePerQuestionSec: 90
+questions:
+  - type: single
+    prompt: "A content site has 5,000 articles. Editors publish a few per day and fix typos on old ones, and full builds already take 25 minutes. How do you render the article route?"
+    explanation: "Prerender the most visited articles with `generateStaticParams`, let the rest be generated on first visit and cached (ISR, or with Cache Components an App Shell upgraded after the first visit), and have the CMS webhook call `revalidateTag` for the changed article. That keeps builds short and content fresh without redeploying. Pure SSG makes builds grow with the content, and per-request SSR wastes work."
+    theoryUrl: https://nextjs.org/docs/app/guides/incremental-static-regeneration
+    options:
+      - { text: "Full SSG for all 5,000 pages, and rebuild the site on every edit", correct: false }
+      - {
+          text: "SSR every request, since the content changes and caching would show stale pages",
+          correct: false,
+        }
+      - {
+          text: "Prerender the top pages, generate the rest on demand and revalidate by tag via webhook",
+          correct: true,
+        }
+      - {
+          text: "A Client Component page that fetches the article from the CMS after mount, so no rebuilds are needed",
+          correct: false,
+        }
+  - type: single
+    prompt: "A logged-in dashboard shows each user's own numbers and a static navigation. Users complain that first paint is slow because the server waits for several queries. What is the best rendering strategy?"
+    explanation: "Per-user data cannot be shared in a static or CDN-cached response, so it must be rendered per request. Keep the layout and navigation in the static shell and stream the personalised widgets in separate `<Suspense>` boundaries, so the user sees the shell immediately and each widget as its query finishes. Caching the page globally would leak data between users."
+    theoryUrl: https://nextjs.org/docs/app/guides/streaming
+    options:
+      - {
+          text: "Prerender the dashboard at build time and refresh it with ISR every minute, so each user sees their own numbers",
+          correct: false,
+        }
+      - {
+          text: "Cache the page at the CDN with a long s-maxage, keyed by the URL only",
+          correct: false,
+        }
+      - {
+          text: "Send a static shell and stream each per-user widget behind its own Suspense",
+          correct: true,
+        }
+      - {
+          text: "Switch to a Client Component page that loads every widget after hydration",
+          correct: false,
+        }
+  - type: single
+    prompt: "A product detail page has descriptions and images that change weekly, a live stock count and a per-visitor 'recently viewed' list. It gets heavy traffic. How do you structure it with Cache Components?"
+    explanation: "Cache the slow-changing product data with `use cache`, `cacheLife` and a `cacheTag` so it lands in the static shell and is revalidated on demand. Read the live stock and per-visitor data at request time inside `<Suspense>` boundaries with fallbacks. This is Partial Prerendering: one route with a static shell and dynamic holes streamed in the same response."
+    theoryUrl: https://nextjs.org/docs/app/getting-started/caching
+    options:
+      - {
+          text: "Make the whole route dynamic, since parts of it depend on live data",
+          correct: false,
+        }
+      - {
+          text: "Cache the whole page with `use cache`, passing the visitor cookie as an argument",
+          correct: false,
+        }
+      - {
+          text: "Split into three routes and join them in the browser with iframes",
+          correct: false,
+        }
+      - {
+          text: "Cache the product data in the shell and stream stock and history under Suspense",
+          correct: true,
+        }
+  - type: single
+    prompt: "Under Cache Components, what is Partial Prerendering?"
+    explanation: "With `cacheComponents` enabled, PPR is the default model: at build time Next.js prerenders a static shell (layout, static markup, Suspense fallbacks and cached output), and request-time parts stream into the same response as they resolve. The old `experimental.ppr` flag is gone. It is not an edge feature, and it does not mean pages are partially cached by URL."
+    theoryUrl: https://nextjs.org/docs/app/api-reference/config/next-config-js/cacheComponents
+    options:
+      - {
+          text: "Rendering only the first half of a page on the server and hydrating the rest",
+          correct: false,
+        }
+      - {
+          text: "An experimental flag that caches some routes at the CDN and others at the origin, set per route",
+          correct: false,
+        }
+      - {
+          text: "A static shell served immediately, with dynamic parts streamed into the same response",
+          correct: true,
+        }
+      - {
+          text: "A fallback that serves a stale full page while the server renders the new one",
+          correct: false,
+        }
+  - type: single
+    prompt: "After enabling Cache Components, every route under the root layout lost its static shell, and the build reports blocking-route errors. The root layout is below. What is the cause and the fix?"
+    code: |
+      export default async function RootLayout({
+        children,
+      }: {
+        children: React.ReactNode
+      }) {
+        const theme = (await cookies()).get('theme')?.value ?? 'light'
+        return (
+          <html data-theme={theme}>
+            <body>{children}</body>
+          </html>
+        )
+      }
+    codeLanguage: tsx
+    explanation: "Awaiting a runtime API at the top of the layout makes everything below it wait for a request, so nothing can be prerendered and there is no Suspense boundary to fall back to. Push the dynamic access down: pass the cookie promise to a small component that reads it inside `<Suspense>`, or use a client-side approach for the theme, so the rest of the layout stays in the static shell."
+    theoryUrl: https://nextjs.org/docs/app/guides/streaming
+    options:
+      - {
+          text: "cookies() is not allowed in layouts at all, so move the call into every single page instead",
+          correct: false,
+        }
+      - {
+          text: "The layout must be marked 'use client' to be able to read the cookies at all in Next.js",
+          correct: false,
+        }
+      - {
+          text: "The top-level await blocks the subtree, so read it in a Suspense'd child component",
+          correct: true,
+        }
+      - {
+          text: "Add `'use cache'` to the layout so that the cookie value is cached with it",
+          correct: false,
+        }
+  - type: single
+    prompt: "Which of the Next.js server-side caches lives only for the duration of a single server render?"
+    explanation: "Request memoization (identical `fetch` calls, and React `cache` wrappers) is scoped to one render pass of the component tree. `use cache` entries and the ISR/static shell cache last across requests, and the browser's client router cache lives in the user's session, so they have different lifetimes and scopes."
+    theoryUrl: https://nextjs.org/docs/app/api-reference/functions/fetch
+    options:
+      - {
+          text: "The `use cache` entries stored by the configured cache handler across several requests",
+          correct: false,
+        }
+      - {
+          text: "The ISR cache entry that holds both the HTML and the RSC payload of a route",
+          correct: false,
+        }
+      - {
+          text: "The copy of the static shell that is kept by the CDN in front of the origin",
+          correct: false,
+        }
+      - { text: "Request memoization of identical fetch calls and React `cache`", correct: true }
+  - type: single
+    prompt: "A cached function sets `cacheLife({ stale: 600, revalidate: 3600, expire: 86400 })`. Which of these three values controls how long the browser's router can reuse the data without asking the server?"
+    explanation: "`stale` is the client-side window: the router shows cached content without any network request until it expires. `revalidate` is the server-side age after which a request triggers a background refresh, and `expire` is the maximum age before a request must wait for fresh content."
+    theoryUrl: https://nextjs.org/docs/app/api-reference/functions/cacheLife
+    options:
+      - {
+          text: "`expire`, because that is when the data is thrown away everywhere",
+          correct: false,
+        }
+      - {
+          text: "`revalidate`, because the router follows the server's refresh interval",
+          correct: false,
+        }
+      - {
+          text: "None, the client router cache ignores cacheLife and uses a fixed 30 seconds",
+          correct: false,
+        }
+      - {
+          text: "`stale`, the time the client can use it without checking the server",
+          correct: true,
+        }
+  - type: single
+    prompt: "You show a live auction price that changes every second. Several teammates suggest ways to keep the page fast. Which design is the most appropriate?"
+    explanation: "A value that changes every second should not be prerendered or cached in the shell. Keep the page shell static, render the price at request time inside `<Suspense>` (or poll or subscribe from a Client Component for truly live updates). The `seconds` cacheLife is excluded from prerenders anyway and `revalidate: 1` gives no real-time guarantee."
+    theoryUrl: https://nextjs.org/docs/app/api-reference/functions/cacheLife
+    options:
+      - {
+          text: "Static shell with the price in a Suspense boundary, or a client subscription",
+          correct: true,
+        }
+      - { text: "`cacheLife('max')` with tag revalidation on every price change", correct: false }
+      - { text: "Prerender the page at build time and rebuild it every second", correct: false }
+      - {
+          text: "ISR with revalidate set to 1, so the page is always at most one second old for every visitor",
+          correct: false,
+        }
+  - type: single
+    prompt: "You self-host Next.js on Kubernetes with six pods behind a load balancer. An editor publishes, the CMS calls `revalidateTag('articles', 'max')`, but some visitors keep seeing the old article for hours. What is the cause and the fix?"
+    explanation: "Revalidation events are local by default: the call reaches one pod, which invalidates its own cache, while the others keep serving theirs. Configure a shared cache handler (`cacheHandler` for ISR and server cache, `cacheHandlers` for `use cache`) backed by something like Redis, with tag invalidation visible to all instances, and keep builds identical across pods."
+    theoryUrl: https://nextjs.org/docs/app/guides/how-revalidation-works
+    options:
+      - {
+          text: "Browsers cache the HTML forever, so add a no-store Cache-Control header to every page response",
+          correct: false,
+        }
+      - { text: "Increase the `stale` time so that every pod refreshes more often", correct: false }
+      - {
+          text: "revalidateTag only works in Server Actions, so call it from an action",
+          correct: false,
+        }
+      - {
+          text: "Invalidation reached one pod only, so use a shared cache handler across pods",
+          correct: true,
+        }
+  - type: single
+    prompt: "A CDN sits in front of your Next.js origin. After `revalidateTag`, the origin returns the new page, but visitors through the CDN still see the old one for an hour. Why, and what should you do?"
+    explanation: "`revalidateTag` and `revalidatePath` invalidate the Next.js server cache, not the CDN's copy, which lives until its own TTL expires. Use short `s-maxage` with stale-while-revalidate, purge by URL or surrogate key from the revalidation path, or bypass the CDN cache for dynamic routes. Making the CDN respect the origin's `Cache-Control` and `Vary` headers is also required."
+    theoryUrl: https://nextjs.org/docs/app/guides/cdn-caching
+    options:
+      - {
+          text: "revalidateTag has no effect on pages, so use revalidatePath for CDN purges",
+          correct: false,
+        }
+      - {
+          text: "The CDN holds its own copy, so purge it on revalidation or use short TTLs",
+          correct: true,
+        }
+      - {
+          text: "Next.js automatically purges every CDN that serves its Cache-Control headers",
+          correct: false,
+        }
+      - {
+          text: "The page was never invalidated, as stale-while-revalidate keeps old copies",
+          correct: false,
+        }
+  - type: single
+    prompt: "Which `Cache-Control` behaviour does Next.js apply to a dynamically rendered, personalised page?"
+    explanation: "Dynamic pages get `private, no-cache, no-store, max-age=0, must-revalidate`, which stops shared caches from storing user-specific content. Static pages get a long `s-maxage`, and ISR pages get `s-maxage` plus `stale-while-revalidate`. Hashed assets under `/_next/static` are `public, immutable` for a year."
+    theoryUrl: https://nextjs.org/docs/app/guides/cdn-caching
+    options:
+      - {
+          text: "`public, s-maxage=31536000` so that CDNs can keep a copy of it for a year",
+          correct: false,
+        }
+      - {
+          text: "`s-maxage` equal to its revalidate value, plus stale-while-revalidate",
+          correct: false,
+        }
+      - { text: "`private, no-cache, no-store, max-age=0, must-revalidate`", correct: true }
+      - {
+          text: "No Cache-Control header, since dynamic responses are never cached by default",
+          correct: false,
+        }
+  - type: single
+    prompt: "After putting a CDN in front of the app, client-side navigation breaks: clicking links does full page loads or shows raw RSC data. The CDN is configured to strip unknown request headers and to ignore query strings in cache keys. What must you change?"
+    explanation: "The client router sends an `rsc` header to ask for the RSC payload instead of HTML, and Next.js adds an `_rsc` search parameter that acts as a cache key for the different response variants. The CDN must forward `rsc` and include `_rsc` in its cache key, or it will serve the wrong variant to the router."
+    theoryUrl: https://nextjs.org/docs/app/guides/cdn-caching
+    options:
+      - {
+          text: "Disable prefetching in next.config, because CDNs cannot cache prefetch requests",
+          correct: false,
+        }
+      - {
+          text: "Serve all HTML responses with `Vary: *` so the CDN never reuses any of them",
+          correct: false,
+        }
+      - {
+          text: "Move the CDN behind the browser's service worker to cache RSC responses",
+          correct: false,
+        }
+      - {
+          text: "Forward the `rsc` header and keep the `_rsc` parameter in the cache key",
+          correct: true,
+        }
+  - type: single
+    prompt: "A low-traffic documentation page uses `cacheLife('days')` (revalidate 1 day, expire 1 week). Nobody visits it for ten days, and then a visitor arrives. What do they experience?"
+    explanation: "Once the entry is older than `expire` with no requests, the server regenerates it synchronously on the next request, so that visitor waits for a fresh render instead of getting stale content. Stale-while-revalidate only applies between `revalidate` and `expire`. Low-traffic pages therefore pay the cost on the first visit after a long gap."
+    theoryUrl: https://nextjs.org/docs/app/api-reference/functions/cacheLife
+    options:
+      - {
+          text: "The ten-day-old page instantly, with a refresh happening in the background",
+          correct: false,
+        }
+      - { text: "A blocking fresh render, because the entry is past expire", correct: true }
+      - {
+          text: "An error page, because the expired entry has been deleted from the cache",
+          correct: false,
+        }
+      - { text: "A redirect to the homepage while the server rebuilds the entry", correct: false }
+  - type: single
+    prompt: "Editors want to preview unpublished CMS drafts on the live site without the drafts ending up in the cache served to normal visitors. What do you use?"
+    explanation: "Draft Mode is designed for this: while it is enabled, cached functions and components re-execute on every request and their results are not saved, so draft content is always fresh and never pollutes the cache. It can be toggled only from a Route Handler or Server Action."
+    theoryUrl: https://nextjs.org/docs/app/guides/draft-mode
+    options:
+      - {
+          text: "`cacheLife('seconds')` on all content, so that drafts show up quickly",
+          correct: false,
+        }
+      - {
+          text: "`revalidateTag` after each keystroke in the editor, with the draft tag",
+          correct: false,
+        }
+      - {
+          text: "A second deployment of the whole site just for editors, with caching disabled",
+          correct: false,
+        }
+      - {
+          text: "Draft Mode, which bypasses cache reads and writes for that visitor",
+          correct: true,
+        }
+  - type: single
+    prompt: "A catalog has 1,000,000 product pages. You prerender only the top 500 with `generateStaticParams`. With Cache Components and partial prefetching enabled, `params` is awaited inside `<Suspense>`. A shopper opens a product outside the top 500 for the first time. What happens?"
+    explanation: "For params that were not prerendered, Next.js serves the route's App Shell immediately (static parts plus fallbacks), renders the URL-specific content, and stores the completed result in the ISR cache, so later visits get the upgraded page. This is the Cache Components counterpart of ISR with fallback. Awaiting `params` outside Suspense would force the first visit to wait for the whole render."
+    theoryUrl: https://nextjs.org/docs/app/guides/incremental-static-regeneration-cache-components
+    options:
+      - {
+          text: "A 404, since only the pre-generated params are valid when dynamicParams is on",
+          correct: false,
+        }
+      - {
+          text: "The App Shell at once, then the product content, and the result is cached for next time",
+          correct: true,
+        }
+      - {
+          text: "A blank page until the next deployment generates the missing product page at build time",
+          correct: false,
+        }
+      - {
+          text: "The page is rendered every time, because unlisted params are never cached",
+          correct: false,
+        }
+  - type: boolean
+    prompt: "In ISR, `generateStaticParams` is called again on every revalidation to discover newly added paths."
+    answer: false
+    explanation: "`generateStaticParams` runs at build time (and on demand in dev). During revalidation it is not called again, so new paths are discovered when they are first requested (if dynamic params are allowed), not through a re-run of the function."
+    theoryUrl: https://nextjs.org/docs/app/api-reference/functions/generate-static-params
+  - type: single
+    prompt: "To cut latency for a global audience, a lead proposes running every route on the Edge Runtime. Your app uses ISR-style caching, an ORM and Cache Components. What is your response?"
+    explanation: "The Edge Runtime supports only a limited set of APIs and does not support ISR, and Cache Components require the Node.js runtime (the `runtime` option is not supported). The recommended runtime is Node.js. Get global latency by serving the static shell from a CDN and keeping dynamic rendering close to the data."
+    theoryUrl: https://nextjs.org/docs/app/api-reference/edge
+    options:
+      - {
+          text: "Agree, since Edge supports every Node.js API and also makes ISR noticeably faster too",
+          correct: false,
+        }
+      - {
+          text: "Disagree, Edge lacks ISR and Cache Components need Node, so cache the shell at a CDN",
+          correct: true,
+        }
+      - {
+          text: "Agree, but only for pages, since route handlers cannot run on the Edge",
+          correct: false,
+        }
+      - {
+          text: "Disagree, because the Edge Runtime cannot respond with streaming at all and is deprecated",
+          correct: false,
+        }
+  - type: single
+    prompt: "Your database is in one region. Pages render on the server at the edge of 30 locations, each making 6 sequential queries to that database. Latency got worse after the move. Why, and what do you change?"
+    explanation: "Each query now crosses the ocean, so the sequential round trips add up. Keep rendering that depends on the database in a region close to it (or colocate), parallelise queries, and let the CDN serve static or cached shells globally. Moving compute to the edge helps only when the work does not need distant data."
+    theoryUrl: https://nextjs.org/docs/app/guides/rendering-philosophy
+    options:
+      - {
+          text: "Each query pays a long round trip, so run near the database and cache shells at the CDN",
+          correct: true,
+        }
+      - {
+          text: "Edge nodes have slower CPUs, so scale the instance size up in each of the locations",
+          correct: false,
+        }
+      - {
+          text: "Streaming is disabled at the edge, so switch the pages to full SSR instead",
+          correct: false,
+        }
+      - {
+          text: "The database must be replicated into the browser with a service worker for each visitor",
+          correct: false,
+        }
+  - type: single
+    prompt: "A product page calls `notFound()` for unknown slugs, but SEO tools report a `200 OK` status with the not-found UI for those URLs. The page is shown below. What is wrong?"
+    code: |
+      export default function Page({ params }: PageProps<'/p/[slug]'>) {
+        return (
+          <Suspense fallback={<Skeleton />}>
+            <Product params={params} />  {/* awaits params, then calls notFound() */}
+          </Suspense>
+        )
+      }
+    codeLanguage: tsx
+    explanation: "Streaming starts when a Suspense fallback is rendered, and the response commits to `200 OK` at that point; headers cannot change afterwards. A `notFound()` firing mid-stream only adds a `noindex` meta tag. To get a real 404 status, perform the existence check and call `notFound()` before any `await` that sits behind a Suspense boundary."
+    theoryUrl: https://nextjs.org/docs/app/guides/streaming
+    options:
+      - {
+          text: "Status is fixed once streaming starts, so check existence before the Suspense boundary",
+          correct: true,
+        }
+      - {
+          text: "notFound() works only in Route Handlers, so return a 404 Response from there instead",
+          correct: false,
+        }
+      - {
+          text: "Search tools ignore the status of streamed pages, so the real status is already a 404",
+          correct: false,
+        }
+      - {
+          text: "Add `export const dynamic = 'force-dynamic'` and the status becomes 404",
+          correct: false,
+        }
+  - type: single
+    prompt: "In production behind nginx, your Suspense-based page arrives all at once after the slowest query, although it streams correctly when you hit the Node server directly. What do you check?"
+    explanation: "Reverse proxies and CDNs can buffer the whole response before forwarding it, which hides streaming. For nginx, disable buffering with the `X-Accel-Buffering: no` response header (which you can set in `next.config` headers), and check that your CDN or serverless platform supports streamed responses."
+    theoryUrl: https://nextjs.org/docs/app/guides/streaming
+    options:
+      - {
+          text: "Whether the page has `use client` at the top, which disables streaming",
+          correct: false,
+        }
+      - {
+          text: "Whether HTTP/2 is turned on, since streaming is impossible over HTTP/1.1",
+          correct: false,
+        }
+      - {
+          text: "Whether nginx buffers responses, which `X-Accel-Buffering: no` turns off",
+          correct: true,
+        }
+      - {
+          text: "Whether Suspense fallbacks have a key prop, which is required for streaming",
+          correct: false,
+        }
+  - type: single
+    prompt: "After every deploy, the origin database spikes for several minutes, although traffic is the same. Pages use `use cache` with long lifetimes. What explains it, and what mitigates it?"
+    explanation: "Cache entries are keyed with the build (or deployment) id, so neither the default nor the remote `use cache` entries carry over to a new deploy; every deploy starts cold. Reduce the impact by prerendering the hot routes at build time (build-time caching works normally), absorbing requests with a CDN, and warming critical entries after the rollout."
+    theoryUrl: https://nextjs.org/docs/app/api-reference/directives/use-cache
+    options:
+      - {
+          text: "Cache keys include the build id, so prerender hot routes and warm entries after deploy",
+          correct: true,
+        }
+      - {
+          text: "`use cache: remote` entries persist across deploys, so switch every function to it",
+          correct: false,
+        }
+      - {
+          text: "Next.js clears browser caches on deploy, which causes a burst of client requests",
+          correct: false,
+        }
+      - {
+          text: "Long `cacheLife` values are ignored for the first hour after a deployment",
+          correct: false,
+        }
+  - type: single
+    prompt: "A legal page (terms of service) changes a few times a year, and legal updates it in the CMS. How do you render and cache it?"
+    explanation: "Content that rarely changes belongs in the static shell: use `use cache` with a long lifetime such as `cacheLife('max')` and a `cacheTag`, and have the CMS webhook call `revalidateTag` when it changes. That avoids needless time-based revalidation and keeps the page served instantly from cache."
+    theoryUrl: https://nextjs.org/docs/app/getting-started/revalidating
+    options:
+      - {
+          text: "Cache with a long cacheLife and a tag, and revalidate the tag from a CMS webhook",
+          correct: true,
+        }
+      - {
+          text: "Render at request time on every visit, to guarantee the latest legal text",
+          correct: false,
+        }
+      - {
+          text: "`cacheLife('seconds')`, so that updates reach visitors within a minute",
+          correct: false,
+        }
+      - {
+          text: "Fetch it in a Client Component, because legal text must not be in the HTML",
+          correct: false,
+        }
+  - type: single
+    prompt: "A route handler runs `revalidateTag('price-1', 'max')` for a cached `Price` component tagged `price-1` at time T. Which responses do the next two requests for the page get?"
+    code: |
+      async function Price({ id }: { id: string }) {
+        'use cache'
+        cacheLife('minutes')
+        cacheTag(`price-${id}`)
+        return <span>{await getPrice(id)}</span>
+      }
+
+      // Route Handler, called at time T:
+      // revalidateTag('price-1', 'max')
+      // Request A arrives at T + 1s, request B at T + 3s
+    codeLanguage: tsx
+    explanation: "`revalidateTag` with the `max` profile marks the entry stale and uses stale-while-revalidate: revalidation is triggered by a request, not by the call. Request A gets the old value instantly and starts the background refresh, and request B, once the new value has been stored, gets the fresh one (if the refresh finished in time). Nobody waits, unlike with `updateTag` in a Server Action."
+    theoryUrl: https://nextjs.org/docs/app/api-reference/functions/revalidateTag
+    options:
+      - { text: "A waits for a fresh render, and B gets the cached fresh value", correct: false }
+      - {
+          text: "A gets the stale value and triggers a refresh, and B can get the fresh value",
+          correct: true,
+        }
+      - {
+          text: "Both get the old value, since revalidation only starts at the next deploy",
+          correct: false,
+        }
+      - {
+          text: "Both wait for the refresh, because the tag was invalidated at time T",
+          correct: false,
+        }
+  - type: single
+    prompt: "Users complain that navigating to `/reports/[id]`, a dynamic route, feels frozen for a second after each click, while navigation to static routes is instant. What is the cheapest improvement?"
+    explanation: "Static routes are fully prefetched, but a dynamic route is only partially prefetched, and only if a `loading.tsx` (a Suspense boundary) exists. Adding `loading.tsx` or a well-placed `<Suspense>` lets the router show the shared layout and a skeleton immediately while the data streams in. Disabling prefetching would not help."
+    theoryUrl: https://nextjs.org/docs/app/getting-started/linking-and-navigating
+    options:
+      - {
+          text: "Add a loading.tsx or Suspense boundary so a skeleton shows at once and data streams in",
+          correct: true,
+        }
+      - {
+          text: "Convert the route to a Client Component so the router no longer has to wait",
+          correct: false,
+        }
+      - {
+          text: "Set `prefetch={false}` on all links to remove the competing background requests",
+          correct: false,
+        }
+      - {
+          text: "Move the data fetching into a Route Handler and call it from the layout",
+          correct: false,
+        }
+  - type: single
+    prompt: "Product wants per-user recommendations cached for 10 minutes to protect the recommendation service. The user id comes from a session cookie. Which design is correct with Cache Components?"
+    explanation: "Read the cookie outside the cached scope and pass the user id as an argument to a `use cache` function, so it becomes part of the cache key and each user has their own entry. Reading `cookies()` inside the cached function is not allowed, caching without the id in the key would show one user's recommendations to another, and `use cache: private` is for the rare case where you cannot refactor."
+    theoryUrl: https://nextjs.org/docs/app/getting-started/caching
+    options:
+      - {
+          text: "Read cookies() inside the `use cache` function, which then keys on the cookie",
+          correct: false,
+        }
+      - {
+          text: "Read the cookie outside, and pass the user id into the `use cache` function",
+          correct: true,
+        }
+      - {
+          text: "Cache without arguments, and filter the shared result for the user afterwards",
+          correct: false,
+        }
+      - {
+          text: "Skip caching because anything that depends on a cookie cannot be cached",
+          correct: false,
+        }

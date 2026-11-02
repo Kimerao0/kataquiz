@@ -1,0 +1,375 @@
+version: 1
+title: "Architect Roadmap 26: Distributed consistency"
+description: Saga pattern, transactional outbox and inbox, at-least-once versus exactly-once delivery, consumer idempotency, message ordering and dead letter queues.
+language: en
+tags: [architect-roadmap, event-driven, saga, outbox, idempotency]
+run:
+  questionsPerRun: 10
+  maxErrors: 3
+  timePerQuestionSec: 90
+questions:
+  - type: single
+    prompt: "An order service writes the order to its database and then publishes OrderCreated to a broker. Occasionally the process crashes between the two steps and downstream services never hear about the order. What is the standard fix?"
+    explanation: "The transactional outbox writes the event to an outbox table in the same local transaction as the business data, and a relay publishes it afterwards. This removes the dual-write gap. Publishing first just reverses the problem (event without order), and a retry loop is lost when the process dies."
+    theoryUrl: https://microservices.io/patterns/data/transactional-outbox.html
+    options:
+      - { text: "Publish the event first and write to the database afterwards", correct: false }
+      - {
+          text: "Write the event to an outbox table in the same transaction, and let a relay publish it",
+          correct: true,
+        }
+      - {
+          text: "Wrap the database write and the broker publish in a try/catch, and retry the publish until the broker answers",
+          correct: false,
+        }
+      - { text: "Increase the broker's replication factor so publishes never fail", correct: false }
+  - type: single
+    prompt: "A checkout flow spans Orders, Payments and Inventory, each with its own database. Payment succeeds but Inventory reports the item is out of stock. Which approach fits a saga?"
+    explanation: "A saga replaces one distributed ACID transaction with a sequence of local transactions, each with a compensating action. Here Payments runs a refund. Two-phase commit across independent services couples availability and is rarely supported by modern brokers and NoSQL stores, and rolling back a committed local transaction is not possible."
+    theoryUrl: https://microservices.io/patterns/data/saga.html
+    options:
+      - {
+          text: "Roll back the committed payment transaction using the database's ROLLBACK",
+          correct: false,
+        }
+      - {
+          text: "Run a compensating transaction that refunds the payment and cancels the order",
+          correct: true,
+        }
+      - {
+          text: "Hold a distributed lock on all three databases until every step is done",
+          correct: false,
+        }
+      - {
+          text: "Ignore the failure and let the customer retry the checkout manually",
+          correct: false,
+        }
+  - type: single
+    prompt: "Your team must choose between choreography-based and orchestration-based sagas for a 7-step order fulfilment with branching compensation logic and a need to see where each order currently stands. Which is the better fit?"
+    explanation: "With many steps, branching and the need for visibility, a central orchestrator keeps the flow in one place and makes state queryable. Choreography spreads the workflow across event handlers and tends to create cyclic dependencies and hard-to-trace flows as it grows. It shines for short flows with two or three participants."
+    theoryUrl: https://microservices.io/patterns/data/saga.html
+    options:
+      - {
+          text: "Choreography, because it removes any central component and is always simpler",
+          correct: false,
+        }
+      - { text: "Choreography, because events never need to be correlated", correct: false }
+      - { text: "Neither, because sagas cannot express compensation branches", correct: false }
+      - { text: "Orchestration, because the flow and its state live in one place", correct: true }
+  - type: single
+    prompt: "A broker advertises at-least-once delivery. Your payment consumer charges the customer's card on every message. What do you do?"
+    explanation: "At-least-once means duplicates will happen after retries, rebalances or crashes before the ack. The consumer must therefore be idempotent, for example by deduplicating on a message id or using an idempotency key with the payment provider. Disabling retries trades duplicates for lost messages, and 'exactly-once' brokers only cover their own boundary, not external side effects."
+    theoryUrl: https://microservices.io/patterns/communication-style/idempotent-consumer.html
+    options:
+      - {
+          text: "Make the consumer idempotent, for instance by passing an idempotency key to the payment provider",
+          correct: true,
+        }
+      - { text: "Disable broker retries so each message is delivered once", correct: false }
+      - {
+          text: "Rely on the broker, since modern brokers never redeliver acknowledged messages",
+          correct: false,
+        }
+      - {
+          text: "Add a sleep before charging so that duplicates arrive first and can be filtered out before the card is charged twice",
+          correct: false,
+        }
+  - type: boolean
+    prompt: "True or false: a broker's exactly-once delivery setting guarantees that an HTTP call to a third-party API made inside your consumer happens exactly once."
+    explanation: "False. Exactly-once semantics in brokers like Kafka apply to reads and writes within the broker's own transactional boundary. Side effects on external systems still need idempotency, because a crash after the call but before the offset commit leads to a replay."
+    theoryUrl: https://kafka.apache.org/documentation/#semantics
+    answer: false
+  - type: single
+    prompt: "What does this code print?"
+    code: |
+      const seen = new Set();
+      const balance = { v: 0 };
+      function handle(msg) {
+        if (seen.has(msg.id)) return 'skip';
+        balance.v += msg.amount;
+        seen.add(msg.id);
+        return 'ok';
+      }
+      const msgs = [
+        { id: 'a', amount: 10 }, { id: 'b', amount: 5 },
+        { id: 'a', amount: 10 }, { id: 'c', amount: 1 },
+        { id: 'b', amount: 5 },
+      ];
+      console.log(msgs.map(handle).join(','), balance.v);
+    codeLanguage: javascript
+    explanation: "The first 'a', 'b' and 'c' are processed (10 + 5 + 1 = 16), the repeated 'a' and 'b' are skipped. This is the idempotent consumer pattern, but note that an in-memory Set is lost on restart, so production code stores processed ids durably."
+    theoryUrl: https://microservices.io/patterns/communication-style/idempotent-consumer.html
+    options:
+      - { text: "ok,ok,ok,ok,ok 31", correct: false }
+      - { text: "ok,ok,skip,ok,skip 16", correct: true }
+      - { text: "ok,ok,skip,ok,skip 31", correct: false }
+      - { text: "ok,ok,skip,ok,ok 21", correct: false }
+  - type: single
+    prompt: "What does this print, assuming the first call crashes after the side effect and the message is redelivered?"
+    code: |
+      const seen = new Set();
+      let total = 0;
+      function handle(m, crash) {
+        total += m.amount;          // side effect
+        if (crash) throw new Error('crash');
+        seen.add(m.id);             // mark as processed
+      }
+      try { handle({ id: 'a', amount: 10 }, true); } catch {}
+      if (!seen.has('a')) handle({ id: 'a', amount: 10 }, false);
+      console.log(total);
+    codeLanguage: javascript
+    explanation: "The side effect ran before the crash and the id was never marked, so the redelivery applies it again: total is 20. Dedup only works if the side effect and the 'processed' marker commit atomically (same DB transaction), or if the side effect itself is idempotent."
+    theoryUrl: https://microservices.io/patterns/communication-style/idempotent-consumer.html
+    options:
+      - { text: "10", correct: false }
+      - { text: "0", correct: false }
+      - { text: "20", correct: true }
+      - { text: "It throws an unhandled error", correct: false }
+  - type: single
+    prompt: "Your consumer stores a row in its own Postgres database and must not process the same message twice. Where should the inbox (processed-messages) record be written?"
+    explanation: "The inbox record must be inserted in the same local transaction as the business change, with a unique constraint on the message id. If the insert violates the constraint, the message is a duplicate. Writing it in a separate transaction recreates a dual-write gap, and a Redis flag adds yet another store that can disagree."
+    theoryUrl: https://microservices.io/patterns/communication-style/idempotent-consumer.html
+    options:
+      - { text: "In Redis with a TTL, before the database transaction starts", correct: false }
+      - {
+          text: "In a separate transaction that runs right after the business transaction commits, keyed on the message id",
+          correct: false,
+        }
+      - {
+          text: "In the same database transaction as the business change, with a unique key on the message id",
+          correct: true,
+        }
+      - { text: "In the broker, by acknowledging the message before processing it", correct: false }
+  - type: single
+    prompt: "A Kafka topic carries events for all orders. Events for the same order must be applied in the order they were produced, while throughput must scale across consumers. How do you design this?"
+    explanation: "Kafka only guarantees order within a partition. Using the order id as the message key sends all of its events to the same partition, so they stay ordered while different orders spread across partitions. A single partition kills parallelism, and random keys lose per-order ordering."
+    theoryUrl: https://kafka.apache.org/documentation/#intro_concepts_and_terms
+    options:
+      - { text: "Use a single partition for the topic and a single consumer", correct: false }
+      - { text: "Produce without a key so partitions are balanced evenly", correct: false }
+      - { text: "Key by the order id so each order's events land on one partition", correct: true }
+      - { text: "Add a timestamp to each event and let consumers sort globally", correct: false }
+  - type: single
+    prompt: "A message fails processing because its payload has an unexpected shape. The consumer retries it immediately forever and blocks everything behind it. What is the right design?"
+    explanation: "A poison message should be retried a bounded number of times (ideally with backoff) and then moved to a dead letter queue with failure metadata, so the rest of the stream keeps flowing and the message can be inspected and replayed. Infinite retries block the partition or queue, and dropping silently loses data."
+    theoryUrl: https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-dead-letter-queues.html
+    options:
+      - {
+          text: "Retry a bounded number of times, then route it to a dead letter queue with failure details",
+          correct: true,
+        }
+      - {
+          text: "Keep retrying immediately until it succeeds, since the data must not be lost and the next attempt may work",
+          correct: false,
+        }
+      - { text: "Acknowledge and discard failing messages after the first error", correct: false }
+      - { text: "Restart the consumer so the message is skipped", correct: false }
+  - type: multi
+    prompt: "Which properties should you put in place before replaying messages from a dead letter queue back to the main queue? Select all that apply."
+    explanation: "Replays redeliver messages that already partially ran, so consumers must be idempotent. You should also have fixed the root cause, otherwise they just fail again, and monitor DLQ depth. Replay does not need the broker to be exactly-once, and it does not require deleting the DLQ first."
+    theoryUrl: https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-dead-letter-queues.html
+    options:
+      - { text: "Idempotent consumers", correct: true }
+      - { text: "The root cause of the failure has been fixed", correct: true }
+      - { text: "Alerting on DLQ depth so the replay is a deliberate action", correct: true }
+      - { text: "An exactly-once broker configuration", correct: false }
+  - type: single
+    prompt: "In an outbox setup, a relay polls the outbox table and publishes rows, marking them as sent afterwards. The relay crashes after publishing but before marking. What is the consequence?"
+    explanation: "The row is still unsent, so the relay publishes it again after restart. The outbox pattern therefore gives at-least-once delivery, and consumers must deduplicate, for example on the event id stored in the outbox row. Messages are not lost, and the broker does not dedupe by itself."
+    theoryUrl: https://microservices.io/patterns/data/transactional-outbox.html
+    options:
+      - { text: "The event is lost, so the relay needs a distributed transaction", correct: false }
+      - { text: "The event is published twice, so consumers must be idempotent", correct: true }
+      - { text: "The broker detects the duplicate and drops it automatically", correct: false }
+      - {
+          text: "The order transaction is rolled back because the outbox row was not marked",
+          correct: false,
+        }
+  - type: single
+    prompt: "You want to avoid polling the outbox table. Which alternative reads the outbox changes with low latency without touching the application code?"
+    explanation: "Change data capture (for example Debezium) tails the database's transaction log and streams inserted outbox rows to the broker. It avoids polling load and keeps ordering from the log. Triggers calling the broker reintroduce a dual write inside the database."
+    theoryUrl: https://debezium.io/documentation/reference/stable/transformations/outbox-event-router.html
+    options:
+      - {
+          text: "A database trigger that calls the broker's HTTP API inside the transaction",
+          correct: false,
+        }
+      - {
+          text: "Change data capture on the database log, publishing the outbox rows",
+          correct: true,
+        }
+      - { text: "A cron job that runs every minute and truncates the table", correct: false }
+      - {
+          text: "Application code that publishes from an in-memory queue after commit",
+          correct: false,
+        }
+  - type: single
+    prompt: "A saga step to reserve inventory is retried by the orchestrator after a timeout, but the first attempt had actually succeeded. What property must the Inventory service's reserve command have?"
+    explanation: "Saga steps and compensations can be retried, so each must be idempotent: reserving the same reservation id twice reserves once. Commutativity is a different property, and a unique ordering guarantee does not stop a duplicate command."
+    theoryUrl: https://learn.microsoft.com/en-us/azure/architecture/patterns/saga
+    options:
+      - { text: "It must be idempotent, keyed by a reservation or saga id", correct: true }
+      - { text: "It must be synchronous so the orchestrator never times out", correct: false }
+      - {
+          text: "It must run inside a distributed transaction with the orchestrator",
+          correct: false,
+        }
+      - { text: "It must be commutative with every other saga step", correct: false }
+  - type: single
+    prompt: "In a saga, a compensating transaction itself fails (the refund API is down). What should the design do?"
+    explanation: "Compensations must eventually succeed, so they are retried with backoff and are idempotent, and persistent failure escalates to an operator or dead letter. Abandoning the compensation leaves the system inconsistent, and a second compensation of the compensation is not a recognised pattern."
+    theoryUrl: https://learn.microsoft.com/en-us/azure/architecture/patterns/saga
+    options:
+      - { text: "Mark the saga as completed so the customer is not blocked", correct: false }
+      - {
+          text: "Roll back the saga's earlier steps by deleting their rows directly from each service's database",
+          correct: false,
+        }
+      - {
+          text: "Retry the compensation with backoff, and escalate to manual handling if it keeps failing",
+          correct: true,
+        }
+      - { text: "Run a compensation of the compensation immediately", correct: false }
+  - type: single
+    prompt: "Two services both consume a stream of AccountCredited and AccountDebited events. A consumer group rebalance causes a consumer to process a debit before the credit of the same account, although both were produced in order to the same partition. What most likely happened?"
+    explanation: "Within one partition, consumption is ordered, so reordering usually comes from processing concurrently inside the consumer (for example handing messages to a thread pool or unawaited async handlers) or from retry topics that reorder. Kafka does not shuffle messages within a partition."
+    theoryUrl: https://kafka.apache.org/documentation/#intro_concepts_and_terms
+    options:
+      - { text: "Kafka reorders messages inside a partition after a rebalance", correct: false }
+      - {
+          text: "The consumer handled messages from the same partition concurrently",
+          correct: true,
+        }
+      - { text: "The producer used a different key for the two events", correct: false }
+      - { text: "Partitions are unordered by design", correct: false }
+  - type: single
+    prompt: "A payment provider offers an Idempotency-Key header. Your API client retries a failed POST after a network timeout. What should the key be?"
+    explanation: "The key must be stable across retries of the same logical operation, so generate it once per operation (for example at the user's click) and reuse it. A new random key per attempt defeats deduplication, and a timestamp changes on every retry."
+    theoryUrl: https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Methods/POST
+    options:
+      - { text: "A new random UUID generated for each attempt", correct: false }
+      - { text: "The current timestamp in milliseconds", correct: false }
+      - {
+          text: "The same value for every payment from the customer, forever, so that any retry is recognised",
+          correct: false,
+        }
+      - {
+          text: "A value generated once for the logical operation and reused on every retry",
+          correct: true,
+        }
+  - type: single
+    prompt: "A team claims their pipeline is exactly-once because the broker has transactions enabled. Their consumer writes results to a separate Postgres database. Which statement is accurate?"
+    explanation: "Exactly-once in the broker covers consume-transform-produce within the broker. Writing to an external database in the same step is a dual write, so effectively-once needs idempotent writes or storing the offset in the same database transaction. Saying it is impossible in any form is too strong."
+    theoryUrl: https://kafka.apache.org/documentation/#semantics
+    options:
+      - {
+          text: "It is exactly-once end to end, since the broker transaction also covers the offsets and the database write",
+          correct: false,
+        }
+      - { text: "It is at-most-once, because transactions drop messages on abort", correct: false }
+      - {
+          text: "It is only effectively-once if the database write is idempotent or tied to the offset",
+          correct: true,
+        }
+      - { text: "It is exactly-once only if the database has a read replica", correct: false }
+  - type: single
+    prompt: "Orders must be shipped only after both Payment and Fraud checks complete, but those events arrive independently and in any order. Which design handles this safely?"
+    explanation: "Persist the state of each order as events arrive (a process manager or saga state) and trigger shipping when both flags are set. This is independent of arrival order and of duplicates. Assuming Payment always arrives first breaks as soon as the broker or retries reorder events."
+    theoryUrl: https://www.enterpriseintegrationpatterns.com/patterns/messaging/ProcessManager.html
+    options:
+      - {
+          text: "Ship when PaymentCompleted arrives, assuming the Fraud event always arrives first in practice",
+          correct: false,
+        }
+      - {
+          text: "Keep per-order state and ship once both events have been recorded, in any order",
+          correct: true,
+        }
+      - { text: "Make Payment wait synchronously on Fraud before publishing", correct: false }
+      - { text: "Use a single partition for the whole topic to force the order", correct: false }
+  - type: single
+    prompt: "A consumer of SQS Standard queue receives the same message twice and, rarely, out of order. The team needs per-customer ordering and deduplication within 5 minutes. What is the closest managed option?"
+    explanation: "SQS FIFO queues provide ordering per message group id and deduplication using a deduplication id within a 5 minute window, at lower throughput than Standard. Raising visibility timeout does not change ordering, and Standard queues explicitly offer best-effort ordering."
+    theoryUrl: https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/FIFO-queues.html
+    options:
+      - { text: "Increase the visibility timeout on the Standard queue", correct: false }
+      - { text: "Use an SQS FIFO queue with the customer id as message group id", correct: true }
+      - { text: "Enable long polling on the Standard queue", correct: false }
+      - { text: "Use a DLQ with maxReceiveCount of 1", correct: false }
+  - type: single
+    prompt: "Which statement about the saga pattern is correct?"
+    explanation: "Sagas give eventual consistency without isolation: other transactions can see intermediate states (for example an order that is pending but already charged), so designs add countermeasures such as semantic locks or pending states. Sagas do not provide ACID isolation or atomic rollback."
+    theoryUrl: https://microservices.io/patterns/data/saga.html
+    options:
+      - {
+          text: "Sagas lack isolation, so intermediate states can be observed by other transactions",
+          correct: true,
+        }
+      - {
+          text: "Sagas guarantee atomic rollback of all steps through the database, so no intermediate state is ever visible",
+          correct: false,
+        }
+      - { text: "Sagas require every participant to share the same database", correct: false }
+      - { text: "Sagas are only valid with orchestration", correct: false }
+  - type: multi
+    prompt: "Which of these are valid ways to make a consumer idempotent? Select all that apply."
+    explanation: "Deduplicating on a unique message id (stored atomically with the effect), naturally idempotent operations such as upserts or setting a value, and conditional updates based on a version all work. Incrementing a counter on every delivery is not idempotent."
+    theoryUrl: https://microservices.io/patterns/communication-style/idempotent-consumer.html
+    options:
+      - {
+          text: "Store processed message ids with a unique constraint, in the same transaction as the effect",
+          correct: true,
+        }
+      - { text: "Use an upsert keyed by the entity id", correct: true }
+      - {
+          text: "Apply a conditional update only if the stored version equals the expected one",
+          correct: true,
+        }
+      - { text: "Increment a counter each time the message is received", correct: false }
+  - type: single
+    prompt: "A DLQ for the orders consumer grows by 40,000 messages overnight after a deploy. What is the most sensible first action?"
+    explanation: "Inspect the failure reason and fix or roll back the deploy, because a sudden bulk failure points to a code or contract change. Only then replay. Purging loses data, and raising maxReceiveCount just delays the same failure."
+    theoryUrl: https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-dead-letter-queues.html
+    options:
+      - { text: "Purge the DLQ to restore the metric to zero", correct: false }
+      - { text: "Raise maxReceiveCount so messages stop landing in the DLQ", correct: false }
+      - {
+          text: "Inspect failure reasons, fix or roll back the change, and then replay",
+          correct: true,
+        }
+      - { text: "Move the DLQ to a larger instance type", correct: false }
+  - type: single
+    prompt: "What does this print? The consumer commits its offset before processing and crashes while handling m1, then restarts from the committed offset."
+    code: |
+      const log = ['m0', 'm1', 'm2', 'm3'];
+      let committed = 0;
+      const processed = [];
+      try {
+        for (let i = committed; i < log.length; i++) {
+          committed = i + 1;                 // commit first
+          if (i === 1) throw new Error('crash');
+          processed.push(log[i]);
+        }
+      } catch {}
+      for (let i = committed; i < log.length; i++) {
+        processed.push(log[i]);
+        committed = i + 1;
+      }
+      console.log(processed.join(','));
+    codeLanguage: javascript
+    explanation: "Committing before processing gives at-most-once: the offset was already advanced to 2 when m1 crashed, so m1 is never processed and the output is m0,m2,m3. Committing after processing would reprocess m1 instead (at-least-once)."
+    theoryUrl: https://kafka.apache.org/documentation/#semantics
+    options:
+      - { text: "m0,m1,m2,m3", correct: false }
+      - { text: "m0,m2,m3", correct: true }
+      - { text: "m0,m1,m1,m2,m3", correct: false }
+      - { text: "m0", correct: false }
+  - type: single
+    prompt: "A flight booking saga reserves a seat, charges the card and issues a ticket. Charging fails permanently. Which steps need compensation?"
+    explanation: "Only steps that completed need compensation: release the seat reservation. The charge failed and nothing was issued, so there is nothing to undo there. Compensating steps that never ran can cause erroneous actions such as refunding money never taken."
+    theoryUrl: https://learn.microsoft.com/en-us/azure/architecture/patterns/saga
+    options:
+      - { text: "Release the seat reservation only", correct: true }
+      - { text: "Release the seat, refund the card and cancel the ticket", correct: false }
+      - { text: "Refund the card and cancel the ticket only", correct: false }
+      - { text: "None, because a failed step cancels earlier steps automatically", correct: false }

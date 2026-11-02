@@ -1,0 +1,484 @@
+version: 1
+title: "Architect Roadmap 09: Data fetching, caching and Server Actions"
+description: Server-side fetching, request memoization, Cache Components with use cache, cacheLife and cacheTag, on-demand revalidation, static versus dynamic rendering and mutations with Server Actions.
+language: en
+tags: [architect-roadmap, nextjs, caching, server-actions, revalidation, cache-components]
+run:
+  questionsPerRun: 10
+  maxErrors: 3
+  timePerQuestionSec: 60
+questions:
+  - type: single
+    prompt: "In Next.js 16, a Server Component calls `fetch('https://api.example.com/posts')` with no options. How is the response cached?"
+    explanation: "Caching is opt-in: a bare `fetch` is not stored in the framework's persistent cache and, as a request-time read, blocks the render (or is streamed behind Suspense). To cache a request you use `use cache` around the function, or pass `cache: 'force-cache'`. The older 'cached by default' behaviour no longer applies."
+    theoryUrl: https://nextjs.org/docs/app/api-reference/functions/fetch
+    options:
+      - { text: "It is cached indefinitely until a tag or a path revalidates it", correct: false }
+      - { text: "It is not cached by default, and caching is an explicit opt-in", correct: true }
+      - { text: "It is cached for 15 minutes using the default cacheLife profile", correct: false }
+      - { text: "It is cached only in production, and never during `next dev`", correct: false }
+  - type: single
+    prompt: "A layout and a page both call `getUser(id)`, which uses `fetch` with the same URL and options, during the same server render. How many network requests are made?"
+    explanation: "Identical `fetch` requests in a React component tree are memoized for the duration of the render, so the component that needs data can fetch it without prop drilling. The memoization lasts only for that render pass, and it does not apply in Route Handlers because they are not part of the component tree."
+    theoryUrl: https://nextjs.org/docs/app/api-reference/functions/fetch
+    options:
+      - {
+          text: "One per render, since identical fetches are memoized within the render pass",
+          correct: true,
+        }
+      - {
+          text: "Two, because layouts and pages render in separate server requests and cannot share results",
+          correct: false,
+        }
+      - {
+          text: "One, and the result is then reused across every later request from every user",
+          correct: false,
+        }
+      - {
+          text: "Zero, because the response is always served from the browser's HTTP cache",
+          correct: false,
+        }
+  - type: single
+    prompt: "`getArtist` takes 300 ms and `getAlbums` takes 200 ms, and they are independent. How long does this component take to finish fetching?"
+    code: |
+      export default async function Page({ username }: { username: string }) {
+        const artist = await getArtist(username)
+        const albums = await getAlbums(username)
+        return <Profile artist={artist} albums={albums} />
+      }
+    codeLanguage: tsx
+    explanation: "The second `await` starts only after the first resolves, so the requests run sequentially and take about 500 ms. Starting both calls first and awaiting them with `Promise.all` (or awaiting the two promises afterwards) takes about 300 ms. Sibling components stream in parallel, but inside one component sequential awaits form a waterfall."
+    theoryUrl: https://nextjs.org/docs/app/getting-started/fetching-data
+    options:
+      - {
+          text: "About 300 ms, because the framework parallelises independent awaits in the same component",
+          correct: false,
+        }
+      - {
+          text: "About 500 ms, since the second request waits for the first to finish",
+          correct: true,
+        }
+      - { text: "About 200 ms, because the shorter request resolves first", correct: false }
+      - { text: "About 800 ms, because each call also waits for a layout render", correct: false }
+  - type: single
+    prompt: "`<Playlists>` needs the `artistID` returned by `getArtist()` before it can query. How do you keep the page responsive?"
+    explanation: "A dependent fetch is inherently sequential, so you cannot parallelise it, but you can stream. Wrap the dependent component in `<Suspense>` (or add a `loading.tsx`) so the rest of the page is shown immediately. Faking parallelism with a guessed id would break correctness, and `Promise.all` cannot start a request without its input."
+    theoryUrl: https://nextjs.org/docs/app/getting-started/fetching-data
+    options:
+      - { text: "Use Promise.all for both calls, passing the id once it is known", correct: false }
+      - {
+          text: "Move both fetches to a Client Component and run them inside useEffect",
+          correct: false,
+        }
+      - {
+          text: "Wrap the dependent component in Suspense so the rest streams first",
+          correct: true,
+        }
+      - {
+          text: "Add 'use cache' to the page so the dependency is resolved at build time",
+          correct: false,
+        }
+  - type: single
+    prompt: "What forms the cache key of a function marked `'use cache'`?"
+    explanation: "A cache entry is keyed by the serialized inputs: the arguments you pass plus any variables captured from outer scopes (and the build/deployment id). Different arguments therefore produce separate entries. The function's file name or the route that calls it are not the key."
+    theoryUrl: https://nextjs.org/docs/app/api-reference/directives/use-cache
+    options:
+      - {
+          text: "The serialized arguments plus any variables captured from the outer scope",
+          correct: true,
+        }
+      - {
+          text: "The function name, the file path and the URL of the route that calls it, so each page gets its own entry",
+          correct: false,
+        }
+      - {
+          text: "Only the first argument, and the rest are ignored to keep the key small",
+          correct: false,
+        }
+      - {
+          text: "The cacheTag values, which are unique per entry by definition of the API",
+          correct: false,
+        }
+  - type: single
+    prompt: "Why does this cached function fail, and what is the recommended fix?"
+    code: |
+      import { cookies } from 'next/headers'
+
+      async function getCart() {
+        'use cache'
+        const session = (await cookies()).get('session')?.value
+        return db.cart.find(session)
+      }
+    codeLanguage: typescript
+    explanation: "Cached scopes cannot read runtime request APIs such as `cookies()`, `headers()` or `searchParams`, even through helpers. Read the value outside the cached scope and pass it as an argument, which also makes it part of the cache key. `use cache: private` exists for the rare case where that refactoring is not possible."
+    theoryUrl: https://nextjs.org/docs/app/api-reference/directives/use-cache
+    options:
+      - { text: "Cached functions must be synchronous, so remove async and await", correct: false }
+      - {
+          text: "cookies() is not allowed in a cached scope, so read it outside and pass it in",
+          correct: true,
+        }
+      - {
+          text: "cookies() works there, but only when the function also calls cacheLife",
+          correct: false,
+        }
+      - {
+          text: "The directive must sit at the top of the file rather than inside the function",
+          correct: false,
+        }
+  - type: single
+    prompt: "A function is cached with `cacheLife('hours')` (profile: stale 5m, revalidate 1h, expire 1d). A request arrives 90 minutes after the entry was filled, with no traffic in between. What is served?"
+    code: |
+      export async function getProducts() {
+        'use cache'
+        cacheLife('hours')
+        cacheTag('products')
+        return db.query('SELECT * FROM products')
+      }
+    codeLanguage: typescript
+    explanation: "After `revalidate` (1 hour) the entry is stale but not yet expired (1 day), so the request is served the stale value immediately and a background refresh is triggered, which is stale-while-revalidate. Only after `expire` with no requests does the next request wait for fresh data."
+    theoryUrl: https://nextjs.org/docs/app/api-reference/functions/cacheLife
+    options:
+      - {
+          text: "The stale value instantly, while a background refresh produces the new one",
+          correct: true,
+        }
+      - {
+          text: "A blocking fresh render, because the one hour lifetime has already passed",
+          correct: false,
+        }
+      - {
+          text: "The stale value forever, until a tag is explicitly revalidated by hand later",
+          correct: false,
+        }
+      - {
+          text: "An error, because the entry expired and no fallback was configured",
+          correct: false,
+        }
+  - type: single
+    prompt: "What is the effect of `cacheLife('seconds')` on a cached component inside a page that is prerendered?"
+    explanation: "Very short lifetimes (revalidate of 0, expire under 5 minutes, or stale under 30 seconds) are excluded from prerenders and become dynamic holes resolved at request time. The `seconds` preset has a 1 minute expire, so it falls in that group. Wrap such a component in `<Suspense>` so a fallback can sit in the static shell."
+    theoryUrl: https://nextjs.org/docs/app/api-reference/functions/cacheLife
+    options:
+      - {
+          text: "It is included in the static shell and refreshed every second by the server",
+          correct: false,
+        }
+      - {
+          text: "It makes the whole route dynamic and removes the static shell for every visitor, not just this component",
+          correct: false,
+        }
+      - {
+          text: "It is ignored in production builds and applies only in local development mode",
+          correct: false,
+        }
+      - {
+          text: "It is excluded from the prerender and resolved at request time as a dynamic hole",
+          correct: true,
+        }
+  - type: single
+    prompt: "A user submits a comment form and must see their comment in the list right after the redirect. The list is cached with `cacheTag('comments')`. Which call should the Server Action make?"
+    explanation: "`updateTag` expires the tag immediately so the next read waits for fresh data, which gives read-your-own-writes. `revalidateTag(tag, 'max')` is stale-while-revalidate, so the user could still see the old list. `updateTag` is only available inside Server Actions."
+    theoryUrl: https://nextjs.org/docs/app/api-reference/functions/updateTag
+    options:
+      - {
+          text: "revalidateTag('comments', 'max'), because it is the recommended default",
+          correct: false,
+        }
+      - { text: "refresh(), because the list is read from the cache anyway", correct: false }
+      - { text: "updateTag('comments'), which expires the entry immediately", correct: true }
+      - {
+          text: "cacheLife('seconds') on the list so that it expires without invalidation",
+          correct: false,
+        }
+  - type: single
+    prompt: "A headless CMS calls your webhook endpoint (a Route Handler) when an article changes, and a blog page tagged `articles` should refresh without blocking visitors. What do you call in the handler?"
+    explanation: "`revalidateTag('articles', 'max')` works in Route Handlers and applies stale-while-revalidate, so visitors keep getting the cached page while it refreshes. `updateTag` is restricted to Server Actions, and calling it from a Route Handler is not supported."
+    theoryUrl: https://nextjs.org/docs/app/api-reference/functions/revalidateTag
+    options:
+      - {
+          text: "updateTag('articles'), since it invalidates immediately for all visitors of the page",
+          correct: false,
+        }
+      - {
+          text: "revalidateTag('articles', 'max'), which works in handlers and serves stale meanwhile",
+          correct: true,
+        }
+      - {
+          text: "refresh(), which refetches the RSC payload of the route for every connected client",
+          correct: false,
+        }
+      - {
+          text: "Nothing, a Route Handler cannot touch the cache used by a Server Component page",
+          correct: false,
+        }
+  - type: boolean
+    prompt: "`updateTag` can be called from a Route Handler, as well as from a Server Action."
+    answer: false
+    explanation: "`updateTag` is designed for read-your-own-writes and can only be used in Server Actions. From Route Handlers or other contexts use `revalidateTag` instead."
+    theoryUrl: https://nextjs.org/docs/app/api-reference/functions/updateTag
+  - type: single
+    prompt: "You want to invalidate every `app/blog/[slug]/page.tsx` page after a bulk import, without knowing the tags. Which call does it?"
+    explanation: "`revalidatePath` accepts a route pattern with dynamic segments, but then the `type` argument is required: `revalidatePath('/blog/[slug]', 'page')`. For a literal path such as `/blog/hello` you omit `type`. Tags are still more precise when you can use them."
+    theoryUrl: https://nextjs.org/docs/app/api-reference/functions/revalidatePath
+    options:
+      - { text: "revalidatePath('/blog/*')", correct: false }
+      - { text: "revalidatePath('/blog/[slug]/page.tsx')", correct: false }
+      - {
+          text: "revalidatePath('/blog') alone, which always invalidates every child page",
+          correct: false,
+        }
+      - { text: "revalidatePath('/blog/[slug]', 'page')", correct: true }
+  - type: single
+    prompt: "Code in your repo calls `revalidateTag('products')` with a single argument. What is the status of that form?"
+    explanation: "The single-argument form is deprecated. It behaves like an immediate expiry (`{ expire: 0 }`) and may be removed. Migrate to `updateTag` inside Server Actions, or to `revalidateTag(tag, 'max')` for stale-while-revalidate."
+    theoryUrl: https://nextjs.org/docs/app/api-reference/functions/revalidateTag
+    options:
+      - {
+          text: "It is the recommended form, and the second argument is only for custom profiles",
+          correct: false,
+        }
+      - {
+          text: "It throws at runtime, because the profile argument is required everywhere",
+          correct: false,
+        }
+      - {
+          text: "It is deprecated and acts like immediate expiry, so migrate to updateTag or 'max'",
+          correct: true,
+        }
+      - {
+          text: "It invalidates only the current route instead of every entry with that tag, since the tag is scoped to the caller's path",
+          correct: false,
+        }
+  - type: single
+    prompt: "With Cache Components enabled, a component reads `await cookies()` and is not inside any `<Suspense>`. What does the dev overlay or build report?"
+    explanation: "Runtime APIs need information that only exists when a request arrives, so the prerender cannot complete that part of the tree. Without a Suspense boundary the route is flagged as blocking (a blocking-route error). Wrapping the component in `<Suspense>` puts the fallback in the static shell and streams the component at request time."
+    theoryUrl: https://nextjs.org/docs/app/getting-started/caching
+    options:
+      - { text: "Nothing, because the page silently becomes fully static", correct: false }
+      - {
+          text: "A type error, because cookies() is allowed only in Route Handlers and Server Actions",
+          correct: false,
+        }
+      - { text: "A warning that is fixed by adding 'use cache' to the component", correct: false }
+      - {
+          text: "A blocking-route error, fixed by wrapping the component in Suspense",
+          correct: true,
+        }
+  - type: single
+    prompt: "In a Cache Components app, what is part of the static shell of a route?"
+    explanation: "The static shell is everything that can render before any async or request-time work resolves: layouts, static markup, the `<Suspense>` fallbacks and the results of `use cache` functions whose lifetime is long enough. Components that read cookies, headers or uncached data are streamed in after the shell."
+    theoryUrl: https://nextjs.org/docs/app/guides/streaming
+    options:
+      - {
+          text: "Only the HTML of the root layout, without any of the page content or fallbacks",
+          correct: false,
+        }
+      - {
+          text: "Everything on the page, because the shell is regenerated from scratch again at each request",
+          correct: false,
+        }
+      - {
+          text: "Static markup, Suspense fallbacks and cached output, but not request-time content",
+          correct: true,
+        }
+      - {
+          text: "Only the content that has been marked with `use client` in its own module",
+          correct: false,
+        }
+  - type: single
+    prompt: "A page's product list depends on `searchParams` (`?category=shoes`). What effect does reading `searchParams` have on how the page can be rendered?"
+    explanation: "`searchParams` is a runtime API: it only exists once a request arrives, so reading it makes that part of the page request-time rather than prerenderable. To keep the rest in the static shell, pass the promise down and await it inside a `<Suspense>` boundary around the filtered list."
+    theoryUrl: https://nextjs.org/docs/app/getting-started/layouts-and-pages
+    options:
+      - {
+          text: "It has no effect, because the router passes query params at build time",
+          correct: false,
+        }
+      - {
+          text: "It forces the entire app to dynamic rendering, not only that route",
+          correct: false,
+        }
+      - {
+          text: "The part reading it is rendered per request, so isolate it behind Suspense",
+          correct: true,
+        }
+      - {
+          text: "It makes the page client-only, so it must be moved to a Client Component",
+          correct: false,
+        }
+  - type: single
+    prompt: "A component renders `new Date().toISOString()` and uses no cookies or headers. You want it to render per request, not at build time. Which API signals that?"
+    explanation: "`connection()` tells Next.js to wait for a real incoming request before continuing, which excludes the component from prerendering even though no request-time API like `cookies()` is used. It is the successor of `unstable_noStore`."
+    theoryUrl: https://nextjs.org/docs/app/api-reference/functions/connection
+    options:
+      - { text: "`await connection()` before reading the date", correct: true }
+      - { text: "cacheLife('max'), because it forces the value to be recomputed", correct: false }
+      - { text: "revalidatePath('/'), called at the top of the component", correct: false }
+      - { text: "`export const runtime = 'edge'` on the page", correct: false }
+  - type: single
+    prompt: "A teammate says a Server Action is safe because only the authenticated page renders the form. What is wrong with that reasoning?"
+    explanation: "A Server Action is a public POST endpoint: anyone who can send the same request can invoke it, so hiding the form is not a security boundary. Authenticate and authorize inside every action, validate the input, and return only what the UI needs. Framework protections such as the CSRF origin check do not replace this."
+    theoryUrl: https://nextjs.org/docs/app/guides/server-actions
+    options:
+      - {
+          text: "Nothing, since action IDs are encrypted and cannot be guessed by clients",
+          correct: false,
+        }
+      - {
+          text: "Server Actions run on the client, so they must verify the session in the browser, where it lives",
+          correct: false,
+        }
+      - {
+          text: "The form should be a Client Component, which makes the action private",
+          correct: false,
+        }
+      - {
+          text: "Actions are reachable by direct POST requests, so each one must check auth itself",
+          correct: true,
+        }
+  - type: single
+    prompt: "What is wrong with this Server Action?"
+    code: |
+      'use server'
+      import { updateTag } from 'next/cache'
+      import { redirect } from 'next/navigation'
+
+      export async function createPost(formData: FormData) {
+        const post = await db.post.create({
+          data: { title: String(formData.get('title')) },
+        })
+        redirect(`/posts/${post.id}`)
+        updateTag('posts')
+      }
+    codeLanguage: typescript
+    explanation: "`redirect` works by throwing a control-flow exception, so the line after it never executes and the `posts` tag is never invalidated. The fix is to call `updateTag('posts')` before `redirect`, so the destination renders with fresh data."
+    theoryUrl: https://nextjs.org/docs/app/api-reference/functions/redirect
+    options:
+      - {
+          text: "updateTag cannot be called in a file marked 'use server' without extra config",
+          correct: false,
+        }
+      - {
+          text: "redirect must be awaited, otherwise the action returns too early to the client",
+          correct: false,
+        }
+      - {
+          text: "formData.get always returns null in actions, so the title is lost on the server",
+          correct: false,
+        }
+      - {
+          text: "`updateTag` never runs, because redirect throws, so call it before redirect",
+          correct: true,
+        }
+  - type: single
+    prompt: "A client fires three Server Actions at once with `Promise.all([a(), b(), c()])` hoping to parallelise them. How does Next.js dispatch them?"
+    explanation: "The client dispatches Server Actions one at a time, so the second waits for the first to finish and so on; this keeps the re-rendered tree consistent with each action's result. For real parallelism, do the work inside one action, fetch in Server Components, or use a Route Handler for non-mutations."
+    theoryUrl: https://nextjs.org/docs/app/guides/server-actions
+    options:
+      - {
+          text: "In parallel, as separate requests, using the browser's connection pool",
+          correct: false,
+        }
+      - {
+          text: "Parallel on the server, but the responses are merged in call order",
+          correct: false,
+        }
+      - {
+          text: "One after another from that client, so Promise.all does not parallelise them",
+          correct: true,
+        }
+      - { text: "Only the last one runs, and the earlier calls are cancelled", correct: false }
+  - type: single
+    prompt: "A Server Action calls `updateTag('cart')` and the user is on a page that shows the cart. How many HTTP round trips are needed to show the updated cart?"
+    explanation: "When an action calls `updateTag`, `revalidatePath`, `refresh`, mutates cookies or redirects, Next.js re-renders the current route in the same request. The response carries both the action's return value and the new RSC payload, so one round trip updates the UI. `revalidateTag` with a stale-while-revalidate profile intentionally skips that re-render."
+    theoryUrl: https://nextjs.org/docs/app/guides/server-actions
+    options:
+      - { text: "Two, one for the action and a second one to refetch the page", correct: false }
+      - {
+          text: "One, as the response carries both the result and the re-rendered route",
+          correct: true,
+        }
+      - {
+          text: "Zero, the client reads the invalidated entry directly from the server cache",
+          correct: false,
+        }
+      - { text: "Three, including a prefetch of the cart route in the background", correct: false }
+  - type: single
+    prompt: "A login Server Action receives an invalid email. How should it report the error?"
+    explanation: "Expected errors such as validation failures should be modelled as return values and displayed with `useActionState`, rather than thrown. Throwing is for unexpected exceptions that error boundaries should catch. Returning a typed state keeps the form on screen with the user's input."
+    theoryUrl: https://nextjs.org/docs/app/getting-started/error-handling
+    options:
+      - {
+          text: "Throw an Error and let the nearest error.tsx show the message to the user",
+          correct: false,
+        }
+      - {
+          text: "Call redirect('/error') with the message in a query string for the page",
+          correct: false,
+        }
+      - {
+          text: "Call notFound(), so that the form shows the 404 UI for invalid input",
+          correct: false,
+        }
+      - {
+          text: "Return an error state that `useActionState` renders, instead of throwing",
+          correct: true,
+        }
+  - type: single
+    prompt: "An action updates a task. The client sends `{ id, title, ownerId }`, validated with Zod. Is the validation enough?"
+    explanation: "Schema validation only checks the shape of the data. A perfectly well-formed object can still refer to a row the caller does not own, or carry an `ownerId` they should never control. Send an id plus the change, derive ownership from the session, and authorize against the database inside the action."
+    theoryUrl: https://nextjs.org/docs/app/guides/server-actions
+    options:
+      - {
+          text: "No, it checks shape only, so verify ownership from the session on the server",
+          correct: true,
+        }
+      - {
+          text: "Yes, because Zod rejects any input that does not match the schema",
+          correct: false,
+        }
+      - {
+          text: "Yes, since Next.js checks the origin of every action request already",
+          correct: false,
+        }
+      - {
+          text: "No, because the action runs inside a transaction and the client controls it",
+          correct: false,
+        }
+  - type: single
+    prompt: "An action changes data that is not in any tagged cache (for example a value read from a database outside `use cache`) and you only need the current route to show it. Which call fits?"
+    explanation: "`refresh()` refetches the current route's RSC payload without invalidating cached data, so it suits state outside the cache that the action just changed. It does not revalidate tagged data; for that use `updateTag` or `revalidateTag`."
+    theoryUrl: https://nextjs.org/docs/app/getting-started/mutating-data
+    options:
+      - { text: "updateTag(), with the name of the route as the tag", correct: false }
+      - {
+          text: "refresh(), which refetches the route without invalidating cached data",
+          correct: true,
+        }
+      - { text: "revalidatePath('/'), which invalidates only the home page", correct: false }
+      - {
+          text: "cacheLife('seconds'), which expires the entry on the next request",
+          correct: false,
+        }
+  - type: single
+    prompt: "Your app runs on serverless functions and a `use cache` function wraps an expensive upstream call. Traffic is spread over many instances, and the upstream is getting far more calls than expected. What is the most direct fix?"
+    explanation: "The default `use cache` handler stores entries in memory, and in serverless each instance has its own short-lived memory, so entries are rarely reused. `use cache: remote` stores output in a shared cache handler across instances, at the cost of a network lookup and platform fees. Longer `cacheLife` values do not help if the entry does not survive between requests."
+    theoryUrl: https://nextjs.org/docs/app/api-reference/directives/use-cache-remote
+    options:
+      - {
+          text: "Switch the function to `use cache: remote` so that all instances share the entries",
+          correct: true,
+        }
+      - {
+          text: "Raise cacheLife to 'max' so entries survive longer in each instance's memory",
+          correct: false,
+        }
+      - {
+          text: "Replace `use cache` with `use cache: private`, which persists across requests",
+          correct: false,
+        }
+      - {
+          text: "Add `cacheTag` to every call, since tags are what make entries persistent",
+          correct: false,
+        }

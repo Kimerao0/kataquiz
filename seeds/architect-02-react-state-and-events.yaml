@@ -1,0 +1,353 @@
+version: 1
+title: "Architect Roadmap 02: React state and events"
+description: useState snapshots and batching, immutable updates, lifting state up, controlled components, event handling and form management.
+language: en
+tags: [architect-roadmap, react, state, events, forms, usestate]
+run:
+  questionsPerRun: 10
+  maxErrors: 3
+  timePerQuestionSec: 60
+questions:
+  - type: single
+    prompt: "The button is clicked once. What do the two logs print, assuming `count` starts at 0?"
+    code: |
+      function Counter() {
+        const [count, setCount] = useState(0)
+
+        function handleClick() {
+          setCount(count + 5)
+          console.log('log:', count)
+          setTimeout(() => console.log('timeout:', count), 1000)
+        }
+
+        return <button onClick={handleClick}>{count}</button>
+      }
+    codeLanguage: tsx
+    explanation: "State is a snapshot: within one render, `count` is a constant `0`, and the handler closes over that value. `setCount` schedules a new render, it does not change the variable. Both logs print 0, even though the screen shows 5 shortly after."
+    theoryUrl: https://react.dev/learn/state-as-a-snapshot
+    options:
+      - { text: "`log: 5` and `timeout: 5`", correct: false }
+      - { text: "`log: 0` and `timeout: 5`", correct: false }
+      - { text: "`log: 5` and `timeout: 0`", correct: false }
+      - { text: "`log: 0` and `timeout: 0`", correct: true }
+  - type: single
+    prompt: "After one click, how many renders happen and what value is shown? `count` starts at 0."
+    code: |
+      function Counter() {
+        const [count, setCount] = useState(0)
+
+        function handleClick() {
+          setCount(count + 1)
+          setCount(count + 1)
+          setCount(count + 1)
+        }
+
+        return <button onClick={handleClick}>{count}</button>
+      }
+    codeLanguage: tsx
+    explanation: "All three calls use the same snapshot, `count` is 0, so each one means `setCount(1)`. React batches them into a single re-render and the value is 1. With the updater form `setCount(c => c + 1)` the three calls queue and the result would be 3."
+    theoryUrl: https://react.dev/learn/queueing-a-series-of-state-updates
+    options:
+      - { text: "Three renders, showing 3", correct: false }
+      - { text: "One render, showing 3", correct: false }
+      - { text: "Three renders, showing 1", correct: false }
+      - { text: "One render, showing 1", correct: true }
+  - type: single
+    prompt: "What is the value after one click if the handler uses updater functions? `count` starts at 0."
+    code: |
+      function handleClick() {
+        setCount((c) => c + 1)
+        setCount((c) => c + 1)
+        setCount(count + 10)
+        setCount((c) => c + 1)
+      }
+    codeLanguage: typescript
+    explanation: "React queues the updates and applies them in order to the pending value: 0, then 1, then 2, then the plain value `count + 10` replaces it with 10, and the last updater makes it 11. A plain value discards what came before it in the queue."
+    theoryUrl: https://react.dev/learn/queueing-a-series-of-state-updates
+    options:
+      - { text: "13", correct: false }
+      - { text: "11", correct: true }
+      - { text: "3", correct: false }
+      - { text: "10", correct: false }
+  - type: single
+    prompt: "Why does clicking the button below not update the screen?"
+    code: |
+      function List() {
+        const [items, setItems] = useState<string[]>(['a'])
+
+        function add() {
+          items.push('b')
+          setItems(items)
+        }
+
+        return <button onClick={add}>{items.length}</button>
+      }
+    codeLanguage: tsx
+    explanation: "`push` mutates the existing array, and `setItems` receives the very same reference. React compares the new state with the old using `Object.is`, sees no change, and skips the re-render. Create a new array: `setItems([...items, 'b'])`."
+    theoryUrl: https://react.dev/learn/updating-arrays-in-state
+    options:
+      - { text: "`push` is asynchronous, so the array is empty at render time", correct: false }
+      - {
+          text: "State updates from event handlers are ignored until the next render",
+          correct: false,
+        }
+      - { text: "`setItems` receives the same reference, so React sees no change", correct: true }
+      - { text: "Arrays cannot be stored in state, only primitives", correct: false }
+  - type: single
+    prompt: "State is `{ user: { name: 'Ada', address: { city: 'Rome', zip: '00100' } } }`. Which update changes only the city, immutably?"
+    explanation: "Each level along the path must be copied, and the untouched siblings (`name`, `zip`) are carried over with spread. A single shallow spread would leave `address` as the same shared object, and mutating then re-setting hits the same-reference problem."
+    theoryUrl: https://react.dev/learn/updating-objects-in-state#updating-a-nested-object
+    options:
+      - {
+          text: "`setState({ ...state, user: { ...state.user, address: { ...state.user.address, city: 'Milan' } } })`",
+          correct: true,
+        }
+      - { text: "`state.user.address.city = 'Milan'; setState(state)`", correct: false }
+      - { text: "`setState({ ...state, user: { city: 'Milan' } })`", correct: false }
+      - { text: "`setState({ ...state, 'user.address.city': 'Milan' })`", correct: false }
+  - type: single
+    prompt: "Which expression removes the todo with a given id from state, without mutating the original array?"
+    explanation: "`filter` returns a new array without the matching item. `splice` and `pop` mutate the existing array in place, and `delete arr[i]` leaves a hole while also mutating."
+    theoryUrl: https://react.dev/learn/updating-arrays-in-state#removing-from-an-array
+    options:
+      - { text: "`setTodos(todos.filter((t) => t.id !== id))`", correct: true }
+      - { text: "`setTodos(todos.splice(todos.findIndex((t) => t.id === id), 1))`", correct: false }
+      - {
+          text: "`delete todos[todos.findIndex((t) => t.id === id)]; setTodos(todos)`",
+          correct: false,
+        }
+      - { text: "`setTodos(todos.pop())`", correct: false }
+  - type: single
+    prompt: "A component is rendered three times in total (mount plus two clicks). How many times is `compute` called?"
+    code: |
+      function C() {
+        const [a, setA] = useState(compute())
+        const [b, setB] = useState(() => compute())
+        return <button onClick={() => setA(a + 1)}>{a + b}</button>
+      }
+    codeLanguage: tsx
+    explanation: "`useState(compute())` evaluates `compute()` on every render, even though React ignores the result after the first one: 3 calls. `useState(() => compute())` passes an initializer that React runs only on mount: 1 call. In total 4."
+    theoryUrl: https://react.dev/reference/react/useState#avoiding-recreating-the-initial-state
+    options:
+      - { text: "2", correct: false }
+      - { text: "3", correct: false }
+      - { text: "4", correct: true }
+      - { text: "6", correct: false }
+  - type: single
+    prompt: "`Child` copies a prop into state. The parent changes `v` from `'one'` to `'two'`. What does `Child` render afterwards?"
+    code: |
+      function Child({ v }: { v: string }) {
+        const [s] = useState(v)
+        return <span>{s} | {v}</span>
+      }
+    codeLanguage: tsx
+    explanation: "`useState` uses its argument only for the first render; later values of `v` are ignored for `s`. The output is `one | two`. If the state should follow the prop, derive the value during render, or give the component a `key` to reset it."
+    theoryUrl: https://react.dev/learn/choosing-the-state-structure#avoid-redundant-state
+    options:
+      - { text: "`one | one`", correct: false }
+      - { text: "`two | two`", correct: false }
+      - { text: "`one | two`", correct: true }
+      - { text: "`two | one`", correct: false }
+  - type: single
+    prompt: "A profile page has a `<ProfileForm userId={id} />` whose draft is kept in `useState`. When the user switches to another profile, stale draft text remains. What is the cleanest fix?"
+    explanation: "Passing `key={userId}` makes React treat a different user as a different component instance, so state is reset naturally on mount. Syncing with `useEffect(() => setDraft(''), [userId])` works but causes an extra render with stale data and is the pattern the docs warn against."
+    theoryUrl: https://react.dev/learn/preserving-and-resetting-state#option-2-resetting-state-with-a-key
+    options:
+      - {
+          text: "Add an effect on `userId` that calls `setDraft('')` after each render",
+          correct: false,
+        }
+      - { text: "Pass `key={userId}` so each profile gets a fresh instance", correct: true }
+      - { text: "Store the draft in a module-level variable and clear it manually", correct: false }
+      - { text: "Switch the form to `useRef` so the draft survives prop changes", correct: false }
+  - type: single
+    prompt: "A search box and a results list are sibling components that both need the current query. Where should the query state live?"
+    explanation: "State should live in the closest common parent, and be passed down as props, with a setter or callback for changes. Duplicating it in both siblings invites desync, and a global store is overkill for two siblings."
+    theoryUrl: https://react.dev/learn/sharing-state-between-components
+    options:
+      - { text: "In `SearchBox`, which exposes it to `Results` through a ref", correct: false }
+      - { text: "In both components, kept in sync with an effect", correct: false }
+      - { text: "In a global store, because siblings cannot share props", correct: false }
+      - { text: "In their closest common parent, passed down as props", correct: true }
+  - type: single
+    prompt: 'A dashboard has deeply nested widgets and one of them needs the "selected date range" that a distant ancestor owns. Intermediate components do not care about it. What is the best trade-off?'
+    explanation: "Lifting state is right, but passing a prop through many layers that ignore it is prop drilling. Restructuring with `children` or composition often removes most of the drilling; if the layers are really many, Context is the next step. Moving the state into every widget would duplicate it."
+    theoryUrl: https://react.dev/learn/passing-data-deeply-with-context#before-you-use-context
+    options:
+      - {
+          text: "Keep the state in the ancestor, and consider composition first, then Context if drilling remains",
+          correct: true,
+        }
+      - { text: "Copy the date range into local state of each widget at mount", correct: false }
+      - {
+          text: "Move the state to the nearest widget and read it from the others by DOM query",
+          correct: false,
+        }
+      - {
+          text: "Always use Context for every shared value, even between two siblings",
+          correct: false,
+        }
+  - type: single
+    prompt: "What is the problem with this input?"
+    code: |
+      function Name() {
+        const [name, setName] = useState('')
+        return <input value={name} />
+      }
+    codeLanguage: tsx
+    explanation: "Providing `value` without `onChange` makes a controlled input that React fully owns: since nothing updates `name`, typing does nothing, and React warns in dev. Add `onChange`, use `defaultValue` for an uncontrolled input, or `readOnly` if intended."
+    theoryUrl: https://react.dev/reference/react-dom/components/input#controlling-an-input-with-a-state-variable
+    options:
+      - {
+          text: "The input is read-only in practice: it never changes, and React warns",
+          correct: true,
+        }
+      - { text: "Nothing, React updates `name` automatically from the DOM", correct: false }
+      - { text: "It works but only updates on blur", correct: false }
+      - { text: "It throws at render because `onChange` is mandatory", correct: false }
+  - type: single
+    prompt: "The state starts as `useState<string>()` (so `undefined`) and the input is `<input value={text} onChange={...} />`. What does React warn about after the first keystroke?"
+    explanation: "`value={undefined}` makes the input uncontrolled; once a string arrives it becomes controlled. React warns about switching from uncontrolled to controlled. Initialise with an empty string so the input is controlled from the start."
+    theoryUrl: https://react.dev/reference/react-dom/components/input#im-getting-an-error-a-component-is-changing-an-uncontrolled-input-to-be-controlled
+    options:
+      - { text: "That `onChange` runs before the state is updated", correct: false }
+      - {
+          text: "That the component is changing an uncontrolled input to be controlled",
+          correct: true,
+        }
+      - { text: "That `value` must be a number or boolean", correct: false }
+      - { text: "Nothing; `undefined` and `''` are equivalent for inputs", correct: false }
+  - type: single
+    prompt: "What is logged when the button renders?"
+    code: |
+      const log = (s: string) => {
+        console.log('called', s)
+        return () => console.log('clicked', s)
+      }
+
+      function C() {
+        console.log('render')
+        return <button onClick={log('x') as any}>go</button>
+      }
+    codeLanguage: tsx
+    explanation: "`log('x')` is a call expression, so it runs immediately while rendering and the returned function becomes the handler. Output on mount: `render`, `called x`. Pass a function, `onClick={() => log('x')}` or `onClick={handler}`, not its result."
+    theoryUrl: https://react.dev/learn/responding-to-events#passing-event-handlers-as-props
+    options:
+      - { text: "`render` only; `called x` appears on click", correct: false }
+      - { text: "`called x`, then `render`", correct: false }
+      - { text: "`render`, then `called x`", correct: true }
+      - { text: "Nothing, until the button is clicked", correct: false }
+  - type: single
+    prompt: "The button is clicked once. In what order are the logs printed?"
+    code: |
+      <div onClickCapture={() => console.log('parent capture')}
+           onClick={() => console.log('parent')}>
+        <button onClickCapture={() => console.log('child capture')}
+                onClick={() => console.log('child')}>
+          go
+        </button>
+      </div>
+    codeLanguage: tsx
+    explanation: "Events have a capture phase from the outermost element down to the target, then a bubble phase back up. React mirrors that: capture handlers run top-down, then regular handlers run bottom-up. So the order is parent capture, child capture, child, parent."
+    theoryUrl: https://react.dev/learn/responding-to-events#event-propagation
+    options:
+      - { text: "`child`, `parent`, `parent capture`, `child capture`", correct: false }
+      - { text: "`parent capture`, `parent`, `child capture`, `child`", correct: false }
+      - { text: "`parent capture`, `child capture`, `child`, `parent`", correct: true }
+      - { text: "`child capture`, `child`, `parent capture`, `parent`", correct: false }
+  - type: single
+    prompt: 'A card has an `onClick` that navigates, and inside it a "Delete" button must not trigger the navigation. What should the button''s handler do?'
+    explanation: "`e.stopPropagation()` stops the click from bubbling to the card's handler. `preventDefault()` cancels the browser's default action, such as a form submit or link, which is not what triggers the parent's React handler. Returning `false` has no effect in React."
+    theoryUrl: https://react.dev/learn/responding-to-events#stopping-propagation
+    options:
+      - { text: "Call `e.preventDefault()`", correct: false }
+      - { text: "Return `false` from the handler", correct: false }
+      - { text: "Call `e.stopPropagation()`", correct: true }
+      - { text: "Call `e.stopImmediatePropagation()` on the parent instead", correct: false }
+  - type: single
+    prompt: "A signup `<form onSubmit={handleSubmit}>` posts via `fetch`, but the whole page reloads on submit. What is missing?"
+    explanation: "The browser's default action for a form submit is to navigate to the form's action URL, reloading the page. Call `e.preventDefault()` at the start of the handler. (In React 19 you can alternatively pass a function to the form's `action` prop.)"
+    theoryUrl: https://react.dev/learn/responding-to-events#preventing-default-behavior
+    options:
+      - { text: "`e.stopPropagation()` in `handleSubmit`", correct: false }
+      - { text: '`type="button"` on the submit button, so the form never fires', correct: false }
+      - { text: "`useEffect` to cancel the navigation after render", correct: false }
+      - { text: "`e.preventDefault()` in `handleSubmit`", correct: true }
+  - type: single
+    prompt: "Which pair of props correctly controls a checkbox and a textarea?"
+    explanation: "A checkbox is controlled with `checked` (a boolean) and `onChange`, because its `value` is just the submitted string. A `<textarea>` takes `value` and `onChange`, and in React you do not put the text as children. Mixing them up leaves the input uncontrolled."
+    theoryUrl: https://react.dev/reference/react-dom/components/input#controlling-an-input-with-a-state-variable
+    options:
+      - { text: "Checkbox `value={bool}`, textarea children as text", correct: false }
+      - { text: "Checkbox `checked={bool}`, textarea `value={text}`", correct: true }
+      - { text: "Checkbox `checked={bool}`, textarea children as text", correct: false }
+      - { text: "Checkbox `value={bool}`, textarea `value={text}`", correct: false }
+  - type: single
+    prompt: "A form has 12 text fields, each controlled. Which single handler removes the repetition?"
+    code: |
+      const [form, setForm] = useState({ name: '', email: '', city: '' })
+
+      function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
+        // ???
+      }
+      // <input name="email" value={form.email} onChange={handleChange} />
+    codeLanguage: tsx
+    explanation: "Using the input's `name` as a computed key updates the matching field and keeps the others: `setForm({ ...form, [e.target.name]: e.target.value })`. Writing `{ e.target.name: ... }` is a syntax error, and assigning to `form` mutates state without a re-render."
+    theoryUrl: https://react.dev/learn/updating-objects-in-state#using-a-single-event-handler-for-multiple-fields
+    options:
+      - { text: "`form[e.target.name] = e.target.value`", correct: false }
+      - { text: "`setForm({ ...form, [e.target.name]: e.target.value })`", correct: true }
+      - { text: "`setForm({ [e.target.name]: e.target.value })`", correct: false }
+      - { text: "`setForm({ ...form, e.target.name: e.target.value })`", correct: false }
+  - type: boolean
+    prompt: "In React, a `<select>` element's current option is set with a `value` prop on the `<select>` itself, not with `selected` on an `<option>`."
+    answer: true
+    explanation: "React deviates from HTML here: you pass `value` (and `onChange`) to `<select>`, and for `multiple` an array of values. Using `selected` on options is discouraged and triggers a warning."
+    theoryUrl: https://react.dev/reference/react-dom/components/select
+  - type: single
+    prompt: "A long signup form has 15 fields, validated only on submit, with no live preview. Re-rendering on every keystroke is noticeable. What is a reasonable approach?"
+    explanation: "When values are needed only at submit time, uncontrolled inputs with `defaultValue` and a read of `new FormData(e.currentTarget)` avoid state and renders altogether. Controlled inputs are the right choice when you need live validation, formatting or dependent fields."
+    theoryUrl: https://react.dev/reference/react-dom/components/input#reading-the-input-values-when-submitting-a-form
+    options:
+      - { text: "Uncontrolled inputs, reading all values with `FormData` on submit", correct: true }
+      - { text: "One `useState` per field and a `useEffect` that collects them", correct: false }
+      - {
+          text: "Controlled inputs, with `memo` around the whole form to stop re-renders",
+          correct: false,
+        }
+      - { text: "Keep values in a global store updated on every keystroke", correct: false }
+  - type: single
+    prompt: "A component stores `fullName` in state and also `firstName` and `lastName`, updating all three in the handlers. What is the best change?"
+    explanation: "`fullName` can be computed from the other two during render. Redundant state invites bugs, because forgetting to update one of them leaves the UI inconsistent. Derive: `const fullName = firstName + ' ' + lastName`."
+    theoryUrl: https://react.dev/learn/choosing-the-state-structure#avoid-redundant-state
+    options:
+      - { text: "Compute `fullName` during render, from `firstName` and `lastName`", correct: true }
+      - { text: "Keep it, but update it with `useEffect` when the others change", correct: false }
+      - { text: "Move all three into refs so they never get out of sync", correct: false }
+      - {
+          text: "Leave it; storing computed values in state is the recommended pattern",
+          correct: false,
+        }
+  - type: multi
+    prompt: Which of these values should live in `useState`? Select all that apply.
+    explanation: "State is for values that change over time and must trigger a re-render when they do: a controlled input's text and an open/closed flag. A timer id is bookkeeping with no visual effect (a ref), and a value computable from other state is derived and should not be stored."
+    theoryUrl: https://react.dev/learn/choosing-the-state-structure
+    options:
+      - { text: "The text typed in a controlled search input", correct: true }
+      - { text: "Whether a dropdown menu is open", correct: true }
+      - { text: "The id returned by `setInterval`, only used to clear it", correct: false }
+      - { text: "`items.filter(i => i.done).length`, derived from `items`", correct: false }
+  - type: boolean
+    prompt: "Calling `setUser({ ...user })` with an identical copy of the object does not cause a re-render, because the contents are equal."
+    answer: false
+    explanation: "React compares the new and old state with `Object.is`, a reference check, not a deep comparison. A new object, even with the same content, is a different value, so the component re-renders."
+    theoryUrl: https://react.dev/reference/react/useState#setstate
+  - type: single
+    prompt: "`Counter` keeps its own `useState` and is rendered by a parent next to other siblings. What re-renders when the button inside `Counter` is clicked?"
+    explanation: "A state update re-renders the component that owns the state and its descendants. The parent and the siblings are unaffected, so only `Counter` (and its children) render again. This is why moving state down limits re-renders."
+    theoryUrl: https://react.dev/learn/render-and-commit
+    options:
+      - { text: "`Counter` and its descendants only", correct: true }
+      - { text: "The whole tree from the root, as React always starts at the top", correct: false }
+      - { text: "`Counter` and its parent, because updates propagate upwards", correct: false }
+      - { text: "`Counter` and all its siblings", correct: false }

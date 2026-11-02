@@ -1,0 +1,357 @@
+version: 1
+title: "Architect Roadmap 33: Infrastructure as Code and CI/CD"
+description: Terraform versus CDK, state management, delivery pipelines, blue/green and canary releases, feature flags and rollback strategies.
+language: en
+tags: [architect-roadmap, infrastructure, iac, terraform, cicd]
+run:
+  questionsPerRun: 10
+  maxErrors: 3
+  timePerQuestionSec: 60
+questions:
+  - type: single
+    prompt: "A product team writes only TypeScript, runs exclusively on AWS and wants real loops, classes and unit-testable abstractions for its infrastructure. Which tool fits best?"
+    explanation: "AWS CDK lets you define infrastructure in a general-purpose language and synthesizes it to CloudFormation, so it fits an AWS-only TypeScript team. Terraform is a fine tool but its HCL has limited abstraction compared with real code. Pulumi is also valid, but CloudFormation YAML by hand is the one that gives up the abstractions the team asked for."
+    theoryUrl: https://docs.aws.amazon.com/cdk/v2/guide/home.html
+    options:
+      - { text: "Hand-written CloudFormation YAML templates", correct: false }
+      - { text: "AWS CDK, synthesizing to CloudFormation", correct: true }
+      - { text: "Terraform, because HCL is more expressive than TypeScript", correct: false }
+      - { text: "Shell scripts calling the AWS CLI", correct: false }
+  - type: single
+    prompt: "What does `cdk deploy` actually hand to AWS?"
+    explanation: "CDK synthesizes your constructs into a CloudFormation template (plus assets) and CloudFormation performs the deployment, so CDK inherits CloudFormation's stack model, limits and rollback behaviour. CDK does not call each service API directly, and it has no state file of its own to manage."
+    theoryUrl: https://docs.aws.amazon.com/cdk/v2/guide/constructs.html
+    options:
+      - { text: "A sequence of direct service API calls issued by the CDK CLI", correct: false }
+      - { text: "A Terraform plan that is applied through a hidden backend", correct: false }
+      - {
+          text: "A diff against a local state file kept in `cdk.out`, which the CLI then applies resource by resource",
+          correct: false,
+        }
+      - {
+          text: "A synthesized CloudFormation template that CloudFormation then deploys",
+          correct: true,
+        }
+  - type: single
+    prompt: "Your platform has to manage AWS accounts, Cloudflare DNS, Datadog monitors and a GitHub organisation from a single workflow. What is the strongest reason to choose Terraform here?"
+    explanation: "Terraform's provider ecosystem covers almost any API with one plan/apply workflow and one state model. CDK for CloudFormation is bound to resources CloudFormation can manage, which excludes most third-party SaaS. The language being more concise is irrelevant to the constraint."
+    theoryUrl: https://developer.hashicorp.com/terraform/language/providers
+    options:
+      - {
+          text: "One provider-based workflow can manage resources across many vendors",
+          correct: true,
+        }
+      - { text: "HCL compiles to CloudFormation, which supports every vendor", correct: false }
+      - { text: "Terraform needs no state when several providers are used", correct: false }
+      - {
+          text: "Terraform is the only infrastructure tool that has providers for both Cloudflare and Datadog",
+          correct: false,
+        }
+  - type: single
+    prompt: "What is the main job of the Terraform state file?"
+    explanation: "State maps each resource block in your configuration to the real object it created (its ID and attributes), so Terraform can compute a diff and know what to update or destroy. It is not a log of past runs, not a copy of your source code, and not a lock by itself."
+    theoryUrl: https://developer.hashicorp.com/terraform/language/state
+    options:
+      - { text: "A history of every apply, used to replay changes in order", correct: false }
+      - { text: "A cached copy of the configuration used to skip parsing", correct: false }
+      - {
+          text: "A mapping between declared resources and the real objects they manage",
+          correct: true,
+        }
+      - {
+          text: "A mutex that prevents two engineers from running plan and apply together on the same workspace",
+          correct: false,
+        }
+  - type: multi
+    prompt: "Why is committing `terraform.tfstate` to a Git repository a bad idea? Select all that apply."
+    explanation: "State can contain secrets in plaintext, Git offers no locking so two people can apply against the same state, and a merged or stale copy can make Terraform believe resources don't exist and recreate them. State size is not the issue, and Git can store the file fine."
+    theoryUrl: https://developer.hashicorp.com/terraform/language/state/remote
+    options:
+      - {
+          text: "It can expose secrets such as database passwords in plaintext history",
+          correct: true,
+        }
+      - { text: "Git cannot store JSON files larger than a few kilobytes", correct: false }
+      - {
+          text: "Git provides no state locking, so concurrent applies can corrupt it",
+          correct: true,
+        }
+      - {
+          text: "A stale or conflicting merge can make Terraform recreate or orphan resources",
+          correct: true,
+        }
+  - type: single
+    prompt: "Two CI jobs run `terraform apply` against the same S3-backed state at the same moment. What protects the state from being corrupted?"
+    explanation: "State locking (for the S3 backend, a lock via DynamoDB or the S3 native lock file depending on the version) makes the second run fail or wait until the first releases the lock. Versioning helps recovery but does not prevent concurrent writes, and encryption concerns confidentiality, not concurrency."
+    theoryUrl: https://developer.hashicorp.com/terraform/language/state/locking
+    options:
+      - { text: "S3 bucket versioning, which merges both writes automatically", correct: false }
+      - { text: "Server-side encryption of the state object", correct: false }
+      - { text: "The `-parallelism` flag, which serialises runs across machines", correct: false }
+      - { text: "The backend's state lock, which makes one run wait or fail", correct: true }
+  - type: single
+    prompt: "You rename a resource in the configuration and run `terraform plan`. What does the plan most likely show, and what is the right fix?"
+    code: |
+      # before
+      resource "aws_s3_bucket" "assets" {
+        bucket = "acme-assets-prod"
+      }
+
+      # after
+      resource "aws_s3_bucket" "static_assets" {
+        bucket = "acme-assets-prod"
+      }
+    codeLanguage: hcl
+    explanation: "Terraform tracks resources by address, so a new address looks like a destroy of the old one and a create of the new one. Adding a `moved` block (or `terraform state mv`) tells it the object is the same. Re-running apply or using `-refresh-only` would not change the address mapping."
+    theoryUrl: https://developer.hashicorp.com/terraform/language/modules/develop/refactoring
+    options:
+      - { text: "A no-op, because the bucket name is unchanged", correct: false }
+      - { text: "An in-place update; no action needed", correct: false }
+      - { text: "Destroy and create; fix it with a `moved` block", correct: true }
+      - { text: "An error about duplicate buckets; fix it with `-refresh-only`", correct: false }
+  - type: single
+    prompt: "Someone widened a security group in the AWS console by hand. Your Terraform code still declares the narrow rule. What does the next `terraform plan` do?"
+    explanation: "Plan refreshes real infrastructure, sees the drift against the configuration, and proposes changing the resource back to what the code declares. It does not adopt the console change into the code, and it does not ignore it. Pulling the manual change into code is a deliberate edit you make yourself."
+    theoryUrl: https://developer.hashicorp.com/terraform/cli/commands/plan
+    options:
+      - { text: "It silently updates the code to match the console", correct: false }
+      - {
+          text: "It ignores the change, because state still has the old rule and the cloud object is never re-read",
+          correct: false,
+        }
+      - { text: "It fails until you run `terraform import` on the group", correct: false }
+      - {
+          text: "It detects the drift and proposes reverting the group to the declared rule",
+          correct: true,
+        }
+  - type: boolean
+    prompt: "Marking a Terraform output or variable as `sensitive = true` keeps its value out of the state file."
+    answer: false
+    explanation: "`sensitive` only redacts the value from CLI output; the value is still stored in plaintext in the state file. That is why state must live in an encrypted backend with tight access control."
+    theoryUrl: https://developer.hashicorp.com/terraform/language/manage-sensitive-data
+  - type: single
+    prompt: "You need strong isolation between staging and production: different credentials, different blast radius, and the ability for staging engineers to never touch prod state. Which layout is the better fit?"
+    explanation: "Separate root modules or directories with their own backends and credentials give real isolation. Workspaces share the same backend and configuration, so a mistaken workspace selection or shared credentials can hit prod. Workspaces are fine for ephemeral copies of the same environment, not for a security boundary."
+    theoryUrl: https://developer.hashicorp.com/terraform/language/state/workspaces
+    options:
+      - { text: "One workspace per environment in a single shared backend", correct: false }
+      - {
+          text: "A single state file with `count` toggled by an environment variable",
+          correct: false,
+        }
+      - { text: "Separate root modules, each with its own backend and credentials", correct: true }
+      - {
+          text: "One workspace, with environments distinguished by resource name prefixes",
+          correct: false,
+        }
+  - type: single
+    prompt: "A team builds a Docker image separately in the staging pipeline and again in the production pipeline from the same commit. Production then behaves differently from staging. What principle was violated?"
+    explanation: "Build once and promote the same immutable artifact through environments, changing only configuration. Rebuilding can pull different dependency versions or base images, so what you tested is not what you shipped. Running more tests or adding approvals does not fix that."
+    theoryUrl: https://martinfowler.com/bliki/DeploymentPipeline.html
+    options:
+      - { text: "Pipelines should have manual approval before every stage", correct: false }
+      - {
+          text: "Build once and promote the same artifact through every environment",
+          correct: true,
+        }
+      - {
+          text: "Production should be built from a different branch than staging, so each environment has its own code",
+          correct: false,
+        }
+      - { text: "Images should be rebuilt per environment to bake in secrets", correct: false }
+  - type: single
+    prompt: "This GitHub Actions job deploys to AWS without any stored access keys. What is the purpose of `id-token: write`?"
+    code: |
+      permissions:
+        id-token: write
+        contents: read
+      jobs:
+        deploy:
+          runs-on: ubuntu-latest
+          steps:
+            - uses: aws-actions/configure-aws-credentials@v4
+              with:
+                role-to-assume: arn:aws:iam::123456789012:role/deploy
+                aws-region: eu-west-1
+            - run: npx cdk deploy --require-approval never
+    codeLanguage: yaml
+    explanation: "It lets the job request a short-lived OIDC token from GitHub, which AWS exchanges for temporary credentials by trusting the identity provider on the role. That removes long-lived keys from repository secrets. It does not grant write access to the repo or to AWS by itself."
+    theoryUrl: https://docs.github.com/en/actions/concepts/security/openid-connect
+    options:
+      - { text: "It allows the job to push an image tag to the repository", correct: false }
+      - {
+          text: "It lets the job request an OIDC token, exchanged for temporary AWS credentials",
+          correct: true,
+        }
+      - {
+          text: "It stores the AWS access key in the runner's identity file so later steps can sign requests with it",
+          correct: false,
+        }
+      - { text: "It gives the job administrator rights in the AWS account", correct: false }
+  - type: single
+    prompt: "Your pipeline runs `terraform plan` on pull requests and `terraform apply` after merge. A reviewer approved a plan, but the apply after merge changed different resources. Which practice closes this gap?"
+    explanation: "Save the reviewed plan with `-out` and apply exactly that file, or re-plan and require approval of the new diff before apply. Otherwise the world (or main) can change between review and apply. Running apply with `-auto-approve` makes the gap worse, and locking only prevents concurrent runs."
+    theoryUrl: https://developer.hashicorp.com/terraform/cli/commands/plan
+    options:
+      - { text: "Add `-auto-approve` so the apply cannot wait on a stale review", correct: false }
+      - { text: "Apply the saved plan file produced by the approved run", correct: true }
+      - { text: "Increase the state lock timeout so applies queue longer", correct: false }
+      - { text: "Run `terraform refresh` before every merge", correct: false }
+  - type: single
+    prompt: "You use blue/green deployment and the new release includes a database migration that drops a column the old version still reads. What goes wrong, and what is the standard remedy?"
+    explanation: "Both versions share the database, so a destructive migration breaks the old environment and removes your instant rollback. Use expand/contract (parallel change): add new schema compatibly first, ship code, and drop old columns only in a later release. Having two databases would break data consistency."
+    theoryUrl: https://martinfowler.com/bliki/ParallelChange.html
+    options:
+      - {
+          text: "Nothing, because blue and green environments always have separate databases that migrate independently",
+          correct: false,
+        }
+      - {
+          text: "The old version breaks; use backwards-compatible expand/contract migrations",
+          correct: true,
+        }
+      - { text: "The load balancer fails; add a second load balancer", correct: false }
+      - { text: "Only DNS caching is affected; lower the TTL before the switch", correct: false }
+  - type: single
+    prompt: "After switching all traffic to green, error rates spike. Why is rollback typically fastest in a blue/green setup?"
+    explanation: "The previous (blue) environment is still running and untouched, so rollback is just pointing the router back at it, with no rebuild or redeploy. The cost is running two full environments for a while. It is not faster because of fewer users affected; that describes a canary."
+    theoryUrl: https://martinfowler.com/bliki/BlueGreenDeployment.html
+    options:
+      - { text: "Only a small slice of users saw green, so it can be dropped", correct: false }
+      - {
+          text: "Green automatically reverts itself when error rates exceed a threshold",
+          correct: false,
+        }
+      - {
+          text: "The old environment is still running, so you only switch traffic back",
+          correct: true,
+        }
+      - { text: "The previous build is recompiled from Git in a few seconds", correct: false }
+  - type: single
+    prompt: "A payments API serves 2,000 requests per second. You want to ship a risky change with the smallest possible user impact and automatic abort. Which strategy fits?"
+    explanation: "A canary exposes the new version to a small percentage of traffic and compares health metrics to the baseline, aborting automatically on regression. Blue/green flips everyone at once, so impact is total if the signal is late. A big-bang rolling update without analysis offers no early abort."
+    theoryUrl: https://martinfowler.com/bliki/CanaryRelease.html
+    options:
+      - { text: "Blue/green with an instant switch of 100% of traffic", correct: false }
+      - { text: "Recreate strategy: stop the old version, then start the new one", correct: false }
+      - { text: "Canary at 1-5% with automated analysis against baseline metrics", correct: true }
+      - { text: "Deploy to all instances at once and watch dashboards manually", correct: false }
+  - type: single
+    prompt: "An internal service receives about 10 requests per minute. You configure a 1% canary and promote automatically after 5 minutes with no errors. What is the flaw?"
+    explanation: "At that volume a 1% canary may see zero requests in 5 minutes, so the absence of errors proves nothing. For low-traffic services use synthetic traffic, larger percentages, or longer bake times. The other options describe problems that do not follow from the numbers."
+    theoryUrl: https://sre.google/workbook/canarying-releases/
+    options:
+      - { text: "Canaries cannot be used on internal services", correct: false }
+      - {
+          text: "Zero errors is impossible at that volume, so the promotion will never happen automatically",
+          correct: false,
+        }
+      - { text: "Percentages below 5% are rejected by every load balancer", correct: false }
+      - {
+          text: "The canary receives too little traffic to produce a meaningful signal",
+          correct: true,
+        }
+  - type: multi
+    prompt: "Which of these are real benefits of putting a new feature behind a feature flag? Select all that apply."
+    explanation: "Flags decouple deployment from release, allow gradual or targeted rollout, and give a kill switch without redeploying. They do not remove the need to test both code paths, and they do not make the code simpler; each flag adds branches."
+    theoryUrl: https://martinfowler.com/articles/feature-toggles.html
+    options:
+      - { text: "Code can be deployed dark and released later by flipping the flag", correct: true }
+      - { text: "Only one code path ever needs to be tested", correct: false }
+      - { text: "A misbehaving feature can be turned off without a redeploy", correct: true }
+      - { text: "Rollout can be limited to a percentage or segment of users", correct: true }
+  - type: single
+    prompt: "A release toggle for a feature that has been 100% on for eight months is still in the code, and nobody remembers what happens if it is turned off. What is the architectural problem?"
+    explanation: "Release toggles are meant to be short-lived; leftover flags multiply the combinations to test, hide dead code and can cause incidents when someone flips them. The fix is to remove the flag and the dead branch once the rollout is done. Flags are not inherently a security risk, and the name of the flag is not the issue."
+    theoryUrl: https://martinfowler.com/articles/feature-toggles.html
+    options:
+      - { text: "Flags are evaluated on the client, so they leak the feature", correct: false }
+      - {
+          text: "Flag state should be stored in the database rather than in a service",
+          correct: false,
+        }
+      - { text: "Long-lived release toggles add untested paths and technical debt", correct: true }
+      - { text: "The flag should have been implemented as an environment variable", correct: false }
+  - type: single
+    prompt: 'The team says the kill switch for `newCheckout` "doesn''t work": flipping it in the flag dashboard changes nothing until the next deploy. What is the most likely cause?'
+    code: |
+      import { flags } from './flag-client'
+
+      // evaluated once when the module is first loaded
+      const useNewCheckout = flags.isEnabled('newCheckout')
+
+      export function checkout(cart: Cart) {
+        return useNewCheckout ? newCheckout(cart) : legacyCheckout(cart)
+      }
+    codeLanguage: typescript
+    explanation: "The flag is read once at module load, so the value is frozen for the lifetime of the process. A kill switch must be evaluated per request (or on a short refresh) inside the handler. The ternary itself and the import are fine."
+    theoryUrl: https://martinfowler.com/articles/feature-toggles.html
+    options:
+      - { text: "The flag is evaluated at module load time and never re-read", correct: true }
+      - { text: "The ternary operator cannot branch on a boolean constant", correct: false }
+      - { text: "The legacy path must be deleted before the flag can work", correct: false }
+      - { text: "Flag clients only work inside React components", correct: false }
+  - type: single
+    prompt: "A release dropped a table column in a migration, then the app release was found faulty. The team redeploys the previous app version and it crashes. What does this show about rollback?"
+    explanation: "Rolling back code does not roll back data or schema: the old version expects the column that is gone. Safe rollback needs migrations that stay compatible with the previous version, which is why destructive changes are deferred. Artifacts being immutable does not help when the data changed."
+    theoryUrl: https://martinfowler.com/bliki/ParallelChange.html
+    options:
+      - { text: "The previous artifact was corrupted by the new deployment", correct: false }
+      - {
+          text: "Application rollback is only possible with blue/green deployments",
+          correct: false,
+        }
+      - { text: "Code rollback is unsafe when the schema moved ahead incompatibly", correct: true }
+      - { text: "Container registries delete the previous tag after a deploy", correct: false }
+  - type: single
+    prompt: "A bad change is in production and the fix is a one-line revert, but the full pipeline takes 40 minutes. The previous artifact is available. What is the usual first move?"
+    explanation: "Restore service first: redeploy or re-point to the last known-good artifact (or flip a flag), then fix forward with calm. Waiting 40 minutes for the revert pipeline extends the outage. Rolling forward is right only when the fix is fast and safe, and skipping tests in the pipeline is the riskier habit."
+    theoryUrl: https://sre.google/sre-book/effective-troubleshooting/
+    options:
+      - { text: "Push the revert commit and wait for the full pipeline", correct: false }
+      - { text: "Disable the test stage permanently to speed up future fixes", correct: false }
+      - { text: "Redeploy the last known-good artifact now, then fix forward", correct: true }
+      - { text: "Keep the faulty version until the root cause is fully understood", correct: false }
+  - type: single
+    prompt: "What does `create_before_destroy` change for this resource when a replacement is needed?"
+    code: |
+      resource "aws_launch_template" "web" {
+        name_prefix   = "web-"
+        image_id      = var.ami_id
+        instance_type = "t3.medium"
+
+        lifecycle {
+          create_before_destroy = true
+        }
+      }
+    codeLanguage: hcl
+    explanation: "By default Terraform destroys the old object and then creates the new one. With `create_before_destroy` it creates the replacement first and removes the old one afterwards, which avoids downtime when dependents need something to point to. It does not skip replacement and does not protect against destroy; that is `prevent_destroy`."
+    theoryUrl: https://developer.hashicorp.com/terraform/language/meta-arguments/lifecycle
+    options:
+      - { text: "It blocks any plan that would destroy the resource", correct: false }
+      - {
+          text: "It creates the replacement first and destroys the old one afterwards",
+          correct: true,
+        }
+      - { text: "It turns every replacement into an in-place update", correct: false }
+      - { text: "It snapshots the old resource before it is destroyed", correct: false }
+  - type: boolean
+    prompt: "If a CloudFormation stack update fails, CloudFormation by default rolls the stack back to its last known-good state."
+    answer: true
+    explanation: "On a failed update CloudFormation automatically reverts to the previous template and parameters, ending in UPDATE_ROLLBACK_COMPLETE, unless you disable rollback for debugging. This is a safety net for infrastructure, not for data changes your application made."
+    theoryUrl: https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/using-cfn-rollback-triggers.html
+  - type: single
+    prompt: "You run `cdk diff` in the pipeline before deploy. What is its role?"
+    explanation: "`cdk diff` compares the synthesized template with the deployed stack and shows what would change, including IAM and security-group changes, so a reviewer can catch destructive or risky changes before deployment. It deploys nothing and is not a drift detector for manual console edits."
+    theoryUrl: https://docs.aws.amazon.com/cdk/v2/guide/cli.html
+    options:
+      - { text: "It detects and repairs manual changes made in the console", correct: false }
+      - {
+          text: "It shows the changes a deploy would make, for review before applying",
+          correct: true,
+        }
+      - {
+          text: "It deploys only the resources that changed since the last run, skipping unchanged stacks",
+          correct: false,
+        }
+      - { text: "It rolls the stack back to the previous version", correct: false }

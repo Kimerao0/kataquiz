@@ -1,0 +1,471 @@
+version: 1
+title: "Architect Roadmap 12: State architecture"
+description: Server state vs client state, when to use Context, Zustand, Redux or TanStack Query, state colocation, the URL as source of truth and data normalisation.
+language: en
+tags: [architect-roadmap, frontend-architecture, state-management, tanstack-query, redux, zustand]
+run:
+  questionsPerRun: 10
+  maxErrors: 3
+  timePerQuestionSec: 60
+questions:
+  - type: single
+    prompt: "What best distinguishes server state from client state in a frontend app?"
+    explanation: "Server state lives on a remote system: the client holds a cached copy that is fetched asynchronously, can become stale and be changed by others, so it needs caching, refetching and invalidation. Client state (a modal being open, a draft) is owned by the UI, is synchronous and always up to date. The split is about ownership, not about which library stores it."
+    theoryUrl: https://tanstack.com/query/latest/docs/framework/react/overview
+    options:
+      - {
+          text: "Server state is anything stored in `localStorage`, client state is anything in memory",
+          correct: false,
+        }
+      - {
+          text: "Server state is owned remotely and can be stale, client state is owned by the UI",
+          correct: true,
+        }
+      - {
+          text: "Server state is state that is rendered on the server, client state is rendered in the browser",
+          correct: false,
+        }
+      - { text: "Server state is immutable, client state is mutable", correct: false }
+  - type: multi
+    prompt: "A dashboard loads data with `useEffect` + `fetch` + `useState` in many components. Which problems does a server-state library such as TanStack Query solve out of the box? Select all that apply."
+    explanation: "TanStack Query deduplicates identical in-flight requests, caches results by key, refetches stale data in the background (on focus, reconnect, mount) and retries failures. It does not make the backend faster or manage purely local UI state like an open dropdown."
+    theoryUrl: https://tanstack.com/query/latest/docs/framework/react/guides/important-defaults
+    options:
+      - { text: "De-duplicating identical requests made by different components", correct: true }
+      - { text: "Caching responses and revalidating them in the background", correct: true }
+      - { text: "Managing whether a sidebar is open or closed", correct: false }
+      - { text: "Retrying failed requests with backoff", correct: true }
+  - type: single
+    prompt: "With the default TanStack Query v5 options, a component mounts with `useQuery({ queryKey: ['user', 1], queryFn })` and the same key is already cached from 5 minutes ago (the previous component unmounted 2 minutes ago). What happens?"
+    explanation: "Default `staleTime` is 0, so cached data is immediately considered stale: the cached value is shown right away and a background refetch starts. `gcTime` (5 minutes by default) controls how long an unused cache entry is kept, and the entry is still there after 2 minutes. So the user sees cached data with no loading state, followed by fresh data."
+    theoryUrl: https://tanstack.com/query/latest/docs/framework/react/guides/important-defaults
+    options:
+      - {
+          text: "It shows a loading state and fetches again, because the previous component unmounted",
+          correct: false,
+        }
+      - {
+          text: "It shows the cached data and does nothing else, as the entry is still in the cache",
+          correct: false,
+        }
+      - {
+          text: "It shows an error, since two mounts of the same key are not allowed",
+          correct: false,
+        }
+      - {
+          text: "It shows the cached data right away and refetches in the background, as it is stale",
+          correct: true,
+        }
+  - type: single
+    prompt: "What is the difference between `staleTime` and `gcTime` in TanStack Query v5?"
+    explanation: "`staleTime` is how long fetched data is considered fresh (no refetch on mount or focus within that window). `gcTime` is how long an inactive query (no observers) stays in the cache before garbage collection. They are independent: you can have long `gcTime` and `staleTime: 0`, as in the defaults."
+    theoryUrl: https://tanstack.com/query/latest/docs/framework/react/guides/caching
+    options:
+      - {
+          text: "`staleTime` is how long data counts as fresh, `gcTime` is how long unused data stays cached",
+          correct: true,
+        }
+      - {
+          text: "`staleTime` is the request timeout, `gcTime` is the maximum number of retries",
+          correct: false,
+        }
+      - {
+          text: "They are aliases, and `gcTime` is the new name of `staleTime` in v5",
+          correct: false,
+        }
+      - {
+          text: "`staleTime` deletes data from the cache, `gcTime` marks it as stale",
+          correct: false,
+        }
+  - type: single
+    prompt: "The list does not update when the user changes the filter. What is the bug?"
+    code: |
+      function Todos({ filter }: { filter: 'all' | 'open' | 'done' }) {
+        const { data } = useQuery({
+          queryKey: ['todos'],
+          queryFn: () => fetchTodos(filter),
+        })
+        return <TodoList todos={data ?? []} />
+      }
+    codeLanguage: tsx
+    explanation: "The query key identifies the cache entry, and every variable used by `queryFn` must be part of it. With `['todos']` all filters share one entry, so changing `filter` does not trigger a new fetch. The key should be `['todos', filter]`, so that each filter gets its own cache entry and refetch."
+    theoryUrl: https://tanstack.com/query/latest/docs/framework/react/guides/query-keys
+    options:
+      - { text: "The `queryFn` must be async, otherwise the filter is ignored", correct: false }
+      - {
+          text: "`data` should be copied into a `useState`, so that the list re-renders on filter change",
+          correct: false,
+        }
+      - { text: "The key lacks `filter`, so all filters share the same cache entry", correct: true }
+      - {
+          text: "`useQuery` cannot depend on props, and it must be moved into the parent component",
+          correct: false,
+        }
+  - type: single
+    prompt: "After a successful `createTodo` mutation, the list on screen must show the new item without a manual reload. What is the standard approach?"
+    explanation: "Calling `queryClient.invalidateQueries({ queryKey: ['todos'] })` in the mutation's `onSuccess` marks the matching queries stale and refetches the active ones, so the server stays the source of truth. Manually pushing into `useState` duplicates the server data, and polling every second is wasteful and still laggy."
+    theoryUrl: https://tanstack.com/query/latest/docs/framework/react/guides/invalidations-from-mutations
+    options:
+      - {
+          text: "Poll the list endpoint every second for as long as the page is open",
+          correct: false,
+        }
+      - {
+          text: "Reload the whole page with `window.location.reload()` after the mutation",
+          correct: false,
+        }
+      - {
+          text: "Invalidate the `todos` queries in `onSuccess`, so they refetch from the server",
+          correct: true,
+        }
+      - { text: "Push the returned item into a local `useState` copy of the list", correct: false }
+  - type: single
+    prompt: "A `LikeButton` must feel instant, but the server call takes about 800 ms and can fail. Which approach gives the best experience while staying correct?"
+    explanation: "Optimistic update: show the new state immediately, send the request, and roll back (or refetch) on error. In React 19 `useOptimistic` does this for an action, and TanStack Query offers `onMutate`/`onError` or the `variables` of the pending mutation. Waiting for the response feels slow, and ignoring errors leaves a wrong UI."
+    theoryUrl: https://react.dev/reference/react/useOptimistic
+    options:
+      - {
+          text: "Show the new state immediately, then roll back to the server value if the request fails",
+          correct: true,
+        }
+      - {
+          text: "Show a spinner for 800 ms, because the UI must never show something unconfirmed",
+          correct: false,
+        }
+      - {
+          text: "Update the UI and ignore the response, since likes are not critical data",
+          correct: false,
+        }
+      - {
+          text: "Disable the button for good after the first click, so the like never needs undoing",
+          correct: false,
+        }
+  - type: boolean
+    prompt: "Copying the result of `useQuery` into `useState` (for example in a `useEffect`) so that the component can edit it is a good way to keep the data in sync with the server."
+    answer: false
+    explanation: "The copy is a second source of truth that stops following the cache: later refetches, invalidations and updates from other components never reach it. Derive from the query data, or keep only the user's edits in state (a draft) and merge them at render time."
+    theoryUrl: https://react.dev/learn/you-might-not-need-an-effect
+  - type: single
+    prompt: "An app has a theme (light/dark), the logged-in user and the interface language. All are read by dozens of components and change rarely. What is the most proportionate tool?"
+    explanation: "React Context is a good fit for low-frequency values that many components read: the re-render cost of a change is paid rarely. A store like Redux would work but adds more machinery than needed. Server-state libraries are for remote data, and prop drilling through dozens of components is the problem being avoided."
+    theoryUrl: https://react.dev/learn/passing-data-deeply-with-context
+    options:
+      - { text: "React Context, since the values are read widely and change rarely", correct: true }
+      - {
+          text: "TanStack Query, because every global value should be cached under a key",
+          correct: false,
+        }
+      - {
+          text: "Props passed through every component, as explicit data flow is always best",
+          correct: false,
+        }
+      - {
+          text: "Redux with time-travel debugging, because anything global requires a store",
+          correct: false,
+        }
+  - type: single
+    prompt: "A trading screen has a price ticker that updates 30 times per second. About 10 components show different parts of it. Context with a single object value makes the whole screen laggy. Which change fixes the cause?"
+    explanation: "Context has no selectors: when its value changes, every consumer re-renders, including those that read an unchanged field. A store with selector-based subscriptions (Zustand, Redux, `useSyncExternalStore`) re-renders a component only when the slice it selects changes. Bigger `memo` or `useMemo` wrappers do not stop context-triggered renders."
+    theoryUrl: https://zustand.docs.pmnd.rs/learn/getting-started/introduction
+    options:
+      - {
+          text: "Store the ticker in an external store and let each component subscribe with a selector",
+          correct: true,
+        }
+      - {
+          text: "Wrap each consumer in `React.memo`, so that it ignores context changes",
+          correct: false,
+        }
+      - {
+          text: "Throttle the provider's `useState` to one update per frame with `setTimeout`",
+          correct: false,
+        }
+      - {
+          text: "Add one more Context provider per component, each with the full ticker object",
+          correct: false,
+        }
+  - type: single
+    prompt: "Which component re-renders only when `bears` changes in this Zustand store?"
+    code: |
+      const useStore = create<{ bears: number; fish: number }>(() => ({ bears: 0, fish: 0 }))
+
+      function A() {
+        const bears = useStore((s) => s.bears)
+        return <p>{bears}</p>
+      }
+
+      function B() {
+        const state = useStore()
+        return <p>{state.bears}</p>
+      }
+    codeLanguage: tsx
+    explanation: "A subscribes through a selector, so it re-renders only when the selected value (`bears`) changes. B calls `useStore()` without a selector, which subscribes to the whole state: it also re-renders when `fish` changes. Selecting the smallest slice you need is the main performance habit with Zustand."
+    theoryUrl: https://zustand.docs.pmnd.rs/learn/getting-started/introduction
+    options:
+      - {
+          text: "Only B, because it reads the whole state and so sees every change",
+          correct: false,
+        }
+      - {
+          text: "Both re-render only when `bears` changes, as the store tracks which fields are read",
+          correct: false,
+        }
+      - {
+          text: "Neither, because Zustand state is not reactive without a provider",
+          correct: false,
+        }
+      - {
+          text: "Only A, because B subscribes to the whole state and also re-renders on `fish`",
+          correct: true,
+        }
+  - type: single
+    prompt: "A 25-person team builds a large app with complex client-side workflows (undo, multi-step wizards, cross-feature events). Which reason most strongly justifies Redux Toolkit over Zustand here?"
+    explanation: "Redux's strengths are predictable state transitions through actions and reducers, strong conventions for big teams, middleware (listeners, sagas) and devtools with action history and time travel. Zustand is lighter and often enough, but it leaves structure up to you. Redux is not faster, and it is not required for server state."
+    theoryUrl: https://redux-toolkit.js.org/introduction/why-rtk-is-redux-today
+    options:
+      - {
+          text: "Redux is faster than any other store, since it avoids all re-renders",
+          correct: false,
+        }
+      - { text: "Zustand cannot be used with TypeScript or with React 19", correct: false }
+      - {
+          text: "Explicit actions, enforced structure, middleware and devtools help a large team reason about changes",
+          correct: true,
+        }
+      - {
+          text: "Redux is the only way to cache server data, which every large app has",
+          correct: false,
+        }
+  - type: boolean
+    prompt: "In Redux Toolkit's `createSlice`, writing `state.items.push(item)` inside a reducer is allowed, because Immer turns it into an immutable update."
+    answer: true
+    explanation: "RTK reducers run on an Immer draft: mutating syntax is translated into a new immutable state. The same code would be a bug in a plain Redux reducer or in React `useState`, where you must create new arrays and objects."
+    theoryUrl: https://redux-toolkit.js.org/api/createSlice
+  - type: single
+    prompt: "What does this script print?"
+    code: |
+      const items = ['a']
+      const before = items
+      items.push('b')
+      console.log(before === items, items.length)
+
+      const next = [...items, 'c']
+      console.log(next === items, next.length, items.length)
+    codeLanguage: javascript
+    explanation: "`push` mutates the array in place, so the reference is the same: `true 2`. The spread creates a new array: different reference, length 3, and the original stays at 2. This is why `setItems(items)` after a `push` does not re-render in React: `useState` compares references and sees no change."
+    theoryUrl: https://react.dev/learn/updating-arrays-in-state
+    options:
+      - { text: "false 2, then true 3 2", correct: false }
+      - { text: "true 2, then false 3 3", correct: false }
+      - { text: "true 2, then false 3 2", correct: true }
+      - { text: "false 2, then false 3 2", correct: false }
+  - type: single
+    prompt: "A modal's `isOpen` flag is kept in a global Redux store, but only one component and its children ever read it. What principle does that violate, and what is the fix?"
+    explanation: "State colocation: keep state as close as possible to where it is used and lift it only when other components need it. A modal flag read by one subtree belongs in a local `useState`. Global state is harder to trace and test, and it persists after the component is gone."
+    theoryUrl: https://react.dev/learn/sharing-state-between-components
+    options:
+      - {
+          text: "Immutability, and the fix is to freeze the store object with `Object.freeze`",
+          correct: false,
+        }
+      - {
+          text: "Single responsibility, and the fix is to split the Redux store into two stores",
+          correct: false,
+        }
+      - {
+          text: "State colocation, and the fix is a local `useState` in the component that owns the modal",
+          correct: true,
+        }
+      - {
+          text: "Separation of server and client state, and the fix is to move it into TanStack Query",
+          correct: false,
+        }
+  - type: multi
+    prompt: "A product catalogue page has filters, sorting and pagination. Which benefits does keeping them in the URL search params give? Select all that apply."
+    explanation: "The URL makes the view shareable and bookmarkable, restores it on reload, and integrates with the browser's back and forward buttons. It also lets a Server Component read the params to fetch the right data. It does not make requests faster: keeping the data fresh is the job of caching."
+    theoryUrl: https://nextjs.org/docs/app/api-reference/functions/use-search-params
+    options:
+      - { text: "The filtered view can be shared or bookmarked as a link", correct: true }
+      - {
+          text: "The state survives a page reload and the back button works as expected",
+          correct: true,
+        }
+      - { text: "The API responses are cached faster by the browser", correct: false }
+      - {
+          text: "A Server Component can read the params and fetch the matching data",
+          correct: true,
+        }
+  - type: single
+    prompt: "A search box updates the URL (`?q=`) on every keystroke with `router.push`. Users complain that the back button needs many clicks to leave the page. What is the best fix?"
+    explanation: "Each `push` adds a history entry. For transient refinements like typing, update the URL with `replace` (no new entries) and debounce the updates so you do not navigate on every key. Moving the query out of the URL loses its benefits, and disabling the back button breaks the browser's navigation."
+    theoryUrl: https://nextjs.org/docs/app/api-reference/functions/use-router
+    options:
+      - {
+          text: "Use `router.replace` and debounce the input, so that typing does not fill the history",
+          correct: true,
+        }
+      - {
+          text: "Move the query to Zustand, since the URL is not meant for user input",
+          correct: false,
+        }
+      - {
+          text: "Intercept the `popstate` event and call `history.go(-10)` to skip the entries",
+          correct: false,
+        }
+      - {
+          text: "Keep `router.push`, and add a warning that the back button works as designed",
+          correct: false,
+        }
+  - type: single
+    prompt: "Which piece of state should NOT go into the URL?"
+    explanation: "The URL is for state that identifies a shareable view: filters, sort, page, selected tab, an open item id. Ephemeral interaction state like which row is hovered, a tooltip, or an unsent draft in a text box is meaningless to a recipient and would pollute history, so it stays in local state."
+    theoryUrl: https://nextjs.org/docs/app/api-reference/functions/use-search-params
+    options:
+      - { text: "The selected sort column and its direction", correct: false }
+      - { text: "The currently hovered table row", correct: true }
+      - { text: "The current page number of a paginated list", correct: false }
+      - { text: "The active tab of a settings page", correct: false }
+  - type: single
+    prompt: "What is wrong with the way `fullName` is handled here?"
+    code: |
+      function Profile({ first, last }: { first: string; last: string }) {
+        const [fullName, setFullName] = useState(`${first} ${last}`)
+
+        useEffect(() => {
+          setFullName(`${first} ${last}`)
+        }, [first, last])
+
+        return <h1>{fullName}</h1>
+      }
+    codeLanguage: tsx
+    explanation: "`fullName` is derived from props, so it should not be state: compute it during render (`const fullName = `${first} ${last}``). The effect version renders once with the stale value and then again after the update, and adds a second source of truth to keep in sync."
+    theoryUrl: https://react.dev/learn/choosing-the-state-structure#avoid-redundant-state
+    options:
+      - {
+          text: "Nothing, since using an effect to sync derived values is the recommended pattern",
+          correct: false,
+        }
+      - {
+          text: "`useEffect` should run on every render, so the dependency array must be removed",
+          correct: false,
+        }
+      - {
+          text: "`fullName` is derived data, so compute it while rendering instead of storing it",
+          correct: true,
+        }
+      - {
+          text: "`useState` must be replaced by `useRef`, because the value does not trigger renders",
+          correct: false,
+        }
+  - type: single
+    prompt: "A feed has posts that each embed their `author` object. When a user renames themselves, five different places in the cache show the old name. Which data shape prevents this class of bug?"
+    explanation: "Normalisation stores each entity once, indexed by id (`users[9]`), and relationships are references (`authorId: 9`). One update to the entity is then visible everywhere, with no copy to forget. Deeply nested copies duplicate the same fact in many places, so updates need to find every one of them."
+    theoryUrl: https://redux.js.org/usage/structuring-reducers/normalizing-state-shape
+    options:
+      - { text: "Entities stored once by id, with posts referencing `authorId`", correct: true }
+      - {
+          text: "A flat array of posts, each holding a full copy of its author for speed",
+          correct: false,
+        }
+      - {
+          text: "Deeper nesting, with posts inside authors and comments inside posts",
+          correct: false,
+        }
+      - { text: "A `JSON.stringify` of the whole feed, compared on every render", correct: false }
+  - type: single
+    prompt: "What does this script print, and what does it show about the two shapes?"
+    code: |
+      const posts = [
+        { id: 1, title: 'A', author: { id: 9, name: 'Ann' } },
+        { id: 2, title: 'B', author: { id: 9, name: 'Ann' } },
+      ]
+
+      const nested = posts.map((p) =>
+        p.id === 1 ? { ...p, author: { ...p.author, name: 'Anna' } } : p,
+      )
+      console.log(nested.map((p) => p.author.name).join(','))
+
+      const state = {
+        posts: { 1: { id: 1, authorId: 9 }, 2: { id: 2, authorId: 9 } },
+        users: { 9: { name: 'Ann' } },
+      }
+      const next = { ...state, users: { ...state.users, 9: { name: 'Anna' } } }
+      console.log(Object.values(next.posts).map((p) => next.users[p.authorId].name).join(','))
+    codeLanguage: javascript
+    explanation: "In the nested shape, the update touched the author copy inside post 1 only, so the two posts disagree (`Anna,Ann`). In the normalised shape a single write to `users[9]` is visible through every reference, giving `Anna,Anna`. This is the consistency benefit of normalisation."
+    theoryUrl: https://redux.js.org/usage/structuring-reducers/normalizing-state-shape
+    options:
+      - { text: "Anna,Anna then Anna,Anna", correct: false }
+      - { text: "Anna,Ann then Anna,Ann", correct: false }
+      - { text: "Anna,Ann then Anna,Anna", correct: true }
+      - { text: "Ann,Ann then Anna,Anna", correct: false }
+  - type: single
+    prompt: "TanStack Query stores each response under its own query key and does not normalise entities. A mutation renames user 9, who appears in the `['posts']`, `['post', 1]` and `['users']` caches. What is the standard way to keep the screens consistent?"
+    explanation: "The usual approach is to invalidate every affected key (or use `setQueryData` for the ones you can update precisely) and let the queries refetch. Full normalised caches exist in GraphQL clients like Apollo, but adding that to a REST app is a big step. Hoping that the screens eventually refetch leaves stale names on screen."
+    theoryUrl: https://tanstack.com/query/latest/docs/framework/react/guides/invalidations-from-mutations
+    options:
+      - {
+          text: "Nothing, since TanStack Query merges entities with the same id automatically",
+          correct: false,
+        }
+      - {
+          text: "Invalidate (or update with `setQueryData`) every affected query key after the mutation",
+          correct: true,
+        }
+      - {
+          text: "Store all server data in a single query with the key `['app']`, so that it is always consistent",
+          correct: false,
+        }
+      - { text: "Disable the cache with `gcTime: 0`, so that nothing can be stale", correct: false }
+  - type: single
+    prompt: "A data-fetching component tracks its state with three booleans, and bugs appear where `isLoading` and `isError` are both true. Which TypeScript design removes that class of bug?"
+    code: |
+      const [isLoading, setIsLoading] = useState(false)
+      const [isError, setIsError] = useState(false)
+      const [data, setData] = useState<Order | null>(null)
+    codeLanguage: tsx
+    explanation: "Model the states as a discriminated union (`idle | loading | error | success`) held by `useReducer` or `useState`, so impossible combinations cannot be represented and TypeScript narrows `data` only in the success case. Independent booleans allow 2 x 2 x 2 combinations, most of them invalid."
+    theoryUrl: https://react.dev/learn/choosing-the-state-structure#avoid-contradictions-in-state
+    options:
+      - {
+          text: "Add more booleans such as `isIdle` and `isSuccess`, so every case has a flag",
+          correct: false,
+        }
+      - {
+          text: "A discriminated union of states, such as `{ status: 'error'; error: Error }`",
+          correct: true,
+        }
+      - {
+          text: "Use `any` for the state, so that TypeScript stops complaining about combinations",
+          correct: false,
+        }
+      - {
+          text: "Store the flags in `localStorage`, so they cannot become inconsistent",
+          correct: false,
+        }
+  - type: boolean
+    prompt: "In a Next.js App Router app, fetching data in Server Components usually reduces the amount of server state that has to be managed on the client."
+    answer: true
+    explanation: "Server Components fetch on the server and send rendered output, so many pages need no client cache, loading state or fetch effect at all. You still need client state libraries for interactive data that changes in the browser (polling, infinite scroll, mutations with optimistic UI), but the share of server state in client code shrinks."
+    theoryUrl: https://react.dev/reference/rsc/server-components
+  - type: single
+    prompt: "An e-commerce app has: the product catalogue, the cart (kept across sessions, edited often), the search filters of the listing page and a multi-step checkout form. Which mapping of state to tool is the best fit?"
+    explanation: "Each kind of state gets the tool that matches its nature: the catalogue is server state (Server Components or a query cache), the cart is client state shared across pages (a small store with persistence), filters belong in the URL so the view can be shared, and the checkout draft is local form state. Putting everything in one Redux store hides these differences and re-creates a cache by hand."
+    theoryUrl: https://tanstack.com/query/latest/docs/framework/react/overview
+    options:
+      - {
+          text: "Catalogue in a query cache or Server Components, cart in a store, filters in the URL, form in local state",
+          correct: true,
+        }
+      - {
+          text: "Everything in one Redux store, so there is a single source of truth for the whole app",
+          correct: false,
+        }
+      - {
+          text: "Everything in Context, since it is built into React and needs no dependencies",
+          correct: false,
+        }
+      - {
+          text: "Catalogue in Zustand, cart in the URL, filters in a Context, form in the query cache",
+          correct: false,
+        }

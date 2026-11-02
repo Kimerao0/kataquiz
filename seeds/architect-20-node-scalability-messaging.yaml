@@ -1,0 +1,485 @@
+version: 1
+title: "Architect Roadmap 20: Scalability and messaging in Node.js"
+description: Cluster and worker threads, load balancing, stateless horizontal scaling, microservices, pub/sub, message queues, request/reply and task distribution.
+language: en
+tags: [architect-roadmap, nodejs, scalability, messaging, worker-threads]
+run:
+  questionsPerRun: 10
+  maxErrors: 3
+  timePerQuestionSec: 90
+questions:
+  - type: single
+    prompt: "An Express API on a 4-core machine resizes uploaded images (about 250 ms of pure CPU per image). During upload bursts, the p99 latency of unrelated cheap endpoints jumps to seconds. What is the most appropriate fix?"
+    explanation: "The resize blocks the single JavaScript thread, so every other request waits. A pool of worker threads moves the CPU work off the main event loop and shares memory cheaply via transferable buffers. `async` wrappers or more `await`s do not help, because the work itself is synchronous CPU work, and a bigger `UV_THREADPOOL_SIZE` only affects libuv tasks, not your JavaScript."
+    theoryUrl: https://nodejs.org/api/worker_threads.html
+    options:
+      - {
+          text: "Wrap the resize function in `async` and `await` it so the event loop can interleave other requests",
+          correct: false,
+        }
+      - {
+          text: "Raise `UV_THREADPOOL_SIZE` to 16 so libuv runs the resize on more threads",
+          correct: false,
+        }
+      - {
+          text: "Run the resize in a fixed-size pool of worker threads and post the buffers to them",
+          correct: true,
+        }
+      - {
+          text: "Add `setImmediate` between each pixel row so the event loop can breathe",
+          correct: false,
+        }
+  - type: single
+    prompt: "What does the Node.js `cluster` module actually do when you call `cluster.fork()` several times in a primary process that listens on a port?"
+    explanation: "Each `fork()` starts a new Node process (with its own V8 heap and event loop). The workers share the listening socket, and on non-Windows platforms the primary accepts connections and distributes them round-robin by default. It is not threads, it does not share memory and it never leaves the machine."
+    theoryUrl: https://nodejs.org/api/cluster.html
+    options:
+      - {
+          text: "It starts new threads in the same process that share one heap and one event loop",
+          correct: false,
+        }
+      - {
+          text: "It spawns processes on other machines and registers them with a built-in service registry",
+          correct: false,
+        }
+      - {
+          text: "It clones the V8 heap so the workers can read each other's variables without copying",
+          correct: false,
+        }
+      - {
+          text: "It spawns worker processes that share the server port, with connections spread among them",
+          correct: true,
+        }
+  - type: single
+    prompt: "What does this program print?"
+    code: |
+      const { Worker, isMainThread, parentPort, workerData } = require('node:worker_threads')
+      let counter = 0
+      if (isMainThread) {
+        counter = 10
+        const w = new Worker(__filename, { workerData: 5 })
+        w.on('message', (m) => {
+          console.log('main got', m, 'main counter', counter)
+        })
+      } else {
+        counter += workerData
+        parentPort.postMessage(counter)
+      }
+    codeLanguage: javascript
+    explanation: "The worker re-evaluates the file in its own isolate, so it has its own `counter` that starts at 0, giving 5. The main thread's `counter` is untouched and stays 10. Worker threads do not share ordinary variables, only what you pass via messages, transfer or `SharedArrayBuffer`."
+    theoryUrl: https://nodejs.org/api/worker_threads.html#workerdata
+    options:
+      - { text: "main got 15 main counter 10", correct: false }
+      - { text: "main got 5 main counter 15", correct: false }
+      - { text: "main got 5 main counter 10", correct: true }
+      - { text: "main got 15 main counter 15", correct: false }
+  - type: single
+    prompt: "Your API keeps user sessions in a JavaScript object in process memory. You scale from 1 to 4 instances behind a round-robin load balancer, and users now get logged out randomly. What is the right architectural fix?"
+    explanation: "Each instance has its own memory, so a session created on instance A does not exist on B. Making the service stateless (sessions in Redis or a signed token) lets any instance serve any request and keeps horizontal scaling and rolling deploys simple. Sticky sessions hide the problem but break on restarts, deploys and instance failure, and a bigger machine does not remove the single point of failure."
+    theoryUrl: https://12factor.net/processes
+    options:
+      - {
+          text: "Move the sessions to a shared store such as Redis, or use signed stateless tokens",
+          correct: true,
+        }
+      - {
+          text: "Enable sticky sessions on the balancer and keep the sessions in memory per instance",
+          correct: false,
+        }
+      - {
+          text: "Go back to one large instance, since sessions cannot be scaled horizontally",
+          correct: false,
+        }
+      - {
+          text: "Replicate the in-memory object between instances by sending it in every HTTP response",
+          correct: false,
+        }
+  - type: multi
+    prompt: "Which of these are real advantages of `worker_threads` over separate child processes for CPU-bound work? Select all that apply."
+    explanation: "Workers start faster and use less memory than full processes, can share memory with `SharedArrayBuffer` and can transfer an `ArrayBuffer` without copying. They do not give process-level fault isolation: a native crash or out-of-memory failure in a thread can take down the whole process, and the OS does not enforce a separate memory limit per thread."
+    theoryUrl: https://nodejs.org/api/worker_threads.html#worker-threads
+    options:
+      - { text: "They can share memory with `SharedArrayBuffer`", correct: true }
+      - {
+          text: "A segfault in a native addon cannot bring down the parent process",
+          correct: false,
+        }
+      - { text: "They are cheaper to start and use less memory than a full process", correct: true }
+      - {
+          text: "An `ArrayBuffer` can be transferred to them without copying its content",
+          correct: true,
+        }
+      - { text: "The kernel enforces a separate hard memory limit on each one", correct: false }
+  - type: single
+    prompt: "A platform lets customers upload plugins that run inside your Node service. Some are buggy native modules that can segfault or leak memory badly. You must keep the host service available. What do you choose?"
+    explanation: "A separate process (child process or container) gives real fault isolation: a crash or leak is contained and the OS can kill or limit it. Worker threads live in the same process, so a native crash takes everything down. For untrusted code, even a worker or `vm` context is not a security boundary, so process or container isolation is the safer choice."
+    theoryUrl: https://nodejs.org/api/child_process.html
+    options:
+      - {
+          text: "Run each plugin in a worker thread with `resourceLimits`, since threads are isolated enough",
+          correct: false,
+        }
+      - {
+          text: "Run each plugin in its own `vm` context in the main thread to keep calls cheap",
+          correct: false,
+        }
+      - {
+          text: "Run each plugin in a separate child process or container, with the OS limiting it",
+          correct: true,
+        }
+      - {
+          text: "Load the plugins in the main thread and wrap each call in `try/catch`",
+          correct: false,
+        }
+  - type: boolean
+    prompt: "The `cluster` module lets a Node.js application scale across several physical machines."
+    answer: false
+    explanation: "Cluster only forks processes on the same machine to use multiple CPU cores. Scaling across machines needs an external load balancer (or orchestrator) in front of several instances."
+    theoryUrl: https://nodejs.org/api/cluster.html#how-it-works
+  - type: single
+    prompt: "A chat service holds long-lived WebSocket connections. You autoscale from 4 to 8 instances during a spike, but the new instances stay almost idle while the old ones are overloaded. The balancer uses round robin. What is the most likely cause and fix?"
+    explanation: "Round robin distributes new connections, but existing WebSocket connections last for hours and stay where they are, so the new instances only get the few connections that arrive afterwards. A least-connections strategy, plus draining or rebalancing clients (for example by asking them to reconnect gradually), fixes the skew. Making each message heavier or adding sticky sessions does not rebalance anything."
+    theoryUrl: https://kubernetes.io/docs/concepts/services-networking/service/
+    options:
+      - {
+          text: "Round robin only balances new connections, so use least-connections and rebalance existing clients",
+          correct: true,
+        }
+      - {
+          text: "WebSocket frames are not supported by round robin, so switch to sticky sessions",
+          correct: false,
+        }
+      - {
+          text: "Node cannot run on more than four instances behind one balancer, so the extra four sit idle and receive no traffic",
+          correct: false,
+        }
+      - {
+          text: "The new instances need a larger heap before the balancer will route to them",
+          correct: false,
+        }
+  - type: single
+    prompt: "Checkout calls the email service synchronously over HTTP to send the receipt. When the email provider has an outage, checkout requests time out and orders are lost. How do you redesign it?"
+    explanation: "Sending a receipt does not need to block the purchase. Publishing an `OrderPlaced` message to a queue decouples the two in time: checkout succeeds, and the email worker retries later when the provider is back. Longer timeouts or more retries on the synchronous call only make checkout wait longer and keep the temporal coupling."
+    theoryUrl: https://microservices.io/patterns/communication-style/messaging.html
+    options:
+      - {
+          text: "Increase the HTTP timeout to 60 seconds and retry the email call three times",
+          correct: false,
+        }
+      - {
+          text: "Publish the event to a durable queue and let an email worker consume it with retries",
+          correct: true,
+        }
+      - {
+          text: "Cache the email service responses so the next checkout can reuse the last one",
+          correct: false,
+        }
+      - {
+          text: "Move the email code into the checkout service so there is no network hop",
+          correct: false,
+        }
+  - type: single
+    prompt: "When an order is placed, billing, inventory and analytics each need to react independently, and more consumers will be added next quarter without touching the order service. Which messaging model fits best?"
+    explanation: "This is fan-out: a pub/sub topic where each consumer has its own subscription and receives a copy of every event. A single work queue with competing consumers would deliver each message to only one of them, and a point-to-point request/reply would couple the order service to every consumer."
+    theoryUrl: https://microservices.io/patterns/communication-style/messaging.html
+    options:
+      - {
+          text: "One shared work queue where billing, inventory and analytics compete for each message",
+          correct: false,
+        }
+      - {
+          text: "A request/reply call from the order service to each of the three services in turn",
+          correct: false,
+        }
+      - { text: "A pub/sub topic with one subscription per consuming service", correct: true }
+      - {
+          text: "A shared database table that each service polls for the newest row",
+          correct: false,
+        }
+  - type: single
+    prompt: "You have 10,000 video transcoding jobs whose durations range from 5 seconds to 40 minutes, and 20 worker instances. A push model that assigns jobs round robin leaves some workers idle while others have long backlogs. What is the better design?"
+    explanation: "With competing consumers, workers pull a job only when they are free (with a prefetch of 1 or a small number), so work naturally flows to whoever finishes first. Round-robin push assigns work without knowing how long it will take. Sorting by estimated duration or adding workers does not remove the structural imbalance."
+    theoryUrl: https://www.enterpriseintegrationpatterns.com/patterns/messaging/CompetingConsumers.html
+    options:
+      - {
+          text: "Keep the push model but sort the jobs by estimated duration before assigning them",
+          correct: false,
+        }
+      - {
+          text: "Double the number of workers until the average backlog per worker looks balanced",
+          correct: false,
+        }
+      - {
+          text: "Give each worker a fixed range of job ids so the distribution is predictable",
+          correct: false,
+        }
+      - {
+          text: "Put the jobs in one queue and let workers pull the next job with a small prefetch",
+          correct: true,
+        }
+  - type: single
+    prompt: "When you implement request/reply over a message broker (the caller publishes a request and waits for a response message), what lets the caller match an incoming response to its original request?"
+    explanation: "The request carries a correlation id and a reply-to address (often a private reply queue). The responder copies the correlation id into the response, and the caller uses it to find the pending request. The message order cannot be relied upon, and timestamps or payload hashes are not unique identifiers."
+    theoryUrl: https://www.enterpriseintegrationpatterns.com/patterns/messaging/RequestReply.html
+    options:
+      - {
+          text: "The order of arrival, because a broker always delivers responses in request order",
+          correct: false,
+        }
+      - { text: "A correlation id copied from the request, plus a reply-to queue", correct: true }
+      - { text: "The timestamp of the response, matched to the closest request", correct: false }
+      - {
+          text: "A hash of the payload, since identical requests give identical responses",
+          correct: false,
+        }
+  - type: single
+    prompt: "In what order do the results appear? The workers run concurrently, and each `await` takes `j * 10` ms."
+    code: |
+      const results = []
+      const jobs = [1, 2, 3, 4, 5]
+      async function worker(name) {
+        while (jobs.length) {
+          const j = jobs.shift()
+          await new Promise((r) => setTimeout(r, j * 10))
+          results.push(`${name}:${j}`)
+        }
+      }
+      Promise.all([worker('A'), worker('B')]).then(() => {
+        console.log(results.join(' '))
+      })
+    codeLanguage: javascript
+    explanation: "A takes job 1 (done at 10 ms), B takes job 2 (20 ms). A then takes 3 (done at 40 ms), B takes 4 (done at 60 ms), and A takes 5 (done at 90 ms). Whoever is free first pulls the next job, which is the competing consumers pattern in miniature."
+    theoryUrl: https://www.enterpriseintegrationpatterns.com/patterns/messaging/CompetingConsumers.html
+    options:
+      - { text: "A:1 A:2 A:3 B:4 B:5", correct: false }
+      - { text: "A:1 B:2 A:3 B:4 A:5", correct: true }
+      - { text: "A:1 B:2 B:3 A:4 B:5", correct: false }
+      - { text: "A:1 A:3 A:5 B:2 B:4", correct: false }
+  - type: single
+    prompt: "A team of five runs a monolith that peaks at 800 requests per second. Management wants to split it into microservices 'to be able to scale'. The load is well within what the code can serve with more instances. What do you recommend?"
+    explanation: "Microservices buy independent deployment and team autonomy at the price of network calls, distributed data and operational complexity. For a small team whose only need is more throughput, running several instances of the monolith behind a load balancer (and keeping modules well separated) solves the problem at a fraction of the cost. Splitting for scale alone is a common anti-pattern."
+    theoryUrl: https://martinfowler.com/bliki/MonolithFirst.html
+    options:
+      - {
+          text: "Split into one service per database table, so each can scale on its own",
+          correct: false,
+        }
+      - {
+          text: "Scale the monolith horizontally and keep it modular, and split only where a boundary pays off",
+          correct: true,
+        }
+      - {
+          text: "Rewrite it as serverless functions per endpoint, since they scale automatically and remove the need to think about scale",
+          correct: false,
+        }
+      - {
+          text: "Split it now, because it is cheaper to do it before the codebase grows",
+          correct: false,
+        }
+  - type: single
+    prompt: "A worker consumes `ChargeCustomer` jobs from a queue with at-least-once delivery. It charges the card, then crashes before acknowledging the message. The broker redelivers the job. What protects the customer from a double charge?"
+    explanation: "At-least-once delivery means duplicates are normal, so the handler must be idempotent: for example it records the job id (or sends an idempotency key to the payment provider) and skips work already done. Acknowledging before processing turns it into at-most-once and loses jobs on a crash. Increasing the visibility timeout merely delays the redelivery."
+    theoryUrl: https://www.enterpriseintegrationpatterns.com/patterns/messaging/IdempotentReceiver.html
+    options:
+      - {
+          text: "Acknowledge the message before charging, so it can never be delivered twice",
+          correct: false,
+        }
+      - {
+          text: "Make the handler idempotent, using the job id as an idempotency key",
+          correct: true,
+        }
+      - {
+          text: "Raise the visibility timeout so that the broker waits longer before redelivery",
+          correct: false,
+        }
+      - {
+          text: "Run only one worker, since a single consumer receives each message exactly once",
+          correct: false,
+        }
+  - type: multi
+    prompt: "Which of these are needed to scale a Node.js HTTP service horizontally behind a load balancer? Select all that apply."
+    explanation: "Instances must be interchangeable: no state in process memory, shared state in external stores, and configuration from the environment so identical images can run anywhere. Sticky sessions are a workaround for stateful servers, not a requirement, and a shared filesystem is not needed if uploads and state go to object storage or a database."
+    theoryUrl: https://12factor.net/disposability
+    options:
+      - { text: "No session or request state held only in one instance's memory", correct: true }
+      - {
+          text: "Sticky sessions, so that a user is always sent to the same instance",
+          correct: false,
+        }
+      - {
+          text: "Configuration injected through the environment, not edited per machine",
+          correct: true,
+        }
+      - {
+          text: "Shared state (database, cache, object storage) kept outside the instances",
+          correct: true,
+        }
+      - {
+          text: "A shared network filesystem mounted on every instance for local uploads",
+          correct: false,
+        }
+  - type: single
+    prompt: "An API runs as 4 cluster workers and enforces '100 requests per minute per user' with a counter in a JavaScript `Map` inside each worker. Under load, users manage far more than 100 requests per minute. What is happening and what is the fix?"
+    explanation: "Each worker is a separate process with its own `Map`, so a user spread over 4 workers can make up to about 400 requests per minute. The counter must live in a shared store such as Redis (atomic `INCR` with expiry). Making the `Map` global or using `SharedArrayBuffer` does not work across processes."
+    theoryUrl: https://nodejs.org/api/cluster.html#how-it-works
+    options:
+      - {
+          text: "Each worker counts separately, so use a shared store such as Redis with atomic increments",
+          correct: true,
+        }
+      - {
+          text: "The Map is garbage collected between requests, so declare it with `var` to keep it alive",
+          correct: false,
+        }
+      - {
+          text: "The workers share a heap, so the race is fixed by wrapping the counter in a mutex",
+          correct: false,
+        }
+      - {
+          text: "Cluster resets the counters every minute, so raise the limit to 400 in each worker",
+          correct: false,
+        }
+  - type: single
+    prompt: "A service uses an in-process `EventEmitter` as its event bus: `OrderPlaced` is emitted and a notification handler reacts. After scaling to three instances, the notification handler on instance 2 never fires for orders placed on instance 1. What is the underlying issue?"
+    explanation: "An `EventEmitter` only dispatches inside one process, so events are not visible to the other instances. Cross-instance events need a real broker (Redis pub/sub, NATS, Kafka, a cloud topic). Increasing `setMaxListeners` or using `once` changes nothing about process boundaries."
+    theoryUrl: https://nodejs.org/api/events.html
+    options:
+      - {
+          text: "The default limit of 10 listeners is exceeded, so raise it with `setMaxListeners`",
+          correct: false,
+        }
+      - {
+          text: "Events must be emitted with `emitter.once` so every instance receives them",
+          correct: false,
+        }
+      - {
+          text: "An in-process emitter does not cross instances, so publish through a shared broker",
+          correct: true,
+        }
+      - {
+          text: "`EventEmitter` is synchronous, so switch to `async` listeners to reach other instances",
+          correct: false,
+        }
+  - type: single
+    prompt: "You need background jobs (emails, PDFs) that must survive a Redis restart and a worker deploy, support retries with delay, and be inspectable. Someone suggests Redis Pub/Sub because it is already in the stack. What is the problem with that choice?"
+    explanation: "Redis Pub/Sub is fire-and-forget: a message is delivered only to subscribers connected at that moment and is not stored, so a deploying worker misses it. A job queue (BullMQ on Redis with persistence, SQS, RabbitMQ) stores jobs, tracks acknowledgements and supports retries and delays. Pub/Sub is fine for ephemeral notifications, not for durable work."
+    theoryUrl: https://redis.io/docs/latest/develop/pubsub/
+    options:
+      - {
+          text: "Pub/Sub is slow because it writes every message to disk before delivering it",
+          correct: false,
+        }
+      - {
+          text: "Pub/Sub delivers to connected subscribers only and stores nothing, so jobs can be lost",
+          correct: true,
+        }
+      - {
+          text: "Pub/Sub delivers each message exactly once, which prevents retries from working",
+          correct: false,
+        }
+      - {
+          text: "Pub/Sub only works with one subscriber, so workers could never share the load",
+          correct: false,
+        }
+  - type: single
+    prompt: "A PDF export endpoint is called a few hundred times per second. A teammate proposes creating a `new Worker(...)` for every request so that each export is isolated. What is your assessment?"
+    explanation: "Starting a worker means creating a new V8 isolate and loading the module, which takes tens of milliseconds and a few MB, and unbounded workers can exhaust memory under a spike. A fixed-size pool (about the number of cores) reuses warm workers and queues the excess. Isolation per request is not worth that cost here."
+    theoryUrl: https://nodejs.org/api/worker_threads.html
+    options:
+      - {
+          text: "Good idea, because worker creation is nearly free and gives per-request isolation",
+          correct: false,
+        }
+      - {
+          text: "Fine, as the garbage collector reclaims finished workers fast enough to bound memory",
+          correct: false,
+        }
+      - {
+          text: "Use a bounded pool of reusable workers, since spawning one per request is costly and unbounded",
+          correct: true,
+        }
+      - {
+          text: "Use `cluster.fork()` per request instead, because processes start faster than workers",
+          correct: false,
+        }
+  - type: boolean
+    prompt: "Worker threads in Node.js run on the same event loop as the main thread, so a long task in a worker still delays the main thread's timers."
+    answer: false
+    explanation: "Each worker has its own V8 isolate and its own event loop, running on a separate OS thread. A long task in a worker does not block the main thread's timers or I/O, which is the whole point of using them."
+    theoryUrl: https://nodejs.org/api/worker_threads.html#worker-threads
+  - type: single
+    prompt: "Producers push 5,000 messages per second to a queue, but consumers can only process 1,000 per second. The queue depth grows without limit and the broker is running out of memory. Which response is the most appropriate?"
+    explanation: "A sustained mismatch needs action on both sides: scale consumers (ideally autoscaling on queue depth or lag) and apply backpressure or load shedding to producers, with a bounded queue and alerts. Raising the visibility timeout or retention only hides the backlog until the broker fails, and removing acknowledgements loses messages."
+    theoryUrl: https://aws.amazon.com/builders-library/using-load-shedding-to-avoid-overload/
+    options:
+      - {
+          text: "Autoscale consumers on queue depth and apply backpressure or shedding to producers",
+          correct: true,
+        }
+      - { text: "Disable acknowledgements so that consumers can run faster", correct: false }
+      - {
+          text: "Increase the message retention period to several days so that the whole backlog is stored and nothing is ever dropped",
+          correct: false,
+        }
+      - {
+          text: "Increase the visibility timeout so messages are redelivered less often",
+          correct: false,
+        }
+  - type: single
+    prompt: "In a cluster, a worker process dies from an uncaught exception. What should the primary process do to keep the service healthy?"
+    explanation: "The primary listens to the `exit` event of workers and forks a replacement (with a limit or backoff to avoid a crash loop). Workers do not restart themselves, and the surviving workers do not take over the dead one's connections automatically other than through new connections. In containers, the orchestrator often plays this role instead."
+    theoryUrl: https://nodejs.org/api/cluster.html#event-exit
+    options:
+      - {
+          text: "Nothing, because the cluster module respawns dead workers automatically",
+          correct: false,
+        }
+      - {
+          text: "Stop the whole application and restart every worker, since one crashed worker means the shared state is corrupted",
+          correct: false,
+        }
+      - {
+          text: "Listen for the worker `exit` event and fork a replacement, with backoff against crash loops",
+          correct: true,
+        }
+      - {
+          text: "Ask the remaining workers to fork a replacement through a `postMessage` call",
+          correct: false,
+        }
+  - type: single
+    prompt: "A payment screen must tell the user within 200 ms whether their card balance is sufficient before enabling the 'Pay' button. A colleague proposes routing the balance check through a message queue 'for decoupling'. What is the best judgement?"
+    explanation: "The user is waiting for an answer, so this interaction is inherently synchronous request/response. A queue adds latency and complexity and forces you to build request/reply on top, with no benefit because the caller cannot proceed without the result. Queues are the right tool when the caller does not need the outcome immediately."
+    theoryUrl: https://microservices.io/patterns/communication-style/rpi.html
+    options:
+      - {
+          text: "Keep the queue and add polling in the browser until the answer arrives",
+          correct: false,
+        }
+      - {
+          text: "Keep a direct synchronous call, with a timeout and a fallback, since the user waits for the result",
+          correct: true,
+        }
+      - { text: "Use pub/sub so every service can learn about the balance check", correct: false }
+      - { text: "Cache the previous balance forever so that no call is needed", correct: false }
+  - type: single
+    prompt: "Your Node service runs in Kubernetes on nodes with 4 vCPUs. A developer wants to embed the `cluster` module in the container to start 4 workers per pod, while the platform already scales pods with an autoscaler. What do you advise?"
+    explanation: "In an orchestrated platform, the usual approach is one Node process per container and scaling by adding pods, so that health checks, resource limits, restarts and metrics map to a single process. Embedding `cluster` hides worker crashes from Kubernetes and makes CPU limits and graceful shutdown harder. It is not forbidden, just usually redundant."
+    theoryUrl: https://kubernetes.io/docs/concepts/workloads/autoscaling/
+    options:
+      - {
+          text: "Run one process per container and let the autoscaler add pods, with limits sized to it",
+          correct: true,
+        }
+      - {
+          text: "Always use cluster in containers, because Node cannot use more than one core otherwise",
+          correct: false,
+        }
+      - {
+          text: "Use cluster and disable the autoscaler, since both mechanisms conflict at runtime",
+          correct: false,
+        }
+      - {
+          text: "Run all four workers as worker threads, since Kubernetes cannot scale processes",
+          correct: false,
+        }

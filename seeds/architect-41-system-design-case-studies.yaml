@@ -1,0 +1,393 @@
+version: 1
+title: "Architect Roadmap 41: System design case studies"
+description: Trade-offs in six case studies (URL shortener, social feed, real-time chat, notification system, rate limiter, payments) covering storage, caching, messaging, scalability, consistency and cost.
+language: en
+tags: [architect-roadmap, system-design, case-studies, trade-offs, distributed-systems]
+run:
+  questionsPerRun: 10
+  maxErrors: 3
+  timePerQuestionSec: 90
+questions:
+  - type: single
+    prompt: "A URL shortener creates codes from an auto-incrementing counter, encoded in base62. What does this print?"
+    code: |
+      const ALPHABET = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
+      function encode(n) {
+        let out = '';
+        while (n > 0) {
+          out = ALPHABET[n % 62] + out;
+          n = Math.floor(n / 62);
+        }
+        return out;
+      }
+      console.log(encode(1000), encode(62), encode(3844));
+    codeLanguage: javascript
+    explanation: "1000 = 16*62 + 8, and index 16 is 'g', so 1000 becomes 'g8'. 62 is 1*62 + 0, giving '10', and 3844 is 62^2, giving '100'. Counter-based codes are collision-free by construction but predictable, unlike truncated hashes, which can collide."
+    theoryUrl: https://en.wikipedia.org/wiki/Snowflake_ID
+    options:
+      - { text: "g8 10 100", correct: true }
+      - { text: "8g 01 001", correct: false }
+      - { text: "g8 1 10", correct: false }
+      - { text: "16 62 3844", correct: false }
+  - type: single
+    prompt: "A shortener expects 1 billion new URLs per year for 10 years. Codes use base62 (a-z, A-Z, 0-9). What is the minimum code length that can hold all of them?"
+    explanation: "62^5 is about 916 million, too few. 62^6 is about 56.8 billion, which covers 10 billion with headroom. 62^7 (3.5 trillion) is more than needed, and every extra character makes URLs longer, which matters for a shortener."
+    theoryUrl: https://en.wikipedia.org/wiki/Snowflake_ID
+    options:
+      - { text: "5 characters", correct: false }
+      - { text: "6 characters", correct: true }
+      - { text: "7 characters", correct: false }
+      - { text: "8 characters", correct: false }
+  - type: single
+    prompt: "A shortener must report the number of clicks for each link. Which redirect status fits best?"
+    explanation: "A 301 is permanent and may be cached by browsers and proxies, so later clicks never reach your server and are not counted. A 302 (or 307) is temporary and not cached by default, so every click hits the service, at the cost of more traffic. 200 with a meta refresh is not a redirect."
+    theoryUrl: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/302
+    options:
+      - { text: "301 Moved Permanently, because it is the SEO-friendly choice", correct: false }
+      - { text: "200 OK with a meta refresh tag in the body", correct: false }
+      - { text: "404 Not Found followed by a client-side lookup", correct: false }
+      - { text: "302 Found, so browsers come back to the service on every click", correct: true }
+  - type: single
+    prompt: "A shortener has a 100:1 read-to-write ratio, a small set of viral links takes most of the traffic, and every lookup is by key. Which design is the best fit?"
+    explanation: "Key-value lookups with a heavy skew fit a key-value store with a cache-aside layer in front: hot keys stay in memory and the store handles the long tail. Relational joins, full-text search or per-request computation add cost without any benefit for this access pattern."
+    theoryUrl: https://learn.microsoft.com/en-us/azure/architecture/patterns/cache-aside
+    options:
+      - {
+          text: "A relational schema with joins, queried directly on every redirect",
+          correct: false,
+        }
+      - { text: "A key-value store with a cache-aside layer in front of it", correct: true }
+      - { text: "A search engine index, so users can query by partial code", correct: false }
+      - { text: "A message queue that stores each code until it is consumed", correct: false }
+  - type: single
+    prompt: "A shortener runs 20 stateless API servers behind a load balancer. How do you generate unique counter-based codes without a database round trip on every write and without collisions?"
+    explanation: "Each server leases a block of IDs (say 10,000) from a coordinator and hands them out locally, so the coordinator is touched rarely and no two servers share a range. Random codes need collision checks, and a global lock per write recreates the bottleneck. A lost block only wastes unused numbers."
+    theoryUrl: https://en.wikipedia.org/wiki/Snowflake_ID
+    options:
+      - {
+          text: "Each server leases a block of counter values and issues them locally",
+          correct: true,
+        }
+      - {
+          text: "Every server increments the same row under a global lock for each write",
+          correct: false,
+        }
+      - {
+          text: "Every server picks a random 6-character code and never checks for duplicates",
+          correct: false,
+        }
+      - { text: "Use the server's system clock in milliseconds as the code", correct: false }
+  - type: single
+    prompt: "A social app has users with 200 followers on average and a few celebrities with 50 million. Feed reads are 100x more frequent than posts. Which feed strategy fits?"
+    explanation: "Fan-out on write (push the post id into followers' precomputed timelines) makes reads cheap for normal users, but would create 50 million writes per celebrity post. The hybrid approach pushes for normal users and pulls celebrity posts at read time and merges them. Pure pull makes the common read path expensive."
+    theoryUrl: https://martinfowler.com/bliki/CQRS.html
+    options:
+      - {
+          text: "Pure fan-out on read for every user, computed with a join across all followees per request",
+          correct: false,
+        }
+      - { text: "Pure fan-out on write for every user, including celebrities", correct: false }
+      - {
+          text: "Hybrid: push for normal users, pull celebrity posts at read time and merge",
+          correct: true,
+        }
+      - { text: "Store one global timeline and filter it in the client", correct: false }
+  - type: single
+    prompt: "For precomputed timelines you need a structure that supports fast insertion by time, trimming to the latest N items and range reads. Which choice fits best?"
+    explanation: "A Redis sorted set (score = timestamp or post id) holding post ids supports inserts, range reads and trimming in logarithmic time, and the post bodies are hydrated from a separate cache or store. Storing full posts per follower multiplies storage, and a relational table with sorting per read is slower."
+    theoryUrl: https://redis.io/docs/latest/develop/data-types/sorted-sets/
+    options:
+      - {
+          text: "A sorted set per user holding post ids, with posts hydrated separately",
+          correct: true,
+        }
+      - { text: "A full copy of each post stored per follower", correct: false }
+      - { text: "A relational table sorted by ORDER BY on every read", correct: false }
+      - {
+          text: "An object-storage file per user, rewritten on every new post and trimmed by a nightly job",
+          correct: false,
+        }
+  - type: single
+    prompt: "A feed is paginated with OFFSET/LIMIT. New posts arrive constantly, and users scrolling see the same posts repeated on the next page. What is the right fix?"
+    explanation: "With offset pagination, items inserted at the top shift everything down, so the next page repeats items. Keyset (cursor) pagination continues from the last seen position (for example a post id or timestamp), which is stable and also avoids scanning skipped rows."
+    theoryUrl: https://use-the-index-luke.com/no-offset
+    options:
+      - { text: "Use larger pages so the problem shows up less often", correct: false }
+      - { text: "Cache each page for five minutes on the server", correct: false }
+      - { text: "Switch to cursor (keyset) pagination from the last item seen", correct: true }
+      - { text: "Lock the feed table while a user is scrolling", correct: false }
+  - type: single
+    prompt: "A user publishes a post, refreshes the feed, and does not see it. The feed is read from an asynchronously replicated replica. Which fix gives the best consistency for that user without making the whole system strongly consistent?"
+    explanation: "Read-your-writes consistency is needed only for the author: route their reads to the primary for a short time (or merge their recent posts client-side). Making all reads synchronous raises latency and cost for everyone, and telling users to wait is a product workaround."
+    theoryUrl: https://jepsen.io/consistency/models/read-your-writes
+    options:
+      - { text: "Make all replication synchronous for every read and write", correct: false }
+      - {
+          text: "Show an error and ask the user to refresh again after a minute, once replication catches up",
+          correct: false,
+        }
+      - { text: "Remove replicas and serve everything from one primary", correct: false }
+      - {
+          text: "Serve the author's recent posts from the primary or merge client-side",
+          correct: true,
+        }
+  - type: multi
+    prompt: "Which of the following reduce the latency of reading a feed? Select all that apply."
+    explanation: "Precomputed timelines avoid joins at read time, a cache for hydrated post objects avoids repeated store reads, and a CDN serves images and video close to the user. Re-joining normalised tables on every request does the opposite."
+    theoryUrl: https://martinfowler.com/bliki/CQRS.html
+    options:
+      - { text: "Precomputed timelines (materialised views) per user", correct: true }
+      - { text: "Joining users, follows and posts tables on every request", correct: false }
+      - { text: "A CDN in front of images and video", correct: true }
+      - { text: "A cache for hydrated post objects", correct: true }
+  - type: single
+    prompt: "A chat app needs messages delivered in well under a second in both directions, with typing indicators. Which transport fits best?"
+    explanation: "A WebSocket keeps one persistent bidirectional connection, so the server can push messages and clients can send without a new HTTP request each time. Short polling wastes requests and adds latency, and server-sent events are server-to-client only."
+    theoryUrl: https://developer.mozilla.org/en-US/docs/Web/API/WebSockets_API
+    options:
+      - { text: "Short polling every 5 seconds", correct: false }
+      - { text: "WebSocket connections held by gateway servers", correct: true }
+      - { text: "Server-sent events for both sending and receiving", correct: false }
+      - { text: "Email notifications for each message", correct: false }
+  - type: single
+    prompt: "Messages in a conversation must appear in the same order for all participants. Two senders write at nearly the same instant from different servers. What is the most reliable approach?"
+    explanation: "Wall-clock timestamps from different machines suffer from clock skew. Routing all messages of a conversation to one owner (a partition keyed by conversation id) lets it assign a monotonically increasing sequence number that defines the order. Client clocks and random UUIDs do not give ordering."
+    theoryUrl: https://kafka.apache.org/documentation/#intro_concepts_and_terms
+    options:
+      - { text: "Order by the sender's device timestamp", correct: false }
+      - {
+          text: "Partition by conversation id and let its owner assign a sequence number",
+          correct: true,
+        }
+      - { text: "Order by UUID, since UUIDs are unique and sortable", correct: false }
+      - {
+          text: "Order by arrival time at whichever gateway received it, synchronised with NTP across gateways",
+          correct: false,
+        }
+  - type: single
+    prompt: "User A is connected to gateway 1, and user B to gateway 7. A sends B a message. How should the message reach B in real time?"
+    explanation: "Gateways are stateful because they hold connections, so the system keeps a registry of which gateway holds which user and routes through a pub/sub or messaging backplane to that gateway. Asking B to poll defeats real time, and replicating all connections to every gateway does not scale."
+    theoryUrl: https://redis.io/docs/latest/develop/interact/pubsub/
+    options:
+      - { text: "Make B's client poll every gateway until the message appears", correct: false }
+      - {
+          text: "Open a direct connection from A's gateway to every other gateway, then broadcast the message",
+          correct: false,
+        }
+      - { text: "Replicate all WebSocket connections on all gateways", correct: false }
+      - {
+          text: "Look up B's gateway in a session registry and forward via a pub/sub backplane",
+          correct: true,
+        }
+  - type: single
+    prompt: "A mobile client sends a message and the connection drops before it sees an acknowledgement. What delivery design gives users the best experience?"
+    explanation: "Networks make exactly-once impossible, so use at-least-once: the client retries until acknowledged, and the server deduplicates by a client-generated message id, so the effect is exactly-once. At-most-once loses messages, and without dedup retries duplicate them."
+    theoryUrl: https://microservices.io/patterns/communication-style/idempotent-consumer.html
+    options:
+      - { text: "At-most-once, with no retry, to avoid duplicates", correct: false }
+      - { text: "Retry blindly and let users delete the duplicates", correct: false }
+      - { text: "At-least-once with a client message id deduplicated by the server", correct: true }
+      - { text: "Two-phase commit between the phone and the server", correct: false }
+  - type: single
+    prompt: "A chat service stores billions of messages. The main access pattern is: append to a conversation, and read the latest N messages of one conversation. Which storage design fits?"
+    explanation: "The workload is write-heavy and always scoped by conversation, so a wide-column or LSM-based store partitioned by conversation id and clustered by time gives sequential reads of the newest rows. General joins are not needed, and a single relational primary becomes the write bottleneck."
+    theoryUrl: https://discord.com/blog/how-discord-stores-trillions-of-messages
+    options:
+      - { text: "One relational table on a single primary, indexed by timestamp", correct: false }
+      - { text: "A store partitioned by conversation id and clustered by time", correct: true }
+      - { text: "Files in object storage, one per message, listed by prefix", correct: false }
+      - { text: "An in-memory cache only, since old messages are rarely read", correct: false }
+  - type: single
+    prompt: "A notification service sends push, email and SMS. The SMS provider becomes slow, and push notifications also start arriving late. Which design change fixes the coupling?"
+    explanation: "A shared worker pool or queue lets the slowest channel block everyone. Separate queues (and consumers) per channel isolate the failure so push keeps flowing while SMS backs up. Larger timeouts or one big pool keep the shared bottleneck."
+    theoryUrl: https://microservices.io/patterns/communication-style/messaging.html
+    options:
+      - { text: "Increase the SMS client timeout to 60 seconds", correct: false }
+      - { text: "Use a single, larger worker pool for all channels", correct: false }
+      - { text: "Separate queues and consumers per channel", correct: true }
+      - { text: "Send all channels synchronously from the API request", correct: false }
+  - type: single
+    prompt: "A workflow service retries a notification job after a timeout, and users sometimes get the same SMS twice. The provider accepted the first call but responded slowly. How do you prevent duplicates?"
+    explanation: "Delivery from a queue is at-least-once, so retries are expected. Attach an idempotency key (for example notification id plus channel) and record it before or atomically with the send, so a retry sees it already happened. Shorter timeouts only produce more ambiguous retries."
+    theoryUrl: https://microservices.io/patterns/communication-style/idempotent-consumer.html
+    options:
+      - {
+          text: "Shorten the timeout so failures are detected sooner and the retry happens before the provider replies",
+          correct: false,
+        }
+      - { text: "Disable retries and accept lost notifications", correct: false }
+      - { text: "Send each message twice on purpose to be safe", correct: false }
+      - {
+          text: "Use an idempotency key per notification and channel, checked before sending",
+          correct: true,
+        }
+  - type: single
+    prompt: "A marketing blast to 20 million users saturates the queue. Meanwhile, login one-time passcodes arrive after 15 minutes. What is the best fix?"
+    explanation: "Transactional, time-sensitive messages need isolation from bulk traffic: separate queues (or priority lanes) with dedicated capacity, and rate-limit the bulk lane to the provider's quota. Scaling everything equally or sending OTPs after the blast keeps the head-of-line blocking."
+    theoryUrl: https://microservices.io/patterns/communication-style/messaging.html
+    options:
+      - {
+          text: "Dedicated high-priority queue and capacity for OTPs, with the bulk lane rate-limited",
+          correct: true,
+        }
+      - { text: "Process all messages in strict arrival order", correct: false }
+      - {
+          text: "Send the marketing blast only during the OTP quiet hours, without any queue change",
+          correct: false,
+        }
+      - { text: "Double the consumers of the single queue", correct: false }
+  - type: single
+    prompt: "A push provider returns temporary errors for 10% of the requests. What is the right handling policy?"
+    explanation: "Retry transient failures with capped exponential backoff and jitter to avoid synchronised retry waves, and send messages that exhaust retries to a dead-letter queue for inspection or replay. Retrying immediately forever creates load spikes, and dropping silently loses data."
+    theoryUrl: https://aws.amazon.com/builders-library/timeouts-retries-and-backoff-with-jitter/
+    options:
+      - { text: "Retry immediately in a tight loop until it succeeds", correct: false }
+      - { text: "Drop failed messages silently and log a counter", correct: false }
+      - {
+          text: "Retry with exponential backoff and jitter, then dead-letter after the limit",
+          correct: true,
+        }
+      - {
+          text: "Retry once after exactly 60 seconds for every message, then drop it if still failing",
+          correct: false,
+        }
+  - type: single
+    prompt: "Your only SMS provider has had three outages this year. Which approach improves delivery for critical messages at reasonable cost?"
+    explanation: "Integrate a second provider and fail over automatically, guarded by a circuit breaker that stops sending to the failing one. Cost stays low by keeping the secondary as a fallback. Retrying the same failed provider longer or waiting for its recovery does not give availability."
+    theoryUrl: https://martinfowler.com/bliki/CircuitBreaker.html
+    options:
+      - { text: "Increase the retry count against the same provider to 20", correct: false }
+      - { text: "Add a secondary provider and switch to it with a circuit breaker", correct: true }
+      - { text: "Tell users to expect delays during provider outages", correct: false }
+      - { text: "Replace SMS with email for every message", correct: false }
+  - type: single
+    prompt: "A fixed-window rate limiter allows 3 requests per 10-second window. What does this print?"
+    code: |
+      const LIMIT = 3, WINDOW = 10;
+      const counts = new Map();
+      function allow(t) {
+        const w = Math.floor(t / WINDOW);
+        const c = (counts.get(w) ?? 0) + 1;
+        counts.set(w, c);
+        return c <= LIMIT;
+      }
+      const times = [8, 9, 9.5, 10, 11, 12, 12.5];
+      console.log(times.filter(allow).length);
+    codeLanguage: javascript
+    explanation: "Requests at 8, 9 and 9.5 fall in window 0 (all allowed), and those at 10, 11 and 12 fall in window 1 (allowed). Only 12.5 is rejected. So 6 requests pass within 4.5 seconds, double the nominal rate: the classic boundary burst of fixed windows."
+    theoryUrl: https://cloud.google.com/architecture/rate-limiting-strategies-techniques
+    options:
+      - { text: "3", correct: false }
+      - { text: "4", correct: false }
+      - { text: "5", correct: false }
+      - { text: "6", correct: true }
+  - type: single
+    prompt: "An API should let clients burst briefly, for example 20 requests at once, but average no more than 5 requests per second. Which algorithm models this directly?"
+    explanation: "A token bucket refills at a steady rate (the average) and has a capacity (the allowed burst). A leaky bucket smooths output to a constant rate, and a fixed window has boundary bursts without control. A concurrency limit caps in-flight requests, not rate."
+    theoryUrl: https://stripe.com/blog/rate-limiters
+    options:
+      - { text: "Fixed window counter", correct: false }
+      - { text: "Token bucket with capacity 20 and refill 5 per second", correct: true }
+      - { text: "Leaky bucket that emits exactly one request every 200 ms", correct: false }
+      - { text: "A concurrency limit of 5 in-flight requests", correct: false }
+  - type: single
+    prompt: "Ten API gateway nodes enforce a per-user limit using a shared Redis counter. The code reads the count, checks it, then writes count + 1. Under load, users exceed their limit. Why, and what is the fix?"
+    explanation: "Read-check-write across the network is a race: several nodes read the same value before any writes it. Use an atomic operation (INCR with expiry, or a Lua script that does the check and update in one step) so the decision is serialised in Redis."
+    theoryUrl: https://redis.io/docs/latest/commands/incr/
+    options:
+      - {
+          text: "Redis is eventually consistent, so switch to a relational database",
+          correct: false,
+        }
+      - { text: "Race on read-check-write, use an atomic INCR or a Lua script", correct: true }
+      - { text: "The counter expires too early, raise the TTL to one hour", correct: false }
+      - { text: "Network latency is too high, move Redis to every node", correct: false }
+  - type: single
+    prompt: "The Redis cluster behind a rate limiter for a public read API goes down. The limiter exists to protect the backend from accidental overload, not to enforce security. What is the best behaviour?"
+    explanation: "For a protective limiter, failing closed turns a limiter outage into a full API outage. Failing open with a conservative per-node local limit keeps the service available while still bounding overload. Fail closed is right for security controls such as login attempts."
+    theoryUrl: https://cloud.google.com/architecture/rate-limiting-strategies-techniques
+    options:
+      - { text: "Fail closed and return 429 for every request until Redis is back", correct: false }
+      - {
+          text: "Fail open with a conservative per-node in-memory limit as fallback",
+          correct: true,
+        }
+      - { text: "Queue every request in memory until Redis returns", correct: false }
+      - { text: "Disable the backend until the limiter recovers", correct: false }
+  - type: single
+    prompt: "A client exceeds its limit. What should the API respond so well-behaved clients can adapt?"
+    explanation: "HTTP 429 Too Many Requests signals the limit was hit, and a Retry-After header tells the client how long to wait, which allows clients to back off correctly. A 500 suggests a server fault, a 403 suggests a permission problem, and a 200 hides the problem."
+    theoryUrl: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/429
+    options:
+      - { text: "500 Internal Server Error with a retry hint in the body", correct: false }
+      - { text: "403 Forbidden, then block the client for a day", correct: false }
+      - { text: "200 OK with an empty body to avoid error alarms", correct: false }
+      - { text: "429 Too Many Requests with a Retry-After header", correct: true }
+  - type: single
+    prompt: "A payment API implements idempotency keys. What does this print?"
+    code: |
+      const seen = new Map();
+      let balance = 100;
+      function charge(key, amount) {
+        if (seen.has(key)) return seen.get(key);
+        balance -= amount;
+        const result = { ok: true, balance };
+        seen.set(key, result);
+        return result;
+      }
+      charge('k1', 30);
+      charge('k1', 30);
+      charge('k2', 30);
+      console.log(balance, charge('k1', 30).balance);
+    codeLanguage: javascript
+    explanation: "The replay of `k1` returns the stored result without charging again, so only `k1` and `k2` take 30 each: balance is 40. The stored result for `k1` was captured when the balance was 70, so a retry returns that original response (70), not the current state."
+    theoryUrl: https://docs.stripe.com/api/idempotent_requests
+    options:
+      - { text: "40 40", correct: false }
+      - { text: "10 10", correct: false }
+      - { text: "40 70", correct: true }
+      - { text: "70 70", correct: false }
+  - type: single
+    prompt: "A ledger must always be able to explain where each cent went and support audits. Which data model fits?"
+    explanation: "A double-entry, append-only ledger records each movement as balanced debit and credit entries that are never updated or deleted; corrections are new compensating entries. Balances are derived or cached from entries. A single mutable balance column loses the history."
+    theoryUrl: https://stripe.com/blog/ledger-stripe-system-for-tracking-and-validating-money-movement
+    options:
+      - { text: "A single mutable balance column updated in place", correct: false }
+      - {
+          text: "An append-only double-entry ledger, corrected with compensating entries",
+          correct: true,
+        }
+      - {
+          text: "A document per order that is overwritten with the latest status and a change timestamp",
+          correct: false,
+        }
+      - { text: "A cache of balances rebuilt from logs only when someone asks", correct: false }
+  - type: single
+    prompt: "A checkout spans three services: Orders, Payments and Inventory, each with its own database. A failure after the payment must not leave stock reserved forever. What is the common approach?"
+    explanation: "A saga runs a sequence of local transactions with compensating actions (release stock, refund) when a later step fails. Two-phase commit across services is fragile and hurts availability. Ignoring the failure leaves inconsistent data."
+    theoryUrl: https://microservices.io/patterns/data/saga.html
+    options:
+      - { text: "A distributed two-phase commit across all three databases", correct: false }
+      - { text: "A shared database for the three services", correct: false }
+      - { text: "A saga of local transactions with compensating actions", correct: true }
+      - { text: "Run the steps in order and ignore failures after the payment", correct: false }
+  - type: single
+    prompt: "A payment provider sends webhooks for events. You see duplicates and out-of-order delivery, such as 'refunded' arriving before 'captured'. How should the handler be built?"
+    explanation: "Verify the signature, deduplicate by event id, and apply transitions of an explicit state machine so impossible or stale transitions are ignored or parked. Webhooks are at-least-once and unordered, so you can also fetch the current object from the provider API when in doubt."
+    theoryUrl: https://docs.stripe.com/webhooks
+    options:
+      - { text: "Process events in arrival order and trust the sequence", correct: false }
+      - { text: "Skip signature checks to keep the endpoint fast", correct: false }
+      - {
+          text: "Verify the signature, deduplicate by event id and apply state transitions",
+          correct: true,
+        }
+      - {
+          text: "Reject every duplicate event with a 500 so the provider stops resending and drops the event",
+          correct: false,
+        }
+  - type: boolean
+    prompt: "A payment provider is the source of truth for settled funds, so a periodic reconciliation job comparing your ledger with the provider's reports is still necessary."
+    answer: true
+    explanation: "Lost webhooks, timeouts and bugs create drift between your records and the provider's. Reconciliation detects mismatches (missing charges, orphan refunds) and feeds corrections, which is a standard control in any money system."
+    theoryUrl: https://stripe.com/blog/ledger-stripe-system-for-tracking-and-validating-money-movement

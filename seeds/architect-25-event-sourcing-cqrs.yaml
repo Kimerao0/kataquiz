@@ -1,0 +1,541 @@
+version: 1
+title: "Architect Roadmap 25: Event sourcing and CQRS"
+description: Event stores, projections and read models, snapshots, replay, eventual consistency, and when these patterns are overkill.
+language: en
+tags: [architect-roadmap, event-driven, event-sourcing, cqrs, projections]
+run:
+  questionsPerRun: 10
+  maxErrors: 3
+  timePerQuestionSec: 90
+questions:
+  - type: single
+    prompt: "What does an event store keep as the source of truth in an event-sourced system?"
+    explanation: "An event store is an append-only log of the events of each aggregate (a stream). The current state is derived by folding those events, so the events are the truth and any table of current state is a disposable projection. Storing snapshots of state, or an audit log next to a mutable table, is a different design."
+    theoryUrl: https://martinfowler.com/eaaDev/EventSourcing.html
+    options:
+      - {
+          text: "The latest state of each entity, with an audit log written beside it",
+          correct: false,
+        }
+      - {
+          text: "An append-only sequence of events per aggregate, from which the state is derived",
+          correct: true,
+        }
+      - {
+          text: "A set of periodic snapshots of each aggregate, with the events kept only for the last 24 hours for debugging",
+          correct: false,
+        }
+      - {
+          text: "Commands received from users, replayed to rebuild the state when needed",
+          correct: false,
+        }
+  - type: single
+    prompt: "A bank must prove to regulators exactly how every account balance was reached, including corrections, and must be able to answer 'what was the balance on 3 March at 10:00?'. Which design fits that requirement most naturally?"
+    explanation: "Event sourcing keeps every change as an immutable fact, so the full history and temporal queries come for free by replaying events up to a point in time, and corrections are new events. A plain CRUD table with `UPDATE` loses history unless you build a parallel audit trail that can drift from the data."
+    theoryUrl: https://learn.microsoft.com/en-us/azure/architecture/patterns/event-sourcing
+    options:
+      - {
+          text: "A CRUD `accounts` table updated in place, with nightly database backups",
+          correct: false,
+        }
+      - {
+          text: "A cache of balances in Redis, with a daily export for the regulators",
+          correct: false,
+        }
+      - {
+          text: "Event sourcing for the account ledger, with immutable events replayed up to the date",
+          correct: true,
+        }
+      - {
+          text: "A `balance_history` column that stores the previous value on every update, so any past balance can be read back",
+          correct: false,
+        }
+  - type: single
+    prompt: "What does this script print?"
+    code: |
+      const stream = []
+      function append(expectedVersion, event) {
+        if (stream.length !== expectedVersion) {
+          throw new Error(`conflict: expected ${expectedVersion}, actual ${stream.length}`)
+        }
+        stream.push(event)
+      }
+      const loadedA = stream.length
+      const loadedB = stream.length
+      append(loadedA, { type: 'ItemAdded', sku: 'A' })
+      try {
+        append(loadedB, { type: 'ItemAdded', sku: 'B' })
+      } catch (e) {
+        console.log(e.message)
+      }
+      console.log(stream.map((e) => e.sku))
+    codeLanguage: javascript
+    explanation: "Both writers loaded version 0. The first append succeeds and moves the stream to length 1, so the second one, still expecting 0, fails with the conflict message. The stream contains only `A`. Event stores use this expected-version check as optimistic concurrency, instead of locks."
+    theoryUrl: https://martinfowler.com/eaaDev/EventSourcing.html
+    options:
+      - { text: "conflict: expected 0, actual 1 and then [ 'A' ]", correct: true }
+      - { text: "No output from the first log, and then [ 'A', 'B' ]", correct: false }
+      - { text: "conflict: expected 1, actual 0 and then [ 'B' ]", correct: false }
+      - { text: "conflict: expected 0, actual 1 and then [ 'A', 'B' ]", correct: false }
+  - type: single
+    prompt: "Two users change the same shopping cart at the same moment, and the second append is rejected with a version conflict. What should the application do?"
+    explanation: "A version conflict means the aggregate changed since it was loaded. Reload the stream, re-run the command against the fresh state (which may now fail a business rule) and append again, usually with a bounded number of retries. Forcing the append would overwrite a decision made on stale state, and silently dropping the command loses the user's intent."
+    theoryUrl: https://learn.microsoft.com/en-us/azure/architecture/patterns/event-sourcing
+    options:
+      - {
+          text: "Force the append with the highest version number, since the last write wins",
+          correct: false,
+        }
+      - {
+          text: "Discard the command silently, because the first writer was there first",
+          correct: false,
+        }
+      - {
+          text: "Reload the events, re-run the command on the new state, and retry a limited number of times",
+          correct: true,
+        }
+      - {
+          text: "Lock the whole event store while the cart is loaded and the command runs, to prevent any conflict from happening",
+          correct: false,
+        }
+  - type: single
+    prompt: "What does this script print?"
+    code: |
+      class Account {
+        constructor(events) {
+          this.balance = 0
+          this.pending = []
+          events.forEach((e) => this.apply(e))
+        }
+        apply(e) {
+          if (e.type === 'Deposited') this.balance += e.amount
+          if (e.type === 'Withdrawn') this.balance -= e.amount
+        }
+        withdraw(n) {
+          if (n > this.balance) throw new Error('insufficient')
+          const e = { type: 'Withdrawn', amount: n }
+          this.apply(e)
+          this.pending.push(e)
+        }
+      }
+      const a = new Account([{ type: 'Deposited', amount: 100 }])
+      a.withdraw(30)
+      try {
+        a.withdraw(80)
+      } catch (e) {
+        console.log(e.message)
+      }
+      console.log(a.balance, a.pending.length)
+    codeLanguage: javascript
+    explanation: "The aggregate rebuilds its state from the stored events (balance 100), and the first withdrawal passes validation and records a new event (balance 70). The second asks for 80 which exceeds 70, so the command is rejected without producing an event. The result is `insufficient`, then `70 1`."
+    theoryUrl: https://martinfowler.com/eaaDev/EventSourcing.html
+    options:
+      - { text: "insufficient and then 70 1", correct: true }
+      - { text: "insufficient and then 100 0", correct: false }
+      - { text: "No error, and then -10 2", correct: false }
+      - { text: "insufficient and then 70 2", correct: false }
+  - type: single
+    prompt: "A `Deposited` event was stored with amount 1000 instead of 100 because of a typo, and read models have already used it. In an event-sourced system, what is the right way to correct this?"
+    explanation: "Events are immutable facts: you append a compensating event (for example `DepositCorrected` or a withdrawal of 900) so that history shows both the mistake and the fix. Editing or deleting stored events rewrites history, invalidates snapshots and projections already derived from it, and defeats the audit value."
+    theoryUrl: https://learn.microsoft.com/en-us/azure/architecture/patterns/event-sourcing
+    options:
+      - { text: "Update the stored event in place and rebuild the projections", correct: false }
+      - {
+          text: "Append a corrective event, and let projections apply it like any other",
+          correct: true,
+        }
+      - { text: "Delete the event from the stream, and then replay everything", correct: false }
+      - {
+          text: "Edit the read model directly and leave the event store alone, since the store is only a log",
+          correct: false,
+        }
+  - type: single
+    prompt: "A product dashboard needs a customer's orders joined with payments and shipments, filtered and sorted in many ways. Loading each aggregate by replaying its events is far too slow for these queries. What do you introduce?"
+    explanation: "A read model (projection) built by consuming events into a structure shaped for the queries (denormalised tables, a search index, a document), updated asynchronously. That is the 'Q' side of CQRS: queries do not go through aggregates. Replaying on every request or adding `JOIN`s to the event store itself does not scale."
+    theoryUrl: https://martinfowler.com/bliki/CQRS.html
+    options:
+      - {
+          text: "A denormalised read model fed by a projection that consumes the events",
+          correct: true,
+        }
+      - {
+          text: "A faster server for the event store, so that replay is quick enough on every request",
+          correct: false,
+        }
+      - {
+          text: "A global lock around the event store, to give each query a consistent snapshot",
+          correct: false,
+        }
+      - {
+          text: "SQL joins directly on the event store's table, using JSON operators for the payloads",
+          correct: false,
+        }
+  - type: single
+    prompt: "What does the first `console.log` print?"
+    code: |
+      const events = [
+        { type: 'Registered', id: 1, name: 'Ann' },
+        { type: 'Renamed', id: 1, name: 'Anna' },
+        { type: 'Registered', id: 2, name: 'Bob' },
+        { type: 'Deleted', id: 2 },
+      ]
+      function project(events) {
+        const rm = new Map()
+        for (const e of events) {
+          if (e.type === 'Deleted') rm.delete(e.id)
+          else rm.set(e.id, e.name)
+        }
+        return [...rm]
+      }
+      console.log(project(events))
+      console.log(project(events.slice(0, 3)))
+    codeLanguage: javascript
+    explanation: "Folding the events: user 1 is set to Ann, then renamed to Anna, user 2 is added as Bob and then removed by `Deleted`, leaving `[ [ 1, 'Anna' ] ]`. The second call stops before the deletion, so it also includes Bob. This is the essence of a projection and of temporal queries: the same events, folded up to a chosen point."
+    theoryUrl: https://martinfowler.com/eaaDev/EventSourcing.html
+    options:
+      - { text: "[ [ 1, 'Ann' ] ]", correct: false }
+      - { text: "[ [ 1, 'Anna' ], [ 2, 'Bob' ] ]", correct: false }
+      - { text: "[ [ 1, 'Anna' ] ]", correct: true }
+      - { text: "[ [ 1, 'Ann' ], [ 1, 'Anna' ] ]", correct: false }
+  - type: single
+    prompt: "What is printed, and what does it imply for rebuilding a projection?"
+    code: |
+      const events = [
+        { type: 'Registered', id: 1 },
+        { type: 'Renamed', id: 1 },
+        { type: 'Registered', id: 2 },
+      ]
+      const readModel = { registered: 0 }
+      function handle(e) {
+        if (e.type === 'Registered') readModel.registered++
+      }
+      events.forEach(handle)
+      events.forEach(handle) // replay from the start, without a reset
+      console.log(readModel.registered)
+    codeLanguage: javascript
+    explanation: "Two `Registered` events are handled twice, so it prints 4, not 2. A projection that increments state is not idempotent, so a replay or a duplicate delivery corrupts it. Rebuild by resetting the read model first (or into a fresh table), or make handlers idempotent, for example by tracking the last applied event position."
+    theoryUrl: https://learn.microsoft.com/en-us/azure/architecture/patterns/event-sourcing
+    options:
+      - { text: "2, because the handler ignores events it has already seen", correct: false }
+      - { text: "6, because every event is counted on both passes", correct: false }
+      - {
+          text: "4, so a rebuild must reset the read model or use idempotent handlers",
+          correct: true,
+        }
+      - {
+          text: "0, because `readModel` is reset when the function is called again",
+          correct: false,
+        }
+  - type: single
+    prompt: "Six months after launch, the business asks for a new report: monthly revenue per customer segment, going back to day one. Nothing in the current read models contains it. What does event sourcing allow you to do?"
+    explanation: "Because every past fact is stored, you can build a new projection and replay the whole history into it (ideally alongside the live ones, then switch queries over). This is one of the main benefits of the pattern. Data that was never recorded as an event cannot be recovered, but here the facts exist; only the view is missing."
+    theoryUrl: https://learn.microsoft.com/en-us/azure/architecture/patterns/event-sourcing
+    options:
+      - {
+          text: "Nothing: past data cannot be reinterpreted, and the report starts from today",
+          correct: false,
+        }
+      - {
+          text: "Edit the old events to add the segment, then rerun the existing projections",
+          correct: false,
+        }
+      - { text: "Create a new projection and replay the event history into it", correct: true }
+      - {
+          text: "Ask each service to export its current tables and join them by hand",
+          correct: false,
+        }
+  - type: single
+    prompt: "A long-lived `Account` aggregate has 80,000 events, and loading it takes 1.5 seconds because every command replays the whole stream. Which technique addresses this directly?"
+    explanation: "Snapshots store the aggregate state at some version (for example every 500 events), so loading starts from the latest snapshot and replays only the events after it. They are an optimisation and can always be rebuilt from events. Compressing the stream or caching read models does not shorten the aggregate's replay."
+    theoryUrl: https://learn.microsoft.com/en-us/azure/architecture/patterns/event-sourcing#issues-and-considerations
+    options:
+      - {
+          text: "Snapshot the aggregate every N events and replay only the events after it",
+          correct: true,
+        }
+      - {
+          text: "Delete the events older than one year, to keep the streams short and the loading time under control",
+          correct: false,
+        }
+      - {
+          text: "Serve the commands from the read model, so no aggregate is needed",
+          correct: false,
+        }
+      - {
+          text: "Add an index on the event type column, since replay scans every row",
+          correct: false,
+        }
+  - type: single
+    prompt: "What are the three lines printed by this script?"
+    code: |
+      const events = [
+        { type: 'Deposited', amount: 100 },
+        { type: 'Withdrawn', amount: 30 },
+        { type: 'Deposited', amount: 50 },
+        { type: 'Withdrawn', amount: 20 },
+      ]
+      const apply = (bal, e) =>
+        e.type === 'Deposited' ? bal + e.amount : bal - e.amount
+      const snapshot = { version: 2, balance: 70 }
+      console.log(events.reduce(apply, 0))
+      console.log(events.slice(snapshot.version).reduce(apply, snapshot.balance))
+      console.log(events.slice(0, 3).reduce(apply, 0))
+    codeLanguage: javascript
+    explanation: "A full replay gives 100 + (-30) + 50 + (-20) = 100. Starting from the snapshot at version 2 (balance 70) and applying only the last two events gives the same 100. The third line stops after three events (a point-in-time query) and gives 120. A correct snapshot never changes the result, only the cost."
+    theoryUrl: https://learn.microsoft.com/en-us/azure/architecture/patterns/event-sourcing#issues-and-considerations
+    options:
+      - { text: "100, then 100, then 120", correct: true }
+      - { text: "100, then 190, then 120", correct: false }
+      - { text: "100, then 100, then 100", correct: false }
+      - { text: "170, then 100, then 120", correct: false }
+  - type: single
+    prompt: "You fix a bug in the `apply` logic of your aggregate (a discount was applied wrongly in `ItemAdded`). Production has snapshots stored with the old state. What must you do with those snapshots?"
+    explanation: "A snapshot is a cache of state derived with the old logic. If the derivation changed, old snapshots can hold wrong state, so they must be invalidated (for example by tagging them with a snapshot or code version) and rebuilt from the events, which remain the truth. Keeping them leaves the bug alive for every aggregate loaded from one."
+    theoryUrl: https://learn.microsoft.com/en-us/azure/architecture/patterns/event-sourcing#issues-and-considerations
+    options:
+      - {
+          text: "Keep them, because snapshots are immutable and corrections only go to new events",
+          correct: false,
+        }
+      - {
+          text: "Invalidate and rebuild them from events, since they were derived with the old logic",
+          correct: true,
+        }
+      - {
+          text: "Patch each snapshot with a SQL update that recomputes only the discount",
+          correct: false,
+        }
+      - {
+          text: "Delete the events that were affected, so that the snapshots become correct",
+          correct: false,
+        }
+  - type: single
+    prompt: "What does this script print?"
+    code: |
+      const store = []
+      const readModel = { total: 0 }
+      function project(e) {
+        readModel.total += e.amount
+      }
+      function append(e) {
+        store.push(e)
+        setTimeout(() => project(e), 10)
+      }
+      append({ amount: 5 })
+      console.log('stored', store.length, 'read', readModel.total)
+      setTimeout(() => console.log('later read', readModel.total), 20)
+    codeLanguage: javascript
+    explanation: "The event is stored immediately, but the projection runs asynchronously 10 ms later, so the first log shows the read model still at 0. After the projection has run, the second log shows 5. This gap is eventual consistency between the write side and the read side."
+    theoryUrl: https://martinfowler.com/bliki/CQRS.html
+    options:
+      - { text: "stored 1 read 5, and then later read 5", correct: false }
+      - { text: "stored 1 read 0, and then later read 0", correct: false }
+      - { text: "stored 0 read 0, and then later read 5", correct: false }
+      - { text: "stored 1 read 0, and then later read 5", correct: true }
+  - type: single
+    prompt: "After clicking 'Place order', a customer is redirected to 'My orders' and the new order is missing for about a second, because the list comes from an asynchronously updated read model. Which fix gives the best user experience with the least cost?"
+    explanation: "Accept the eventual consistency and handle it in the UX: return the new order (or its version) from the command and show it optimistically, or have the query wait until the read model has reached the command's position. Making the write synchronous with every projection removes the benefits of CQRS, and an arbitrary sleep is fragile."
+    theoryUrl: https://martinfowler.com/bliki/CQRS.html
+    options:
+      - {
+          text: "Return the new order from the command and show it right away, or wait for the projection checkpoint",
+          correct: true,
+        }
+      - {
+          text: "Make the command wait until all projections have finished before it responds, so reads are always fresh",
+          correct: false,
+        }
+      - {
+          text: "Sleep 2 seconds before the redirect so the read model has time to catch up",
+          correct: false,
+        }
+      - {
+          text: "Tell users that orders can take a few minutes to appear in the list",
+          correct: false,
+        }
+  - type: boolean
+    prompt: "CQRS can only be used together with event sourcing."
+    answer: false
+    explanation: "CQRS only separates the write model from the read model. You can use it with a normal relational database for writes and a denormalised read store fed by CDC or events. Event sourcing is a separate pattern that pairs well with CQRS, but neither requires the other."
+    theoryUrl: https://martinfowler.com/bliki/CQRS.html
+  - type: single
+    prompt: "A back-office tool manages product categories and settings for about 20 internal users, built by a team of three. Someone proposes event sourcing with CQRS and Kafka-fed projections for it. What is your judgement?"
+    explanation: "Event sourcing and CQRS add real complexity: event versioning, projections, eventual consistency, new tooling and skills. They pay off in domains with audit needs, complex histories or very different read and write loads. A small CRUD admin gets none of these benefits, so a simple relational model is the better choice."
+    theoryUrl: https://martinfowler.com/bliki/CQRS.html
+    options:
+      - {
+          text: "Good idea, as every new system should start with an event store for flexibility, since history will surely help audits later",
+          correct: false,
+        }
+      - {
+          text: "Use event sourcing but skip CQRS, since reads from the event store are cheap",
+          correct: false,
+        }
+      - {
+          text: "Use plain CRUD on a relational database, because the pattern's costs outweigh any benefit",
+          correct: true,
+        }
+      - {
+          text: "Use CQRS only for the settings and keep event sourcing for the categories",
+          correct: false,
+        }
+  - type: multi
+    prompt: "A team is evaluating event sourcing for several new domains. Which of these are strong fits? Select all that apply."
+    explanation: "A financial ledger and an inventory with a strict audit trail benefit from immutable history and temporal queries, and a collaborative domain with complex conflict resolution benefits from having all the intent recorded. A simple settings table or a static content catalog gets no benefit from history and pays all the costs."
+    theoryUrl: https://learn.microsoft.com/en-us/azure/architecture/patterns/event-sourcing
+    options:
+      - { text: "A payments ledger that regulators audit", correct: true }
+      - { text: "A table of feature settings, edited rarely by a few admins", correct: false }
+      - {
+          text: "A warehouse stock tracker where past states must be reconstructible",
+          correct: true,
+        }
+      - {
+          text: "A booking system that needs to reason about the sequence of user intents",
+          correct: true,
+        }
+      - { text: "A static marketing content catalog that is rewritten every night", correct: false }
+  - type: single
+    prompt: "Your event store holds the full history, including customers' emails and addresses inside events. A customer exercises the GDPR right to erasure. Events are meant to be immutable. What is a widely used approach?"
+    explanation: "Keep personal data out of the events where possible (store it in a separate, deletable store referenced by id) or use crypto-shredding: encrypt each subject's personal data with a per-subject key and delete the key to make the data unreadable. Editing events in place breaks immutability, and ignoring the request is not an option."
+    theoryUrl: https://gdpr-info.eu/art-17-gdpr/
+    options:
+      - {
+          text: "Rewrite the event files by hand and rebuild all snapshots and projections",
+          correct: false,
+        }
+      - {
+          text: "Refuse the request, since an event-sourced system cannot forget anything",
+          correct: false,
+        }
+      - {
+          text: "Add a `CustomerErased` event that marks the customer as gone, and leave the personal data in earlier events",
+          correct: false,
+        }
+      - {
+          text: "Encrypt personal data per subject, or keep it outside events, and delete the key or the data",
+          correct: true,
+        }
+  - type: single
+    prompt: "After two years, the `OrderPlaced` event has gone through three schema versions in the event store. New code only understands the latest. What is the standard way to handle old events?"
+    explanation: "Because stored events are immutable, convert them when reading, with an upcaster that turns each old version into the latest shape before the aggregate or projection sees it. Rewriting the whole store is risky and loses the original facts, and making every handler support all versions spreads the complexity everywhere."
+    theoryUrl: https://martinfowler.com/articles/201701-event-driven.html
+    options:
+      - {
+          text: "Upcast old events to the latest shape at read time, leaving the store unchanged",
+          correct: true,
+        }
+      - {
+          text: "Migrate the entire store in place with a one-off script and drop the old versions",
+          correct: false,
+        }
+      - {
+          text: "Keep every old version in every handler, with one `switch` branch per version",
+          correct: false,
+        }
+      - {
+          text: "Ignore events older than the current version, since they are no longer relevant",
+          correct: false,
+        }
+  - type: single
+    prompt: "A projection handler throws an exception on event number 1,234,567 (an unexpected null). The projection process crashes, restarts, and fails on the same event again, so the read model is stuck. What is the best handling?"
+    explanation: "The projection should resume from its stored checkpoint, so make the failure visible (alerts) and handle the poison event deliberately: fix the handler and redeploy, or park the event in a dead-letter or quarantine list and continue. Skipping silently corrupts the read model, and deleting the event destroys history."
+    theoryUrl: https://learn.microsoft.com/en-us/azure/architecture/patterns/event-sourcing
+    options:
+      - {
+          text: "Delete event 1,234,567 from the store so the projection can move on",
+          correct: false,
+        }
+      - {
+          text: "Wrap the handler in an empty `catch`, to ignore any failure and move on",
+          correct: false,
+        }
+      - {
+          text: "Alert, then fix the handler or quarantine the event, and resume from the checkpoint",
+          correct: true,
+        }
+      - {
+          text: "Reset the projection to zero and replay, since a checkpoint can never be trusted",
+          correct: false,
+        }
+  - type: single
+    prompt: "A projection updates a read-model table and then saves its checkpoint (last processed event position) in a separate store. The process crashes between the two steps, and after the restart some events are applied twice. What is the cleanest fix?"
+    explanation: "Save the checkpoint in the same transaction as the read model changes (same database), so either both happen or neither, and the projection resumes exactly where its data stands. Alternatively, make handlers idempotent. Saving the checkpoint first would lose events on a crash instead of duplicating them."
+    theoryUrl: https://learn.microsoft.com/en-us/azure/architecture/patterns/event-sourcing
+    options:
+      - {
+          text: "Write the checkpoint first and the read model afterwards, to avoid duplicate events",
+          correct: false,
+        }
+      - {
+          text: "Store the checkpoint in the same transaction as the read model update",
+          correct: true,
+        }
+      - {
+          text: "Run two projection instances so that one always covers the other's crash",
+          correct: false,
+        }
+      - { text: "Keep the checkpoint only in memory, because restarts are rare", correct: false }
+  - type: single
+    prompt: "An e-commerce site has 200 reads for every write. Orders are written to a normalised store, but product search and listing pages are slow and compete with writes for database resources. How does CQRS help here?"
+    explanation: "Separating the models lets you project orders into a read store designed for the queries (a search index, a cache, a denormalised database) and scale it independently of the write side, which stays small and consistent. The price is eventual consistency and an extra pipeline, justified when read and write loads differ this much."
+    theoryUrl: https://learn.microsoft.com/en-us/azure/architecture/patterns/cqrs
+    options:
+      - {
+          text: "It makes the write side faster, since it no longer needs a transaction",
+          correct: false,
+        }
+      - {
+          text: "It lets reads use a separate, query-shaped store that scales independently of writes",
+          correct: true,
+        }
+      - {
+          text: "It removes eventual consistency, since the read and write models are the same",
+          correct: false,
+        }
+      - {
+          text: "It makes caching unnecessary, as commands refresh every client's screen",
+          correct: false,
+        }
+  - type: single
+    prompt: "A projection joins `OrderPlaced` events from the Orders stream with `PaymentTaken` events from the Payments stream. Occasionally a `PaymentTaken` event is processed before the matching `OrderPlaced`, and the projection throws 'order not found'. What is the correct view of the problem?"
+    explanation: "Ordering is guaranteed within one stream (or partition), not across streams, so a projection combining several must tolerate either arrival order, for example by upserting a partial row or buffering until the counterpart arrives, using a correlation id. Assuming a global order or dropping the early event breaks correctness."
+    theoryUrl: https://learn.microsoft.com/en-us/azure/architecture/patterns/event-sourcing
+    options:
+      - {
+          text: "Events across streams have no guaranteed order, so make the handler order-tolerant",
+          correct: true,
+        }
+      - {
+          text: "The broker has a bug, since events from two streams are always globally ordered",
+          correct: false,
+        }
+      - {
+          text: "Drop `PaymentTaken` events that arrive first, because the producer will resend them",
+          correct: false,
+        }
+      - {
+          text: "Add a 10 second sleep in the handler, so that the order event has time to arrive",
+          correct: false,
+        }
+  - type: single
+    prompt: "A subscriber reacts to `OrderPlaced` by sending a confirmation email, and you now replay the whole history into a new projection that lives in the same handler code. Customers start receiving thousands of old confirmation emails. What is the design lesson?"
+    explanation: "Replay re-delivers old events, so handlers with external side effects (emails, charges) must not run during a replay. Keep pure projections (safe to rebuild) separate from reactors that trigger actions, and make reactors idempotent and aware of whether they are processing live events or a replay."
+    theoryUrl: https://learn.microsoft.com/en-us/azure/architecture/patterns/event-sourcing
+    options:
+      - {
+          text: "Replays should be avoided entirely, since they cannot be made safe",
+          correct: false,
+        }
+      - {
+          text: "Keep projections free of side effects, and run reactors that send emails only on live events",
+          correct: true,
+        }
+      - {
+          text: "Add a 1 hour delay before each email so that replays can be cancelled in time",
+          correct: false,
+        }
+      - {
+          text: "Delete the old events before replaying so that no emails are ever triggered",
+          correct: false,
+        }
