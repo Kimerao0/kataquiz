@@ -18,6 +18,7 @@ describe('site header', () => {
 
     expect(screen.getByRole('link', { name: 'Sign in' })).toHaveAttribute('href', '/signin')
     expect(screen.queryByRole('button', { name: 'Sign out' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'My mistakes' })).not.toBeInTheDocument()
   })
 
   it("shows the user's name and a sign-out control when signed in", () => {
@@ -26,6 +27,7 @@ describe('site header', () => {
     expect(screen.getByText('Signed in as Ada Lovelace')).toBeVisible()
     expect(screen.getByRole('button', { name: 'Sign out' })).toBeEnabled()
     expect(screen.queryByRole('link', { name: 'Sign in' })).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'My mistakes' })).toHaveAttribute('href', '/mistakes')
   })
 
   it('keeps a long display name whole in the DOM and truncates it visually', () => {

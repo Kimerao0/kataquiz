@@ -1,4 +1,4 @@
-import { Compass, LogIn, Upload } from 'lucide-react'
+import { BookX, Compass, LogIn, Upload } from 'lucide-react'
 import Link from 'next/link'
 import { useTranslations } from 'next-intl'
 import type { ReactNode } from 'react'
@@ -105,6 +105,11 @@ export function SessionNav({ user }: { user: SessionUser | null }) {
       >
         {t('signedInAs', { name: user.name })}
       </span>
+      <Link href="/mistakes" className={navLink}>
+        <NavLabel icon={<BookX aria-hidden className="size-5 sm:hidden" />}>
+          {t('mistakes')}
+        </NavLabel>
+      </Link>
       <SignOutButton />
     </span>
   )

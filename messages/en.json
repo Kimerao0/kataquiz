@@ -7,6 +7,7 @@
     "label": "Main",
     "browse": "Browse quizzes",
     "upload": "Upload a quiz",
+    "mistakes": "My mistakes",
     "signIn": "Sign in",
     "signOut": "Sign out",
     "signingOut": "Signing out…",
@@ -71,6 +72,22 @@
     "percentWrong": "{percent}% wrong",
     "notEnoughData": "Not enough data yet",
     "topWrongPick": "Most picked wrong answer: {text} ({count})"
+  },
+  "mistakes": {
+    "title": "My mistakes",
+    "intro": "Every question you have answered wrong while signed in, most recent first.",
+    "signInTitle": "Sign in to see your mistakes",
+    "signInCta": "Sign in",
+    "tagsLabel": "Filter by tag",
+    "allTags": "All",
+    "count": "{count, plural, =1 {# question to review} other {# questions to review}}",
+    "download": "Download as JSON",
+    "listLabel": "Questions you got wrong, most recent first",
+    "timesWrong": "{count, plural, =1 {Wrong # time} other {Wrong # times}}",
+    "empty": "Nothing to review here yet. Questions you answer wrong while signed in show up on this page.",
+    "emptyCta": "Browse quizzes",
+    "emptyTag": "No mistakes tagged {tag}.",
+    "showAll": "Show all"
   },
   "run": {
     "title": "Ready to drill",

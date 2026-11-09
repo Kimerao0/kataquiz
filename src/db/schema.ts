@@ -179,10 +179,12 @@ export const attempts = pgTable(
   // `quiz_id` plus the owner column (`ownedBy` picks `user_id` for a signed-in
   // player, `guest_id` for a guest) and sort by `started_at` desc. One index per
   // owner column serves both kinds of player; a btree scans backwards, so no
-  // DESC is needed.
+  // DESC is needed. The mistakes queries (src/lib/mistakes/) filter by `user_id`
+  // alone, which the quiz-led indexes cannot serve on Postgres 17 (no skip scan).
   (table) => [
     index().on(table.quizId, table.userId, table.startedAt),
     index().on(table.quizId, table.guestId, table.startedAt),
+    index().on(table.userId, table.startedAt),
   ],
 )
 

@@ -1,0 +1,1 @@
+CREATE INDEX "attempts_user_id_started_at_index" ON "attempts" USING btree ("user_id","started_at");

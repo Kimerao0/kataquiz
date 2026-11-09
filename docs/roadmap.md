@@ -30,6 +30,9 @@ Closed items: `docs/roadmap-archive-2026-10.md`, `docs/roadmap-archive-2026-11.m
 - [ ] KQ07: Deleting a question destroys past answer rows
   `attempt_answers` cascades from `questions`, so the M2 editor will silently erase the per-answer history of finished runs while `attempts.score` keeps the old totals. Decide before the editor ships.
   _`src/db/schema.ts`_
+- [ ] KQ45: My mistakes page + JSON export
+  Lists the signed-in player's wrong answers with a tag filter and downloads them as `kataquiz-mistakes` v1 JSON, consumed by the separate aws-flashcards study app.
+  _new `src/lib/mistakes/`, `src/app/(app)/mistakes/`_
 
 
 ## Paths — "road to" series of quizzes
