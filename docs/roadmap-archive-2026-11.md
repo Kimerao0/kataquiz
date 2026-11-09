@@ -33,6 +33,12 @@ must still resolve.
   offers nothing. A run that finished between render and click is treated as gone; the lost-result
   case behind that is KQ41.
 
+- [x] KQ45: My mistakes page + JSON export
+  Closed by `1a0b167`. `/mistakes` lists the signed-in player's wrong answers on listed quizzes
+  (guest runs excluded), most recent first, with a tag filter and no correct answers shown.
+  `/mistakes/export` returns `kataquiz-mistakes` v1 JSON (including `imageUrl`), 401 for guests.
+  Owner-checked on a production build 2026-11-09: header at 375px, tag filter, download.
+
 ## Dropped
 
 - [-] KQ19: Drop the dead `ChallengeInvite.quizId`
