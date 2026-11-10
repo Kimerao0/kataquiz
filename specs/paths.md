@@ -24,6 +24,7 @@ Paths (KQ42-KQ44). Convert the existing settled spec docs/specs/2026-11-02-paths
 - `src/lib/paths/` (new: file schema, import, queries, progress, and their tests)
 - `src/lib/quiz-schema/index.ts` (shared parse helpers)
 - `src/lib/quizzes/import.ts`, `src/lib/quizzes/seed.ts`, `src/lib/quizzes/seed.test.ts`
+- `src/lib/quizzes/progress.ts` (export its `Executor` type, so path progress reuses it)
 - `src/lib/quizzes/seed-author.ts` (new: `SEED_AUTHOR_ID` on its own, to break the seed ↔ path-import cycle)
 - `src/lib/quiz-schema/seed-files.test.ts`
 - `src/lib/run/engine.ts` (`worstTier` next to `bestTier`)
@@ -159,3 +160,4 @@ Paths (KQ42-KQ44). Convert the existing settled spec docs/specs/2026-11-02-paths
 - 2026-11-10 — fence widened: `CLAUDE.md`, ac04ee9 reformats it for biome's markdown check (part of `pnpm check`); no feature change
 - 2026-11-10 — fence widened: `src/lib/quizzes/seed-author.ts`, breaks the `seed.ts` ↔ `paths/import.ts` import cycle (R1 check finding 4)
 - 2026-11-10 — R1 merged 708ca78
+- 2026-11-10 — fence widened: `src/lib/quizzes/progress.ts`, exports `Executor` for `getPathProgress` instead of a redeclared copy
