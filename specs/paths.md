@@ -2,7 +2,7 @@
 
 feature: paths
 title: Paths
-phase: approved
+phase: building
 ---
 
 # Paths
@@ -36,7 +36,8 @@ Paths (KQ42-KQ44). Convert the existing settled spec docs/specs/2026-11-02-paths
 - `src/app/(app)/page.tsx`, `src/app/(app)/q/[slug]/page.tsx`, `src/app/(app)/q/[slug]/run/page.tsx`
 - `src/components/paths/` (new)
 - `src/components/run/run-start-panel.tsx`, `src/components/run/run-player.tsx`,
-  `src/components/run/run-summary.tsx`, `src/components/run/run-summary.test.tsx`
+  `src/components/run/run-summary.tsx`, `src/components/run/run-summary.test.tsx`,
+  `src/components/run/run-player.test.tsx`, `src/components/run/challenge-invite-panel.test.tsx` (R4.7 replay and R4.8 challenge tests)
 - `src/components/site-header.tsx`, `src/components/site-header.test.tsx`
 - `src/components/quiz-row.tsx`, `src/components/quiz-row.test.tsx` (the catalog row renders the path badge)
 - `messages/en.json` (`paths` namespace)
@@ -186,3 +187,4 @@ Paths (KQ42-KQ44). Convert the existing settled spec docs/specs/2026-11-02-paths
 - 2026-11-10 — fence widened: `src/components/quiz-row.tsx` (+ test), the catalog row is where R3.5/R3.6's badge renders; `src/components/site-header.test.tsx`, R3.4's header link test
 - 2026-11-10 — Decisions 15–17 recorded from the R3 check (owner: go with the recommendations)
 - 2026-11-10 — R3 merged c8d90af
+- 2026-11-10 — fence widened: `src/components/run/run-player.test.tsx`, `src/components/run/challenge-invite-panel.test.tsx`, seams confirmed for R4.7 and R4.8
