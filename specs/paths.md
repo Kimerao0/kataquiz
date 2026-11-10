@@ -78,8 +78,8 @@ Paths (KQ42-KQ44). Convert the existing settled spec docs/specs/2026-11-02-paths
 2. [built] On `/upload`, a path file whose second step names an unknown or hidden quiz slug is refused with an error naming step 2, and no path is created.
 3. [built] On `/upload`, a path file that names the same quiz twice is refused with an error naming the repeated step, and a path file with 101 steps is refused with an error on `steps`.
 4. [built] On `/upload`, an author who has already uploaded 10 files in the last hour, mixing quizzes and paths, has an 11th path upload refused by the rate limit.
-5. [open] Running `pnpm db:seed` on a database with the seed quizzes reports Road to Software Architect and AWS Cloud Practitioner as imported, and a second run reports both as skipped, already imported.
-6. [open] On `/p/<slug>` of the seeded Road to Software Architect, the page lists 41 steps from Architect Roadmap 01 to 41 in order; on the seeded AWS Cloud Practitioner page, the 26th and last step is the mock exam.
+5. [built] Running `pnpm db:seed` on a database with the seed quizzes reports Road to Software Architect and AWS Cloud Practitioner as imported, and a second run reports both as skipped, already imported.
+6. [built] On `/p/<slug>` of the seeded Road to Software Architect, the page lists 41 steps from Architect Roadmap 01 to 41 in order; on the seeded AWS Cloud Practitioner page, the 26th and last step is the mock exam.
 7. [built] On `/p/<slug>` of a three-step path whose second quiz is hidden, the page lists two steps numbered 1 and 2; with the quiz deleted instead, it also lists two steps.
 8. [built] On `/p/<slug>` of a path whose every quiz is hidden, the page shows the empty state and no Continue button.
 9. [built] Opening `/p/<slug>` for a hidden path or an unknown slug shows the not-found page.
