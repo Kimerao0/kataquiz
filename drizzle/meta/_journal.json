@@ -50,6 +50,13 @@
       "when": 1793699754717,
       "tag": "0006_little_carmella_unuscione",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1794301129539,
+      "tag": "0007_large_hex",
+      "breakpoints": true
     }
   ]
 }

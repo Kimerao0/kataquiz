@@ -1,6 +1,16 @@
 import { eq } from 'drizzle-orm'
 import { type TestTx, withTestDb } from '@/test/db'
-import { attemptAnswers, attempts, options, questions, quizzes, rateLimits, user } from './schema'
+import {
+  attemptAnswers,
+  attempts,
+  options,
+  pathSteps,
+  paths,
+  questions,
+  quizzes,
+  rateLimits,
+  user,
+} from './schema'
 
 async function insertUser(tx: TestTx) {
   const id = `user-${crypto.randomUUID()}`
@@ -21,6 +31,14 @@ async function insertQuiz(tx: TestTx, slug = `quiz-${crypto.randomUUID()}`, auth
     })
     .returning({ id: quizzes.id })
   return quiz.id
+}
+
+async function insertPath(tx: TestTx) {
+  const [path] = await tx
+    .insert(paths)
+    .values({ slug: `path-${crypto.randomUUID()}`, title: 'Road to the licence', language: 'it' })
+    .returning({ id: paths.id })
+  return path.id
 }
 
 describe('schema', () => {
@@ -301,6 +319,44 @@ describe('schema', () => {
 
       expect(found?.answers).toHaveLength(1)
       expect(found?.answers[0]?.elapsedMs).toBe(1200)
+    })
+  })
+
+  it('deleting a quiz deletes its path steps', async () => {
+    await withTestDb(async (tx) => {
+      const pathId = await insertPath(tx)
+      const quizId = await insertQuiz(tx)
+      await tx.insert(pathSteps).values({ pathId, quizId, position: 1 })
+
+      await tx.delete(quizzes).where(eq(quizzes.id, quizId))
+
+      const left = await tx.select().from(pathSteps).where(eq(pathSteps.pathId, pathId))
+      expect(left).toHaveLength(0)
+    })
+  })
+
+  it('a quiz cannot appear twice in one path', async () => {
+    await withTestDb(async (tx) => {
+      const pathId = await insertPath(tx)
+      const quizId = await insertQuiz(tx)
+
+      await tx.insert(pathSteps).values({ pathId, quizId, position: 1 })
+      await expect(tx.insert(pathSteps).values({ pathId, quizId, position: 2 })).rejects.toThrow()
+    })
+  })
+
+  it('deleting a path deletes its steps', async () => {
+    await withTestDb(async (tx) => {
+      const pathId = await insertPath(tx)
+      const quizId = await insertQuiz(tx)
+      await tx.insert(pathSteps).values({ pathId, quizId, position: 1 })
+
+      await tx.delete(paths).where(eq(paths.id, pathId))
+
+      const left = await tx.select().from(pathSteps).where(eq(pathSteps.pathId, pathId))
+      expect(left).toHaveLength(0)
+      const [quiz] = await tx.select().from(quizzes).where(eq(quizzes.id, quizId))
+      expect(quiz, 'deleting a path must not delete its quizzes').toBeDefined()
     })
   })
 

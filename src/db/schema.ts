@@ -211,6 +211,40 @@ export const attemptAnswers = pgTable(
   (table) => [unique().on(table.attemptId, table.questionId), index().on(table.questionId)],
 )
 
+export const paths = pgTable('paths', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  slug: text('slug').notNull().unique(),
+  // Set null like quizzes.authorId: an account leaving must not destroy its paths.
+  authorId: text('author_id').references(() => user.id, { onDelete: 'set null' }),
+  title: text('title').notNull(),
+  description: text('description'),
+  language: text('language').notNull(),
+  isHidden: boolean('is_hidden').notNull().default(false),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+})
+
+export const pathSteps = pgTable(
+  'path_steps',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    pathId: uuid('path_id')
+      .notNull()
+      .references(() => paths.id, { onDelete: 'cascade' }),
+    quizId: uuid('quiz_id')
+      .notNull()
+      .references(() => quizzes.id, { onDelete: 'cascade' }),
+    position: integer('position').notNull(),
+  },
+  // The unique on (path_id, quiz_id) means a quiz appears once per path. The
+  // index on quiz_id serves "which paths contain this quiz", which the unique
+  // indexes cannot because they lead with `path_id`.
+  (table) => [
+    unique().on(table.pathId, table.position),
+    unique().on(table.pathId, table.quizId),
+    index().on(table.quizId),
+  ],
+)
+
 export const rateLimits = pgTable('rate_limits', {
   key: text('key').primaryKey(),
   windowStart: timestamp('window_start', { withTimezone: true }).notNull(),
@@ -224,6 +258,7 @@ export const userRelations = relations(user, ({ many }) => ({
 export const quizzesRelations = relations(quizzes, ({ one, many }) => ({
   author: one(user, { fields: [quizzes.authorId], references: [user.id] }),
   questions: many(questions),
+  pathSteps: many(pathSteps),
 }))
 
 export const questionsRelations = relations(questions, ({ one, many }) => ({
@@ -247,6 +282,16 @@ export const attemptAnswersRelations = relations(attemptAnswers, ({ one }) => ({
   question: one(questions, { fields: [attemptAnswers.questionId], references: [questions.id] }),
 }))
 
+export const pathsRelations = relations(paths, ({ one, many }) => ({
+  author: one(user, { fields: [paths.authorId], references: [user.id] }),
+  steps: many(pathSteps),
+}))
+
+export const pathStepsRelations = relations(pathSteps, ({ one }) => ({
+  path: one(paths, { fields: [pathSteps.pathId], references: [paths.id] }),
+  quiz: one(quizzes, { fields: [pathSteps.quizId], references: [quizzes.id] }),
+}))
+
 export type User = typeof user.$inferSelect
 export type NewUser = typeof user.$inferInsert
 export type Quiz = typeof quizzes.$inferSelect
@@ -259,3 +304,7 @@ export type Attempt = typeof attempts.$inferSelect
 export type NewAttempt = typeof attempts.$inferInsert
 export type AttemptAnswer = typeof attemptAnswers.$inferSelect
 export type NewAttemptAnswer = typeof attemptAnswers.$inferInsert
+export type Path = typeof paths.$inferSelect
+export type NewPath = typeof paths.$inferInsert
+export type PathStep = typeof pathSteps.$inferSelect
+export type NewPathStep = typeof pathSteps.$inferInsert

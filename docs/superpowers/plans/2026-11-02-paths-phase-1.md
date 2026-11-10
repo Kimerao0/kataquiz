@@ -86,8 +86,8 @@
 **Interfaces:**
 - Consumes: `PathFile`, `parsePathText`, `isPathText` (Task 1); `slugify`, `SLUG_SUFFIX_LENGTH`-style slugging from `src/lib/quizzes/import.ts` (export what's needed rather than duplicating).
 - Produces:
-  - `class PathStepError extends Error { step: number }` (1-based step number in the message: `steps.<n>: ...`).
-  - `importPath(params: { file: PathFile; authorId: string; resolveBy: 'slug' | 'seedTitle'; executor?: Executor }): Promise<{ pathId: string; slug: string }>` — resolves every step to a live (not hidden) quiz id, throws `PathStepError` for an unknown/hidden quiz, or for a `title` step when `resolveBy === 'slug'`; inserts the path and its steps (positions 1..n) in one transaction, with the same executor/transaction rule as `importQuiz`.
+  - `class PathStepError extends Error { step: number }` (1-based step number in the message: `step <n>: ...`, matching the parser's duplicate error; `steps.<n>` stays Zod's 0-based path only).
+  - `importPath(params: { file: PathFile; authorId: string; resolveBy: 'slug' | 'seedTitle'; executor?: Executor }): Promise<{ pathId: string; slug: string }>` — resolves every step to a live (not hidden) quiz id, throws `PathStepError` for an unknown/hidden quiz, for two steps that resolve to the same quiz id (e.g. a `quiz:` and a `title:` step naming one quiz — the parser only compares step text), or for a `title` step when `resolveBy === 'slug'`; inserts the path and its steps (positions 1..n) in one transaction, with the same executor/transaction rule as `importQuiz`.
   - `UploadResult` becomes `{ ok: true; kind: 'quiz' | 'path'; slug: string } | { ok: false; errors: string[] }`; the form navigates to `/q/<slug>` or `/p/<slug>` by `kind`.
 
 - [ ] **Step 1: Write failing tests**:
@@ -123,18 +123,18 @@
 **Interfaces:**
 - Consumes: tables (Task 2); `getBestTiers` (`src/lib/quizzes/progress.ts:14`); `Tier`, `bestTier` (`src/lib/run/engine.ts`).
 - Produces (all exclude hidden paths and hidden quizzes; positions are 1-based over live steps):
-  - `type PathStep = { position: number; quizId: string; quizSlug: string; quizTitle: string }`
-  - `type PathDetail = { id: string; slug: string; title: string; description: string | null; authorName: string | null; steps: PathStep[] }`
+  - `type LiveStep = { position: number; quizId: string; quizSlug: string; quizTitle: string }`
+  - `type PathDetail = { id: string; slug: string; title: string; description: string | null; authorName: string | null; steps: LiveStep[] }`
   - `getPath(slug: string, executor?): Promise<PathDetail | null>`
   - `type PathCard = { slug: string; title: string; stepCount: number; quizIds: string[] }` (live steps' quiz ids, so a page can compute ribbons with one `getBestTiers` call)
   - `listPaths(params: { page: number; pageSize: number; executor? }): Promise<{ items: PathCard[]; total: number }>` — newest first.
-  - `type PathPlacement = { pathSlug: string; pathTitle: string; position: number; total: number; previous: PathStep | null; next: PathStep | null }`
+  - `type PathPlacement = { pathSlug: string; pathTitle: string; position: number; total: number; previous: LiveStep | null; next: LiveStep | null }`
   - `getPlacements(quizId: string, executor?): Promise<PathPlacement[]>` — every path containing the quiz, newest path first.
   - `getPlacementsForQuizzes(quizIds: string[], executor?): Promise<Map<string, PathPlacement[]>>` — one query, for the catalog.
   - `nextSuggestions(placements: PathPlacement[], pathSlug: string | null): PathPlacement[]` — pure: the requested path only when it's among `placements`, else the first 3.
   - `type StepStatus = 'todo' | 'toPerfect' | 'perfected'`
   - `stepStatus(tier: Tier | null): StepStatus`; `pathTier(stepTiers: (Tier | null)[]): Tier | null` (null for an empty list; otherwise the worst step tier, and null if any step is null).
-  - `continueTarget(steps: PathStep[], tiers: Map<string, Tier> | null): { step: PathStep; mode: 'continue' | 'perfect' } | null` — `tiers === null` (guest) → first step, `continue`.
+  - `continueTarget(steps: LiveStep[], tiers: Map<string, Tier> | null): { step: LiveStep; mode: 'continue' | 'perfect' } | null` — `tiers === null` (guest) → first step, `continue`.
   - `getPathProgress(userId: string, path: PathDetail, executor?): Promise<Map<string, Tier>>` — `getBestTiers` over the path's quiz ids.
 
 - [ ] **Step 1: Write failing tests**:
@@ -153,7 +153,7 @@
 
 **Interfaces:**
 - Consumes: `getPath`, `getPathProgress`, `continueTarget`, `stepStatus`, `pathTier` (Task 5); `readPlayer`/`getCurrentUser` as the quiz page does; the KQ40 ribbon component used on the quiz page.
-- Produces: `PathSteps({ pathSlug, steps, tiers }: { pathSlug: string; steps: PathStep[]; tiers: Map<string, Tier> | null })` — ordered list; each row links to `/q/<quizSlug>/run?path=<pathSlug>`; with `tiers`, each row shows its status and ribbon.
+- Produces: `PathSteps({ pathSlug, steps, tiers }: { pathSlug: string; steps: LiveStep[]; tiers: Map<string, Tier> | null })` — ordered list; each row links to `/q/<quizSlug>/run?path=<pathSlug>`; with `tiers`, each row shows its status and ribbon.
 
 Page shape (same shell and Suspense pattern as `src/app/(app)/q/[slug]/page.tsx`): title, description, author, "N steps", for signed-in players a progress line (`{done} done · {perfected} perfected · {left} left`) and the path ribbon, the Continue / Perfect next button (`continueTarget`), then `PathSteps`. Unknown or hidden slug → `notFound()`. No live steps → `paths.emptyBody` and no button. `generateMetadata` gives the path title.
 
