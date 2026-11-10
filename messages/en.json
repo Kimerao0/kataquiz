@@ -6,6 +6,7 @@
   "nav": {
     "label": "Main",
     "browse": "Browse quizzes",
+    "paths": "Paths",
     "upload": "Upload a quiz",
     "mistakes": "My mistakes",
     "signIn": "Sign in",
@@ -248,6 +249,11 @@
       "toPerfect": "to perfect",
       "perfected": "perfected"
     },
-    "emptyBody": "None of the quizzes in this path are available right now."
+    "emptyBody": "None of the quizzes in this path are available right now.",
+    "badge": "{title} · {position}/{total}",
+    "badgeMore": "+{count}",
+    "placement": "Step {position} of {total} in {title}",
+    "previous": "Previous: {title}",
+    "next": "Next: {title}"
   }
 }

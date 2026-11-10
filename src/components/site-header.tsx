@@ -1,4 +1,4 @@
-import { BookX, Compass, LogIn, Upload } from 'lucide-react'
+import { BookX, Compass, LogIn, Route, Upload } from 'lucide-react'
 import Link from 'next/link'
 import { useTranslations } from 'next-intl'
 import type { ReactNode } from 'react'
@@ -62,6 +62,11 @@ export function HeaderShell({ children }: { children: ReactNode }) {
           <Link href="/" className={navLink}>
             <NavLabel icon={<Compass aria-hidden className="size-5 sm:hidden" />}>
               {t('browse')}
+            </NavLabel>
+          </Link>
+          <Link href="/paths" className={navLink}>
+            <NavLabel icon={<Route aria-hidden className="size-5 sm:hidden" />}>
+              {t('paths')}
             </NavLabel>
           </Link>
           <Link href="/upload" className={navLink}>

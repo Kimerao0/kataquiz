@@ -31,4 +31,27 @@ describe('quiz row', () => {
 
     expect(screen.getByText('Your best: Gold')).toBeInTheDocument()
   })
+
+  it('shows the path badge when given placements', () => {
+    renderWithMessages(
+      <QuizRow
+        quiz={quiz}
+        paths={[
+          {
+            pathSlug: 'road-to-ts',
+            pathTitle: 'Road to TypeScript',
+            position: 2,
+            total: 5,
+            previous: null,
+            next: null,
+          },
+        ]}
+      />,
+    )
+
+    expect(screen.getByRole('link', { name: 'Road to TypeScript · 2/5' })).toHaveAttribute(
+      'href',
+      '/p/road-to-ts',
+    )
+  })
 })

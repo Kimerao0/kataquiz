@@ -1,6 +1,8 @@
 import Link from 'next/link'
 import { useTranslations } from 'next-intl'
+import { PathBadge } from '@/components/paths/path-badge'
 import { TierRibbon } from '@/components/tier-ribbon'
+import type { PathPlacement } from '@/lib/paths/queries'
 import type { QuizSummary } from '@/lib/quizzes/search'
 import type { Tier } from '@/lib/run/engine'
 
@@ -12,10 +14,12 @@ export function QuizRow({
   quiz,
   activeTag,
   tier,
+  paths,
 }: {
   quiz: QuizSummary
   activeTag?: string
   tier?: Tier
+  paths?: PathPlacement[]
 }) {
   const t = useTranslations('common')
 
@@ -43,6 +47,7 @@ export function QuizRow({
           ))}
         </ul>
       )}
+      <PathBadge placements={paths ?? []} />
       <p className="flex flex-wrap items-center gap-x-4 gap-y-1 text-ink-quiet text-meta sm:col-start-2 sm:row-start-1 sm:self-center">
         <span>{t('questionCount', { count: quiz.questionCount })}</span>
         {tier && <TierRibbon tier={tier} />}

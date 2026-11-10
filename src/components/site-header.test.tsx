@@ -1,6 +1,6 @@
 import { screen } from '@testing-library/react'
 import { renderWithMessages } from '@/test/intl'
-import { SessionNav } from './site-header'
+import { HeaderShell, SessionNav } from './site-header'
 
 // site-header.tsx reaches the database through @/lib/session; the mock keeps
 // the import chain (and the pg Pool it builds at module scope) out of jsdom.
@@ -46,5 +46,18 @@ describe('site header', () => {
     // The visible label collapses to an icon below sm but stays the name.
     const signOut = screen.getByRole('button', { name: 'Sign out' })
     expect(signOut.querySelector('svg')).toHaveAttribute('aria-hidden', 'true')
+  })
+
+  it('links Paths between Browse and Upload', () => {
+    renderWithMessages(<HeaderShell>{null}</HeaderShell>)
+
+    const paths = screen.getByRole('link', { name: 'Paths' })
+    expect(paths).toHaveAttribute('href', '/paths')
+
+    const links = screen.getAllByRole('link')
+    const browse = links.indexOf(screen.getByRole('link', { name: 'Browse quizzes' }))
+    const upload = links.indexOf(screen.getByRole('link', { name: 'Upload a quiz' }))
+    expect(links.indexOf(paths)).toBeGreaterThan(browse)
+    expect(links.indexOf(paths)).toBeLessThan(upload)
   })
 })
