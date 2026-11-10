@@ -102,24 +102,31 @@ export const quizFileSchema = z
     error: 'must not exceed questionsPerRun',
   })
 
+export function readDocument(
+  text: string,
+): { ok: true; raw: unknown } | { ok: false; error: string } {
+  const trimmed = text.trim()
+  try {
+    return { ok: true, raw: trimmed.startsWith('{') ? JSON.parse(trimmed) : parseYaml(trimmed) }
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : String(error) }
+  }
+}
+
+export function formatIssues(issues: z.core.$ZodIssue[]): string[] {
+  return issues.map((issue) => {
+    const path = issue.path.map(String).join('.') || '(root)'
+    return `${path}: ${issue.message}`
+  })
+}
+
 export function parseQuizText(
   text: string,
 ): { ok: true; data: QuizFile } | { ok: false; errors: string[] } {
-  const trimmed = text.trim()
-  let raw: unknown
-  try {
-    raw = trimmed.startsWith('{') ? JSON.parse(trimmed) : parseYaml(trimmed)
-  } catch (error) {
-    return { ok: false, errors: [error instanceof Error ? error.message : String(error)] }
-  }
+  const document = readDocument(text)
+  if (!document.ok) return { ok: false, errors: [document.error] }
 
-  const result = quizFileSchema.safeParse(raw)
-  if (!result.success) {
-    const errors = result.error.issues.map((issue) => {
-      const path = issue.path.map(String).join('.') || '(root)'
-      return `${path}: ${issue.message}`
-    })
-    return { ok: false, errors }
-  }
+  const result = quizFileSchema.safeParse(document.raw)
+  if (!result.success) return { ok: false, errors: formatIssues(result.error.issues) }
   return { ok: true, data: result.data }
 }
