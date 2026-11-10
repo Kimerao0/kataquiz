@@ -2,7 +2,7 @@
 
 feature: paths
 title: Paths
-phase: proving
+phase: shipped
 ---
 
 # Paths
@@ -197,3 +197,4 @@ Paths (KQ42-KQ44). Convert the existing settled spec docs/specs/2026-11-02-paths
 - 2026-11-10 — R3 merged c8d90af
 - 2026-11-10 — fence widened: `src/components/run/run-player.test.tsx`, `src/components/run/challenge-invite-panel.test.tsx`, seams confirmed for R4.7 and R4.8
 - 2026-11-10 — fence widened: `src/components/run/run-start-panel.test.tsx`, the R4 check found the finished-resume branch's suggestion untested
+- 2026-11-10 — R4 merged 87b1e76
