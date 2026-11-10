@@ -256,6 +256,8 @@
     "placement": "Step {position} of {total} in {title}",
     "previous": "Previous: {title}",
     "next": "Next: {title}",
+    "nextIn": "Next in {path}: {title}",
+    "lastStep": "Last step of {path}",
     "stripTitle": "Paths",
     "seeAll": "See all",
     "listTitle": "Paths",

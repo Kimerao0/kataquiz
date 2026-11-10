@@ -1,8 +1,15 @@
 import { attempts, quizzes, user } from '@/db/schema'
 import type { Tier } from '@/lib/run/engine'
 import { type TestTx, withTestDb } from '@/test/db'
-import { continueTarget, getPathProgress, pathTier, progressCounts, stepStatus } from './progress'
-import type { LiveStep } from './queries'
+import {
+  continueTarget,
+  getPathProgress,
+  nextSuggestions,
+  pathTier,
+  progressCounts,
+  stepStatus,
+} from './progress'
+import type { LiveStep, PathPlacement } from './queries'
 
 function makeSteps(count: number): LiveStep[] {
   return Array.from({ length: count }, (_, index) => ({
@@ -121,6 +128,42 @@ describe('progressCounts', () => {
     ])
 
     expect(progressCounts(steps, tiers)).toEqual({ done: 3, perfected: 1, left: 1 })
+  })
+})
+
+function makePlacements(count: number): PathPlacement[] {
+  return Array.from({ length: count }, (_, index) => ({
+    pathSlug: `path-${index + 1}`,
+    pathTitle: `Path ${index + 1}`,
+    position: 1,
+    total: 2,
+    previous: null,
+    next: null,
+  }))
+}
+
+describe('nextSuggestions', () => {
+  it('keeps only the requested path when the quiz is in it', () => {
+    const placements = makePlacements(4)
+
+    expect(nextSuggestions(placements, 'path-2')).toEqual([placements[1]])
+  })
+
+  it('ignores a path the quiz is not in and returns up to 3', () => {
+    const placements = makePlacements(2)
+
+    expect(nextSuggestions(placements, 'elsewhere')).toEqual(placements)
+  })
+
+  it('ignores null and returns up to 3', () => {
+    const placements = makePlacements(5)
+
+    expect(nextSuggestions(placements, null)).toEqual(placements.slice(0, 3))
+  })
+
+  it('returns an empty list for no placements', () => {
+    expect(nextSuggestions([], 'path-1')).toEqual([])
+    expect(nextSuggestions([], null)).toEqual([])
   })
 })
 

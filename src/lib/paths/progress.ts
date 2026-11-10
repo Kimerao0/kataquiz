@@ -1,7 +1,7 @@
 import { db } from '@/db/client'
 import { type Executor, getBestTiers } from '@/lib/quizzes/progress'
 import { type Tier, worstTier } from '@/lib/run/engine'
-import type { LiveStep } from './queries'
+import type { LiveStep, PathPlacement } from './queries'
 
 export type StepStatus = 'todo' | 'toPerfect' | 'perfected'
 
@@ -39,6 +39,15 @@ export function progressCounts(
   const done = steps.filter((step) => tiers.has(step.quizId)).length
   const perfected = steps.filter((step) => tiers.get(step.quizId) === 'gold').length
   return { done, perfected, left: steps.length - done }
+}
+
+export function nextSuggestions(
+  placements: PathPlacement[],
+  pathSlug: string | null,
+): PathPlacement[] {
+  const requested = placements.find((placement) => placement.pathSlug === pathSlug)
+  if (requested) return [requested]
+  return placements.slice(0, 3)
 }
 
 export async function getPathProgress(
