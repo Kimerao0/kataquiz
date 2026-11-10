@@ -1,13 +1,7 @@
 import { attempts, quizzes, user } from '@/db/schema'
 import type { Tier } from '@/lib/run/engine'
 import { type TestTx, withTestDb } from '@/test/db'
-import {
-  continueTarget,
-  getPathProgress,
-  pathTier,
-  progressCounts,
-  stepStatus,
-} from './progress'
+import { continueTarget, getPathProgress, pathTier, progressCounts, stepStatus } from './progress'
 import type { LiveStep } from './queries'
 
 function makeSteps(count: number): LiveStep[] {

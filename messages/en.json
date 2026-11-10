@@ -241,6 +241,13 @@
   "paths": {
     "stepCount": "{count, plural, =1 {# step} other {# steps}}",
     "continue": "Continue",
+    "perfectNext": "Perfect next",
+    "progress": "{done} done · {perfected} perfected · {left} left",
+    "status": {
+      "todo": "to do",
+      "toPerfect": "to perfect",
+      "perfected": "perfected"
+    },
     "emptyBody": "None of the quizzes in this path are available right now."
   }
 }

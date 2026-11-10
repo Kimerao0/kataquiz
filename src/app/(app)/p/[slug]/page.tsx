@@ -1,13 +1,14 @@
 import type { Metadata } from 'next'
-import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { getTranslations } from 'next-intl/server'
 import { cache, Suspense } from 'react'
 import { PageFrame } from '@/components/page-frame'
+import { PathProgress } from '@/components/paths/path-progress'
 import { PathSteps } from '@/components/paths/path-steps'
-import { buttonVariants } from '@/components/ui/button'
+import { getPathProgress } from '@/lib/paths/progress'
 import { getPath } from '@/lib/paths/queries'
+import { getCurrentUser } from '@/lib/session'
 
 type PathParams = Promise<{ slug: string }>
 
@@ -50,7 +51,9 @@ async function PathDetailView({ params }: { params: PathParams }) {
   const tCatalog = await getTranslations('catalog')
   // A path outlives its author's account, so the byline has to stand in for one.
   const authorName = path.authorName ?? tCatalog('deletedAuthor')
-  const [first] = path.steps
+  const viewer = await getCurrentUser()
+  // Only a signed-in player has progress; a guest costs no query.
+  const tiers = viewer ? await getPathProgress(viewer.id, path.steps) : null
 
   return (
     <PageFrame
@@ -67,18 +70,10 @@ async function PathDetailView({ params }: { params: PathParams }) {
       <div className="flex max-w-measure flex-col gap-8 pt-4">
         {path.description && <p className="font-reading text-prose">{path.description}</p>}
 
-        {first ? (
+        {path.steps.length > 0 ? (
           <>
-            <Link
-              href={`/q/${first.quizSlug}/run?path=${encodeURIComponent(path.slug)}`}
-              className={buttonVariants({
-                size: 'lg',
-                className: 'h-12 w-full text-base sm:w-fit sm:px-12',
-              })}
-            >
-              {t('continue')}
-            </Link>
-            <PathSteps pathSlug={path.slug} steps={path.steps} />
+            <PathProgress pathSlug={path.slug} steps={path.steps} tiers={tiers} />
+            <PathSteps pathSlug={path.slug} steps={path.steps} tiers={tiers} />
           </>
         ) : (
           <p className="text-ink-quiet">{t('emptyBody')}</p>
