@@ -114,14 +114,14 @@ Paths (KQ42-KQ44). Convert the existing settled spec docs/specs/2026-11-02-paths
 
 #### Specs
 
-1. [open] On the catalog `/` with seven paths, a Paths strip above the quiz list shows the six newest with a See all link to `/paths`; with no paths, there is no strip.
-2. [open] On `/paths`, every non-hidden path is listed newest first and paginated like the catalog, and a hidden path does not appear.
-3. [open] On `/paths` and the catalog strip, a signed-in player sees their path ribbon on each card they have earned one for, and a guest sees no ribbons.
-4. [open] In the site header at 1440px, a Paths link sits between Browse and Upload and goes to `/paths`; at 375px it is an icon with the accessible name "Paths" and the header does not overflow.
-5. [open] On the catalog `/`, the row of a quiz that is step 16 of a 41-step path shows `<path title> · 16/41` linking to `/p/<path slug>`.
-6. [open] On the catalog `/`, the row of a quiz in three paths shows the first path's badge plus `+2`, and the row of a quiz in no path shows no badge.
-7. [open] On `/q/<slug>` of a quiz that is step 3 of a path, a line reads `Step 3 of <total> in <path title>` linking to the path, with links to steps 2 and 4.
-8. [open] On `/q/<slug>` of a path's first step there is no previous link, on its last step there is no next link, and a quiz in no path shows no path line.
+1. [built] On the catalog `/` with seven paths, a Paths strip above the quiz list shows the six newest with a See all link to `/paths`; with no paths, there is no strip.
+2. [built] On `/paths`, every non-hidden path is listed newest first and paginated like the catalog, and a hidden path does not appear.
+3. [built] On `/paths` and the catalog strip, a signed-in player sees their path ribbon on each card they have earned one for, and a guest sees no ribbons.
+4. [built] In the site header at 1440px, a Paths link sits between Browse and Upload and goes to `/paths`; at 375px it is an icon with the accessible name "Paths" and the header does not overflow.
+5. [built] On the catalog `/`, the row of a quiz that is step 16 of a 41-step path shows `<path title> · 16/41` linking to `/p/<path slug>`.
+6. [built] On the catalog `/`, the row of a quiz in three paths shows the first path's badge plus `+2`, and the row of a quiz in no path shows no badge.
+7. [built] On `/q/<slug>` of a quiz that is step 3 of a path, a line reads `Step 3 of <total> in <path title>` linking to the path, with links to steps 2 and 4.
+8. [built] On `/q/<slug>` of a path's first step there is no previous link, on its last step there is no next link, and a quiz in no path shows no path line.
 
 ### R4 — Next step after a run
 
