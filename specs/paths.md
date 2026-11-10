@@ -2,7 +2,7 @@
 
 feature: paths
 title: Paths
-phase: proving
+phase: approved
 ---
 
 # Paths
@@ -185,3 +185,4 @@ Paths (KQ42-KQ44). Convert the existing settled spec docs/specs/2026-11-02-paths
 - 2026-11-10 — R2 merged 8652eb4
 - 2026-11-10 — fence widened: `src/components/quiz-row.tsx` (+ test), the catalog row is where R3.5/R3.6's badge renders; `src/components/site-header.test.tsx`, R3.4's header link test
 - 2026-11-10 — Decisions 15–17 recorded from the R3 check (owner: go with the recommendations)
+- 2026-11-10 — R3 merged c8d90af
