@@ -34,6 +34,24 @@ describe('seed quizzes', () => {
   })
 })
 
+function quizTitle(file: string): string | undefined {
+  const parsed = parseQuizText(texts.get(file) ?? '')
+  return parsed.ok ? parsed.data.title : undefined
+}
+
+function quizTitlesOf(match: (file: string) => boolean): string[] {
+  return files
+    .filter(match)
+    .sort()
+    .flatMap((f) => quizTitle(f) ?? [])
+}
+
+function pathTitles(file: string): string[] {
+  const result = parsePathText(texts.get(file) ?? '')
+  if (!result.ok) throw new Error(`${file} is invalid`)
+  return result.data.steps.flatMap((step) => ('title' in step ? [step.title] : []))
+}
+
 describe('seed paths', () => {
   it('there is at least one seed path', () => {
     expect(pathFiles.length).toBeGreaterThan(0)
@@ -58,5 +76,37 @@ describe('seed paths', () => {
       'title' in step && !quizTitles.has(step.title) ? [step.title] : [],
     )
     expect(unknown).toEqual([])
+  })
+
+  // importPath resolves seed steps by title only, so any other step throws at seed time.
+  it.each(pathFiles)('%s has only title steps', (file) => {
+    const result = parsePathText(texts.get(file) ?? '')
+    if (!result.ok) throw new Error(`${file} is invalid`)
+    const offending = result.data.steps.flatMap((step, i) => ('title' in step ? [] : [i + 1]))
+    if (offending.length > 0) {
+      throw new Error(`${file} has non-title steps at step number(s) ${offending.join(', ')}`)
+    }
+  })
+
+  it('the architect path lists every architect-*.yaml quiz in file-number order', () => {
+    const expected = quizTitlesOf((f) => /^architect-\d+/.test(f))
+    expect(expected.length).toBeGreaterThan(0)
+    expect(pathTitles('path-road-to-software-architect.yaml')).toEqual(expected)
+  })
+
+  it('the AWS path lists the numbered topic quizzes in order, then the mock exam', () => {
+    const numbered = files
+      .map((f) => ({ f, title: quizTitle(f) ?? '' }))
+      .flatMap(({ title }) => {
+        const match = /^AWS Cloud Practitioner (\d+):/.exec(title)
+        return match ? [{ n: Number(match[1]), title }] : []
+      })
+      .sort((a, b) => a.n - b.n)
+      .map((q) => q.title)
+    expect(numbered.length).toBeGreaterThan(0)
+    expect(pathTitles('path-aws-cloud-practitioner.yaml')).toEqual([
+      ...numbered,
+      'AWS Cloud Practitioner: Mock exam (CLF-C02)',
+    ])
   })
 })
