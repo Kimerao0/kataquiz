@@ -4,8 +4,10 @@ import { ALREADY_IMPORTED, seedQuizzes } from '@/lib/quizzes/seed'
 const outcomes = await seedQuizzes({})
 
 for (const outcome of outcomes) {
-  if (outcome.status === 'imported') console.log(`imported ${outcome.file} as /q/${outcome.slug}`)
-  else console.log(`skipped ${outcome.file}: ${outcome.reason}`)
+  if (outcome.status === 'imported') {
+    const route = outcome.kind === 'path' ? 'p' : 'q'
+    console.log(`imported ${outcome.file} as /${route}/${outcome.slug}`)
+  } else console.log(`skipped ${outcome.file}: ${outcome.reason}`)
 }
 
 const imported = outcomes.filter((outcome) => outcome.status === 'imported').length

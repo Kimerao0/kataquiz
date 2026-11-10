@@ -2,9 +2,9 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { eq } from 'drizzle-orm'
-import { quizzes, user } from '@/db/schema'
+import { pathSteps, paths, quizzes, user } from '@/db/schema'
 import { type TestTx, withTestDb } from '@/test/db'
-import { SEED_AUTHOR_ID, seedQuizzes } from './seed'
+import { ALREADY_IMPORTED, SEED_AUTHOR_ID, seedQuizzes } from './seed'
 
 const createdDirs: string[] = []
 
@@ -70,6 +70,33 @@ questions:
     options:
       - { text: Alone, correct: true }
 `
+
+function pathYaml(title: string, stepTitles: string[]): string {
+  return `version: 1
+kind: path
+title: ${title}
+language: en
+steps:
+${stepTitles.map((stepTitle) => `  - title: ${stepTitle}`).join('\n')}
+`
+}
+
+function seededPaths(tx: TestTx) {
+  return tx
+    .select({ id: paths.id, title: paths.title })
+    .from(paths)
+    .where(eq(paths.authorId, SEED_AUTHOR_ID))
+}
+
+async function stepTitlesOf(tx: TestTx, pathId: string): Promise<string[]> {
+  const rows = await tx
+    .select({ title: quizzes.title })
+    .from(pathSteps)
+    .innerJoin(quizzes, eq(quizzes.id, pathSteps.quizId))
+    .where(eq(pathSteps.pathId, pathId))
+    .orderBy(pathSteps.position)
+  return rows.map((row) => row.title)
+}
 
 function seededQuizzes(tx: TestTx) {
   return tx
@@ -207,6 +234,66 @@ describe('seedQuizzes', () => {
       const outcomes = await seedQuizzes({ dir: fixtureDir({}), executor: tx })
 
       expect(outcomes).toEqual([])
+    })
+  })
+
+  it('imports a path after the quizzes it names', async () => {
+    await withTestDb(async (tx) => {
+      // 'a-path.yaml' sorts before both quiz files: the order is the seeder's, not the filesystem's.
+      const dir = fixtureDir({
+        'a-path.yaml': pathYaml('Seed Fixture Path', ['Seed Fixture Zulu', 'Seed Fixture Yankee']),
+        'y-quiz.yaml': quizYaml('Seed Fixture Yankee'),
+        'z-quiz.yaml': quizYaml('Seed Fixture Zulu'),
+      })
+
+      const outcomes = await seedQuizzes({ dir, executor: tx })
+
+      expect(outcomes).toHaveLength(3)
+      expect(outcomes.map((outcome) => outcome.status)).toEqual([
+        'imported',
+        'imported',
+        'imported',
+      ])
+      expect(outcomes.find((outcome) => outcome.file === 'a-path.yaml')?.slug).toEqual(
+        expect.any(String),
+      )
+      const [path] = await seededPaths(tx)
+      expect(path.title).toBe('Seed Fixture Path')
+      expect(await stepTitlesOf(tx, path.id)).toEqual(['Seed Fixture Zulu', 'Seed Fixture Yankee'])
+    })
+  })
+
+  it('skips a path already imported', async () => {
+    await withTestDb(async (tx) => {
+      const dir = fixtureDir({
+        'a-path.yaml': pathYaml('Seed Fixture Path', ['Seed Fixture Yankee']),
+        'y-quiz.yaml': quizYaml('Seed Fixture Yankee'),
+      })
+      await seedQuizzes({ dir, executor: tx })
+
+      const outcomes = await seedQuizzes({ dir, executor: tx })
+
+      expect(outcomes.find((outcome) => outcome.file === 'a-path.yaml')).toEqual(
+        expect.objectContaining({ status: 'skipped', reason: ALREADY_IMPORTED }),
+      )
+      expect(await seededPaths(tx)).toHaveLength(1)
+    })
+  })
+
+  it('reports a path naming a missing quiz title', async () => {
+    await withTestDb(async (tx) => {
+      const dir = fixtureDir({
+        'a-path.yaml': pathYaml('Seed Fixture Path', ['Seed Fixture Nowhere']),
+        'y-quiz.yaml': quizYaml('Seed Fixture Yankee'),
+      })
+
+      const outcomes = await seedQuizzes({ dir, executor: tx })
+
+      const outcome = outcomes.find((entry) => entry.file === 'a-path.yaml')
+      expect(outcome?.status).toBe('skipped')
+      expect(outcome?.reason).toContain('Seed Fixture Nowhere')
+      expect(outcome?.reason).not.toBe(ALREADY_IMPORTED)
+      expect(await seededPaths(tx)).toEqual([])
     })
   })
 })

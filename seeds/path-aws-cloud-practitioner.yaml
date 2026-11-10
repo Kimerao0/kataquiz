@@ -1,0 +1,32 @@
+version: 1
+kind: path
+title: AWS Cloud Practitioner
+description: Every topic of the CLF-C02 exam, then a full mock exam.
+language: en
+steps:
+  - title: "AWS Cloud Practitioner 01: Getting started"
+  - title: "AWS Cloud Practitioner 02: Accessing and using AWS services"
+  - title: "AWS Cloud Practitioner 03: Account security, permissions and IAM"
+  - title: "AWS Cloud Practitioner 04: Compute services and EC2"
+  - title: "AWS Cloud Practitioner 05: Managing cloud networks with VPCs"
+  - title: "AWS Cloud Practitioner 06: Scaling and load balancing"
+  - title: "AWS Cloud Practitioner 07: Storing files with EBS and EFS"
+  - title: "AWS Cloud Practitioner 08: S3 (Simple Storage Service)"
+  - title: "AWS Cloud Practitioner 09: Databases (RDS, Aurora, ElastiCache, DynamoDB)"
+  - title: "AWS Cloud Practitioner 10: Global networking and content delivery"
+  - title: "AWS Cloud Practitioner 11: Serverless and containers"
+  - title: "AWS Cloud Practitioner 12: APIs with API Gateway and AppSync"
+  - title: "AWS Cloud Practitioner 13: Deploying with Elastic Beanstalk, Lightsail and more"
+  - title: "AWS Cloud Practitioner 14: App integration with SQS, SNS and EventBridge"
+  - title: "AWS Cloud Practitioner 15: Monitoring workloads"
+  - title: "AWS Cloud Practitioner 16: Managing compute at scale"
+  - title: "AWS Cloud Practitioner 17: Cloud migration and hybrid cloud"
+  - title: "AWS Cloud Practitioner 18: Data analytics and data science"
+  - title: "AWS Cloud Practitioner 19: Cloud management"
+  - title: "AWS Cloud Practitioner 20: Security, a closer look"
+  - title: "AWS Cloud Practitioner 21: Developer tools"
+  - title: "AWS Cloud Practitioner 22: Other services"
+  - title: "AWS Cloud Practitioner 23: Cloud best practices"
+  - title: "AWS Cloud Practitioner 24: Additional offerings"
+  - title: "AWS Cloud Practitioner 25: Practice exam"
+  - title: "AWS Cloud Practitioner: Mock exam (CLF-C02)"

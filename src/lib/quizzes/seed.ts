@@ -4,7 +4,9 @@ import { and, eq } from 'drizzle-orm'
 import type { NodePgQueryResultHKT } from 'drizzle-orm/node-postgres'
 import type { PgDatabase } from 'drizzle-orm/pg-core'
 import { type Db, db } from '@/db/client'
-import { quizzes, user } from '@/db/schema'
+import { paths, quizzes, user } from '@/db/schema'
+import { isPathText, parsePathText } from '@/lib/paths/file'
+import { importPath, PathStepError } from '@/lib/paths/import'
 import { parseQuizText } from '@/lib/quiz-schema'
 import { importQuiz } from './import'
 
@@ -30,6 +32,7 @@ export type SeedOutcome = {
   status: 'imported' | 'skipped'
   slug?: string
   reason?: string
+  kind?: 'path'
 }
 
 export async function seedQuizzes(params: {
@@ -43,11 +46,18 @@ export async function seedQuizzes(params: {
     .filter((file) => QUIZ_EXTENSIONS.some((extension) => file.endsWith(extension)))
     .sort()
 
+  const texts = new Map(files.map((file) => [file, readFileSync(join(dir, file), 'utf8')]))
+  const pathFiles = files.filter((file) => isPathText(texts.get(file) ?? ''))
+  const quizFiles = files.filter((file) => !pathFiles.includes(file))
+
   const outcomes: SeedOutcome[] = []
   // One file at a time: they share an executor, and a transaction cannot run
-  // two statements at once.
-  for (const file of files) {
-    outcomes.push(await seedFile(file, dir, executor))
+  // two statements at once. Quizzes first: paths name them.
+  for (const file of quizFiles) {
+    outcomes.push(await seedFile(file, texts.get(file) ?? '', executor))
+  }
+  for (const file of pathFiles) {
+    outcomes.push(await seedPathFile(file, texts.get(file) ?? '', executor))
   }
   return outcomes
 }
@@ -61,8 +71,8 @@ async function ensureSeedAuthor(executor?: Executor): Promise<void> {
     .onConflictDoNothing()
 }
 
-async function seedFile(file: string, dir: string, executor?: Executor): Promise<SeedOutcome> {
-  const parsed = parseQuizText(readFileSync(join(dir, file), 'utf8'))
+async function seedFile(file: string, text: string, executor?: Executor): Promise<SeedOutcome> {
+  const parsed = parseQuizText(text)
   // One unparseable file must not cost the catalog all the others.
   if (!parsed.ok) return { file, status: 'skipped', reason: parsed.errors.join('; ') }
 
@@ -79,4 +89,33 @@ async function seedFile(file: string, dir: string, executor?: Executor): Promise
   // transaction, which is what keeps one quiz's three inserts atomic.
   const { slug } = await importQuiz({ file: parsed.data, authorId: SEED_AUTHOR_ID, executor })
   return { file, status: 'imported', slug }
+}
+
+async function seedPathFile(file: string, text: string, executor?: Executor): Promise<SeedOutcome> {
+  const parsed = parsePathText(text)
+  if (!parsed.ok) return { file, status: 'skipped', kind: 'path', reason: parsed.errors.join('; ') }
+
+  const [existing] = await (executor ?? db)
+    .select({ slug: paths.slug })
+    .from(paths)
+    .where(and(eq(paths.title, parsed.data.title), eq(paths.authorId, SEED_AUTHOR_ID)))
+    .limit(1)
+  if (existing) {
+    return { file, status: 'skipped', kind: 'path', slug: existing.slug, reason: ALREADY_IMPORTED }
+  }
+
+  try {
+    const { slug } = await importPath({
+      file: parsed.data,
+      authorId: SEED_AUTHOR_ID,
+      resolveBy: 'seedTitle',
+      executor,
+    })
+    return { file, status: 'imported', kind: 'path', slug }
+  } catch (error) {
+    if (error instanceof PathStepError) {
+      return { file, status: 'skipped', kind: 'path', reason: error.message }
+    }
+    throw error
+  }
 }
