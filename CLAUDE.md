@@ -12,7 +12,7 @@ points at it.
 - **Gate:** `pnpm check` (biome, `tsc`, vitest, portability). Vitest needs Postgres on **55432**
   (`pnpm db:up`). A stopped database shows up as `No test files found`, not as a connection error:
   check `docker ps` first.
-- **Tracker:** `docs/roadmap.md`, ids `KQnn`. Take the next id from the live file *and* the
+- **Tracker:** `docs/roadmap.md`, ids `KQnn`. Take the next id from the live file _and_ the
   `docs/roadmap-archive-*.md` files, never from the parser alone.
 - **UI work:** tests cannot see a page. Look at it with `pnpm shots`, and verify CSS against
   `pnpm build`, not `pnpm dev`, which serves stale CSS (KQ35).
