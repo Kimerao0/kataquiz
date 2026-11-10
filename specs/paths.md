@@ -2,7 +2,7 @@
 
 feature: paths
 title: Paths
-phase: checking
+phase: proving
 ---
 
 # Paths
@@ -95,15 +95,15 @@ Paths (KQ42-KQ44). Convert the existing settled spec docs/specs/2026-11-02-paths
 
 #### Specs
 
-1. [built] On `/p/<slug>` signed in, a step with no passing run shows "to do", a step whose best tier is bronze or silver shows "to perfect" with that ribbon, and a step at gold shows "perfected".
-2. [built] On `/p/<slug>` as a guest, no step shows a status or a ribbon, and there is no progress line.
-3. [built] On `/p/<slug>` signed in, the progress line reads `<done> done · <perfected> perfected · <left> left` and its numbers match the step statuses on the page.
-4. [built] On `/p/<slug>` signed in, the path ribbon is bronze when every live step is passed and the weakest is bronze, and there is no path ribbon while any live step is unpassed.
-5. [built] On `/p/<slug>` signed in, the path ribbon is gold when every live step is gold, and silver when the weakest live step is silver.
-6. [built] On `/p/<slug>` signed in with steps 1 and 2 passed, Continue links to step 3's run.
-7. [built] On `/p/<slug>` signed in with every step passed and step 2 the first below gold, the button reads Perfect next and links to step 2's run.
-8. [built] On `/p/<slug>` signed in with every step at gold, there is no Continue or Perfect next button.
-9. [built] On `/p/<slug>` as a guest, Continue links to the first step's run.
+1. [proven] On `/p/<slug>` signed in, a step with no passing run shows "to do", a step whose best tier is bronze or silver shows "to perfect" with that ribbon, and a step at gold shows "perfected".
+2. [proven] On `/p/<slug>` as a guest, no step shows a status or a ribbon, and there is no progress line.
+3. [proven] On `/p/<slug>` signed in, the progress line reads `<done> done · <perfected> perfected · <left> left` and its numbers match the step statuses on the page.
+4. [proven] On `/p/<slug>` signed in, the path ribbon is bronze when every live step is passed and the weakest is bronze, and there is no path ribbon while any live step is unpassed.
+5. [proven] On `/p/<slug>` signed in, the path ribbon is gold when every live step is gold, and silver when the weakest live step is silver.
+6. [proven] On `/p/<slug>` signed in with steps 1 and 2 passed, Continue links to step 3's run.
+7. [proven] On `/p/<slug>` signed in with every step passed and step 2 the first below gold, the button reads Perfect next and links to step 2's run.
+8. [proven] On `/p/<slug>` signed in with every step at gold, there is no Continue or Perfect next button.
+9. [proven] On `/p/<slug>` as a guest, Continue links to the first step's run.
 
 ### R3 — Browsing paths
 
@@ -141,18 +141,27 @@ Paths (KQ42-KQ44). Convert the existing settled spec docs/specs/2026-11-02-paths
 
 ## Proofs
 
-| Spec  | Verdict | Evidence                                       |
-| ----- | ------- | ---------------------------------------------- |
-| R1.1  | proven  | .proofs/paths/R1.1-observation.md              |
-| R1.2  | proven  | .proofs/paths/vitest-logic.txt                 |
-| R1.3  | proven  | .proofs/paths/vitest-logic.txt                 |
-| R1.4  | proven  | .proofs/paths/vitest-logic.txt                 |
-| R1.5  | proven  | .proofs/paths/R1.5-seed-twice.txt              |
-| R1.6  | proven  | .proofs/paths/R1.6-R1.10-served-pages.txt      |
-| R1.7  | proven  | .proofs/paths/R1.7-R1.8-R1.9-fixtures-http.txt |
-| R1.8  | proven  | .proofs/paths/R1.8-R1.9-followup.txt           |
-| R1.9  | proven  | .proofs/paths/R1.9-notfound-markup.txt         |
-| R1.10 | proven  | .proofs/paths/R1.6-R1.10-served-pages.txt      |
+| Spec  | Verdict | Evidence                                            |
+| ----- | ------- | --------------------------------------------------- |
+| R1.1  | proven  | .proofs/paths/R1.1-observation.md                   |
+| R1.2  | proven  | .proofs/paths/vitest-logic.txt                      |
+| R1.3  | proven  | .proofs/paths/vitest-logic.txt                      |
+| R1.4  | proven  | .proofs/paths/vitest-logic.txt                      |
+| R1.5  | proven  | .proofs/paths/R1.5-seed-twice.txt                   |
+| R1.6  | proven  | .proofs/paths/R1.6-R1.10-served-pages.txt           |
+| R1.7  | proven  | .proofs/paths/R1.7-R1.8-R1.9-fixtures-http.txt      |
+| R1.8  | proven  | .proofs/paths/R1.8-R1.9-followup.txt                |
+| R1.9  | proven  | .proofs/paths/R1.9-notfound-markup.txt              |
+| R1.10 | proven  | .proofs/paths/R1.6-R1.10-served-pages.txt           |
+| R2.1  | proven  | .proofs/paths/R2.1-step-status-and-ribbon.txt       |
+| R2.2  | proven  | .proofs/paths/R2.2-guest-no-status.txt              |
+| R2.3  | proven  | .proofs/paths/R2.3-progress-line.txt                |
+| R2.4  | proven  | .proofs/paths/R2.4-no-path-ribbon-when-unpassed.txt |
+| R2.5  | proven  | .proofs/paths/R2.5-path-ribbon-silver.txt           |
+| R2.6  | proven  | .proofs/paths/R2.6-continue-step3.txt               |
+| R2.7  | proven  | .proofs/paths/R2.7-perfect-next-step2.txt           |
+| R2.8  | proven  | .proofs/paths/R2.8-no-button-all-gold.txt           |
+| R2.9  | proven  | .proofs/paths/R2.9-guest-continue-first-step.txt    |
 
 ## Changelog
 
