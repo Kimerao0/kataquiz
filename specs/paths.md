@@ -2,7 +2,7 @@
 
 feature: paths
 title: Paths
-phase: approved
+phase: building
 ---
 
 # Paths
@@ -37,7 +37,8 @@ Paths (KQ42-KQ44). Convert the existing settled spec docs/specs/2026-11-02-paths
 - `src/components/paths/` (new)
 - `src/components/run/run-start-panel.tsx`, `src/components/run/run-player.tsx`,
   `src/components/run/run-summary.tsx`, `src/components/run/run-summary.test.tsx`
-- `src/components/site-header.tsx`
+- `src/components/site-header.tsx`, `src/components/site-header.test.tsx`
+- `src/components/quiz-row.tsx`, `src/components/quiz-row.test.tsx` (the catalog row renders the path badge)
 - `messages/en.json` (`paths` namespace)
 - `README.md` (path file format), `docs/roadmap.md`, `docs/roadmap-archive-2026-11.md`
 ### Out of scope
@@ -171,3 +172,4 @@ Paths (KQ42-KQ44). Convert the existing settled spec docs/specs/2026-11-02-paths
 - 2026-11-10 — R1 merged 708ca78
 - 2026-11-10 — fence widened: `src/lib/quizzes/progress.ts`, exports `Executor` for `getPathProgress` instead of a redeclared copy
 - 2026-11-10 — R2 merged 8652eb4
+- 2026-11-10 — fence widened: `src/components/quiz-row.tsx` (+ test), the catalog row is where R3.5/R3.6's badge renders; `src/components/site-header.test.tsx`, R3.4's header link test
