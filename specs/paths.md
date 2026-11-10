@@ -95,15 +95,15 @@ Paths (KQ42-KQ44). Convert the existing settled spec docs/specs/2026-11-02-paths
 
 #### Specs
 
-1. [open] On `/p/<slug>` signed in, a step with no passing run shows "to do", a step whose best tier is bronze or silver shows "to perfect" with that ribbon, and a step at gold shows "perfected".
-2. [open] On `/p/<slug>` as a guest, no step shows a status or a ribbon, and there is no progress line.
-3. [open] On `/p/<slug>` signed in, the progress line reads `<done> done · <perfected> perfected · <left> left` and its numbers match the step statuses on the page.
-4. [open] On `/p/<slug>` signed in, the path ribbon is bronze when every live step is passed and the weakest is bronze, and there is no path ribbon while any live step is unpassed.
-5. [open] On `/p/<slug>` signed in, the path ribbon is gold when every live step is gold, and silver when the weakest live step is silver.
-6. [open] On `/p/<slug>` signed in with steps 1 and 2 passed, Continue links to step 3's run.
-7. [open] On `/p/<slug>` signed in with every step passed and step 2 the first below gold, the button reads Perfect next and links to step 2's run.
-8. [open] On `/p/<slug>` signed in with every step at gold, there is no Continue or Perfect next button.
-9. [open] On `/p/<slug>` as a guest, Continue links to the first step's run.
+1. [built] On `/p/<slug>` signed in, a step with no passing run shows "to do", a step whose best tier is bronze or silver shows "to perfect" with that ribbon, and a step at gold shows "perfected".
+2. [built] On `/p/<slug>` as a guest, no step shows a status or a ribbon, and there is no progress line.
+3. [built] On `/p/<slug>` signed in, the progress line reads `<done> done · <perfected> perfected · <left> left` and its numbers match the step statuses on the page.
+4. [built] On `/p/<slug>` signed in, the path ribbon is bronze when every live step is passed and the weakest is bronze, and there is no path ribbon while any live step is unpassed.
+5. [built] On `/p/<slug>` signed in, the path ribbon is gold when every live step is gold, and silver when the weakest live step is silver.
+6. [built] On `/p/<slug>` signed in with steps 1 and 2 passed, Continue links to step 3's run.
+7. [built] On `/p/<slug>` signed in with every step passed and step 2 the first below gold, the button reads Perfect next and links to step 2's run.
+8. [built] On `/p/<slug>` signed in with every step at gold, there is no Continue or Perfect next button.
+9. [built] On `/p/<slug>` as a guest, Continue links to the first step's run.
 
 ### R3 — Browsing paths
 
