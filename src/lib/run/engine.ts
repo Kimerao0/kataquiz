@@ -91,3 +91,11 @@ export function bestTier(tiers: (Tier | null)[]): Tier | null {
   }
   return best
 }
+
+export function worstTier(tiers: Tier[]): Tier | null {
+  let worst: Tier | null = null
+  for (const tier of tiers) {
+    if (worst === null || TIER_RANK.indexOf(tier) < TIER_RANK.indexOf(worst)) worst = tier
+  }
+  return worst
+}

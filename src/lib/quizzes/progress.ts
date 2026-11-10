@@ -7,7 +7,7 @@ import { bestTier, type Tier, tierFor } from '@/lib/run/engine'
 
 // The base class of both `db` and a transaction, so tests can read through the
 // rollback harness.
-type Executor = PgDatabase<NodePgQueryResultHKT, Db['_']['fullSchema']>
+export type Executor = PgDatabase<NodePgQueryResultHKT, Db['_']['fullSchema']>
 
 // The best tier a signed-in player has reached on each quiz, keyed by quiz id.
 // Guest runs never count: a guest id is a cookie, not a person to remember.
