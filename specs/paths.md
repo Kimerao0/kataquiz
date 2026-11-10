@@ -2,7 +2,7 @@
 
 feature: paths
 title: Paths
-phase: checking
+phase: proving
 ---
 
 # Paths
@@ -135,46 +135,54 @@ Paths (KQ42-KQ44). Convert the existing settled spec docs/specs/2026-11-02-paths
 
 #### Specs
 
-1. [built] On the run summary of a quiz that is step 3 of one path, opened without `?path=`, a line reads `Next in <path title>: <step 4 title>` and links to step 4's run with `?path=<path slug>`.
-2. [built] On the run summary of a quiz in several paths, opened with `?path=<slug>` of one of them, only that path's next step is shown.
-3. [built] On the run summary opened with `?path=<slug>` of a path that does not contain the quiz, or does not exist, the summary lists the quiz's paths as if no `?path=` were given.
-4. [built] On the run summary of a quiz in five paths, opened without `?path=`, three path suggestions are shown.
-5. [built] On the run summary of a quiz that is the last step of a path, a line reads `Last step of <path title>` and links to `/p/<path slug>`.
-6. [built] On the run summary of a quiz in no path, no path line is shown.
-7. [built] On the run summary reached through Play again from a summary that showed a path suggestion, the same suggestion is shown.
-8. [built] On the summary of a challenge run at `/c/<attemptId>`, no path suggestion is shown.
+1. [proven] On the run summary of a quiz that is step 3 of one path, opened without `?path=`, a line reads `Next in <path title>: <step 4 title>` and links to step 4's run with `?path=<path slug>`.
+2. [proven] On the run summary of a quiz in several paths, opened with `?path=<slug>` of one of them, only that path's next step is shown.
+3. [proven] On the run summary opened with `?path=<slug>` of a path that does not contain the quiz, or does not exist, the summary lists the quiz's paths as if no `?path=` were given.
+4. [proven] On the run summary of a quiz in five paths, opened without `?path=`, three path suggestions are shown.
+5. [proven] On the run summary of a quiz that is the last step of a path, a line reads `Last step of <path title>` and links to `/p/<path slug>`.
+6. [proven] On the run summary of a quiz in no path, no path line is shown.
+7. [proven] On the run summary reached through Play again from a summary that showed a path suggestion, the same suggestion is shown.
+8. [proven] On the summary of a challenge run at `/c/<attemptId>`, no path suggestion is shown.
 
 ## Proofs
 
-| Spec  | Verdict | Evidence                                             |
-| ----- | ------- | ---------------------------------------------------- |
-| R1.1  | proven  | .proofs/paths/R1.1-observation.md                    |
-| R1.2  | proven  | .proofs/paths/vitest-logic.txt                       |
-| R1.3  | proven  | .proofs/paths/vitest-logic.txt                       |
-| R1.4  | proven  | .proofs/paths/vitest-logic.txt                       |
-| R1.5  | proven  | .proofs/paths/R1.5-seed-twice.txt                    |
-| R1.6  | proven  | .proofs/paths/R1.6-R1.10-served-pages.txt            |
-| R1.7  | proven  | .proofs/paths/R1.7-R1.8-R1.9-fixtures-http.txt       |
-| R1.8  | proven  | .proofs/paths/R1.8-R1.9-followup.txt                 |
-| R1.9  | proven  | .proofs/paths/R1.9-notfound-markup.txt               |
-| R1.10 | proven  | .proofs/paths/R1.6-R1.10-served-pages.txt            |
-| R2.1  | proven  | .proofs/paths/R2.1-step-status-and-ribbon.txt        |
-| R2.2  | proven  | .proofs/paths/R2.2-guest-no-status.txt               |
-| R2.3  | proven  | .proofs/paths/R2.3-progress-line.txt                 |
-| R2.4  | proven  | .proofs/paths/R2.4-no-path-ribbon-when-unpassed.txt  |
-| R2.5  | proven  | .proofs/paths/R2.5-path-ribbon-silver.txt            |
-| R2.6  | proven  | .proofs/paths/R2.6-continue-step3.txt                |
-| R2.7  | proven  | .proofs/paths/R2.7-perfect-next-step2.txt            |
-| R2.8  | proven  | .proofs/paths/R2.8-no-button-all-gold.txt            |
-| R2.9  | proven  | .proofs/paths/R2.9-guest-continue-first-step.txt     |
-| R3.1  | proven  | .proofs/paths/R3.1b-seven-paths-six-in-strip.txt     |
-| R3.2  | proven  | .proofs/paths/R3.2-paths-list-order-hidden-pager.txt |
-| R3.3  | proven  | .proofs/paths/R3.3-ribbons-signed-vs-guest.txt       |
-| R3.4  | proven  | .proofs/paths/R3.4-header-375-dark.png               |
-| R3.5  | proven  | .proofs/paths/R3.5-step16-of-41-badge.txt            |
-| R3.6  | proven  | .proofs/paths/R3.6-three-paths-plus2-and-none.txt    |
-| R3.7  | proven  | .proofs/paths/R3.7-step3-line-prev-next.txt          |
-| R3.8  | proven  | .proofs/paths/R3.8-first-last-none.txt               |
+| Spec  | Verdict | Evidence                                              |
+| ----- | ------- | ----------------------------------------------------- |
+| R1.1  | proven  | .proofs/paths/R1.1-observation.md                     |
+| R1.2  | proven  | .proofs/paths/vitest-logic.txt                        |
+| R1.3  | proven  | .proofs/paths/vitest-logic.txt                        |
+| R1.4  | proven  | .proofs/paths/vitest-logic.txt                        |
+| R1.5  | proven  | .proofs/paths/R1.5-seed-twice.txt                     |
+| R1.6  | proven  | .proofs/paths/R1.6-R1.10-served-pages.txt             |
+| R1.7  | proven  | .proofs/paths/R1.7-R1.8-R1.9-fixtures-http.txt        |
+| R1.8  | proven  | .proofs/paths/R1.8-R1.9-followup.txt                  |
+| R1.9  | proven  | .proofs/paths/R1.9-notfound-markup.txt                |
+| R1.10 | proven  | .proofs/paths/R1.6-R1.10-served-pages.txt             |
+| R2.1  | proven  | .proofs/paths/R2.1-step-status-and-ribbon.txt         |
+| R2.2  | proven  | .proofs/paths/R2.2-guest-no-status.txt                |
+| R2.3  | proven  | .proofs/paths/R2.3-progress-line.txt                  |
+| R2.4  | proven  | .proofs/paths/R2.4-no-path-ribbon-when-unpassed.txt   |
+| R2.5  | proven  | .proofs/paths/R2.5-path-ribbon-silver.txt             |
+| R2.6  | proven  | .proofs/paths/R2.6-continue-step3.txt                 |
+| R2.7  | proven  | .proofs/paths/R2.7-perfect-next-step2.txt             |
+| R2.8  | proven  | .proofs/paths/R2.8-no-button-all-gold.txt             |
+| R2.9  | proven  | .proofs/paths/R2.9-guest-continue-first-step.txt      |
+| R3.1  | proven  | .proofs/paths/R3.1b-seven-paths-six-in-strip.txt      |
+| R3.2  | proven  | .proofs/paths/R3.2-paths-list-order-hidden-pager.txt  |
+| R3.3  | proven  | .proofs/paths/R3.3-ribbons-signed-vs-guest.txt        |
+| R3.4  | proven  | .proofs/paths/R3.4-header-375-dark.png                |
+| R3.5  | proven  | .proofs/paths/R3.5-step16-of-41-badge.txt             |
+| R3.6  | proven  | .proofs/paths/R3.6-three-paths-plus2-and-none.txt     |
+| R3.7  | proven  | .proofs/paths/R3.7-step3-line-prev-next.txt           |
+| R3.8  | proven  | .proofs/paths/R3.8-first-last-none.txt                |
+| R4.1  | proven  | .proofs/paths/R4.1-next-step-link.txt                 |
+| R4.2  | proven  | .proofs/paths/R4.2-only-selected-path.txt             |
+| R4.3  | proven  | .proofs/paths/R4.3-unrelated-or-missing-path.txt      |
+| R4.4  | proven  | .proofs/paths/R4.4-three-suggestions-newest-first.txt |
+| R4.5  | proven  | .proofs/paths/R4.5-last-step.txt                      |
+| R4.6  | proven  | .proofs/paths/R4.6-no-path.txt                        |
+| R4.7  | proven  | .proofs/paths/R4.7-play-again-keeps-suggestion.txt    |
+| R4.8  | proven  | .proofs/paths/R4.8-challenge-no-suggestion.txt        |
 
 ## Changelog
 
