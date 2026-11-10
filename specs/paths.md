@@ -135,14 +135,14 @@ Paths (KQ42-KQ44). Convert the existing settled spec docs/specs/2026-11-02-paths
 
 #### Specs
 
-1. [open] On the run summary of a quiz that is step 3 of one path, opened without `?path=`, a line reads `Next in <path title>: <step 4 title>` and links to step 4's run with `?path=<path slug>`.
-2. [open] On the run summary of a quiz in several paths, opened with `?path=<slug>` of one of them, only that path's next step is shown.
-3. [open] On the run summary opened with `?path=<slug>` of a path that does not contain the quiz, or does not exist, the summary lists the quiz's paths as if no `?path=` were given.
-4. [open] On the run summary of a quiz in five paths, opened without `?path=`, three path suggestions are shown.
-5. [open] On the run summary of a quiz that is the last step of a path, a line reads `Last step of <path title>` and links to `/p/<path slug>`.
-6. [open] On the run summary of a quiz in no path, no path line is shown.
-7. [open] On the run summary reached through Play again from a summary that showed a path suggestion, the same suggestion is shown.
-8. [open] On the summary of a challenge run at `/c/<attemptId>`, no path suggestion is shown.
+1. [built] On the run summary of a quiz that is step 3 of one path, opened without `?path=`, a line reads `Next in <path title>: <step 4 title>` and links to step 4's run with `?path=<path slug>`.
+2. [built] On the run summary of a quiz in several paths, opened with `?path=<slug>` of one of them, only that path's next step is shown.
+3. [built] On the run summary opened with `?path=<slug>` of a path that does not contain the quiz, or does not exist, the summary lists the quiz's paths as if no `?path=` were given.
+4. [built] On the run summary of a quiz in five paths, opened without `?path=`, three path suggestions are shown.
+5. [built] On the run summary of a quiz that is the last step of a path, a line reads `Last step of <path title>` and links to `/p/<path slug>`.
+6. [built] On the run summary of a quiz in no path, no path line is shown.
+7. [built] On the run summary reached through Play again from a summary that showed a path suggestion, the same suggestion is shown.
+8. [built] On the summary of a challenge run at `/c/<attemptId>`, no path suggestion is shown.
 
 ## Proofs
 
