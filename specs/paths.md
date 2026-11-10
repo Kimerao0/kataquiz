@@ -2,7 +2,7 @@
 
 feature: paths
 title: Paths
-phase: building
+phase: checking
 ---
 
 # Paths
