@@ -1,5 +1,6 @@
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import type { PathPlacement } from '@/lib/paths/queries'
 import { TIMER_GRACE_MS } from '@/lib/run/engine'
 import type {
   AnswerResult,
@@ -10,17 +11,24 @@ import type {
 } from '@/lib/run/service'
 import { renderWithMessages } from '@/test/intl'
 import { ADVANCE_LOCK_MS, RunPlayer } from './run-player'
+import { RunStartPanel } from './run-start-panel'
 
-const { submitAnswerAction, resumeRunAction, fetchChallengeComparisonAction } = vi.hoisted(() => ({
-  submitAnswerAction: vi.fn(),
-  resumeRunAction: vi.fn(),
-  fetchChallengeComparisonAction: vi.fn(),
-}))
+const { startRunAction, submitAnswerAction, resumeRunAction, fetchChallengeComparisonAction } =
+  vi.hoisted(() => ({
+    startRunAction: vi.fn(),
+    submitAnswerAction: vi.fn(),
+    resumeRunAction: vi.fn(),
+    fetchChallengeComparisonAction: vi.fn(),
+  }))
 
 // A factory mock, so the real module — and the pg Pool it builds at import
 // time through @/lib/run/service — never loads in jsdom. The action has its
 // own tests against the service.
-vi.mock('@/app/(app)/q/[slug]/actions', () => ({ submitAnswerAction, resumeRunAction }))
+vi.mock('@/app/(app)/q/[slug]/actions', () => ({
+  startRunAction,
+  submitAnswerAction,
+  resumeRunAction,
+}))
 
 // Imported by the player for the challenge reveal, and reached by the same pg
 // Pool if it were allowed to load for real.
@@ -801,6 +809,79 @@ describe('run player', () => {
       await userEvent.click(screen.getByRole('button', { name: 'Next question' }))
       await userEvent.click(await optionAfterAdvance('Left'))
       expect(await screen.findByText('2 correct, 1 wrong')).toBeInTheDocument()
+    })
+  })
+
+  // Play again is wired by RunStartPanel, which remounts the player on every
+  // replay, so the suggestion has to be owned above it to survive. Rendered
+  // through the real panel: a player handed the prop by the test could not show
+  // whether the replayed one is handed it too.
+  describe('the path suggestion', () => {
+    const step3: PathPlacement = {
+      pathSlug: 'road-to-architect',
+      pathTitle: 'Road to Architect',
+      position: 3,
+      total: 5,
+      previous: { position: 2, quizId: 'id-2', quizSlug: 'cqrs', quizTitle: 'CQRS' },
+      next: {
+        position: 4,
+        quizId: 'id-4',
+        quizSlug: 'event-sourcing',
+        quizTitle: 'Event sourcing',
+      },
+    }
+
+    it('shows the same path suggestion on the summary of a run started by Play again', async () => {
+      startRunAction
+        .mockResolvedValueOnce({ ok: true, run: runOf(single, { total: 1 }) })
+        .mockResolvedValueOnce({
+          ok: true,
+          run: runOf(second, { attemptId: 'attempt-2', total: 1 }),
+        })
+      submitAnswerAction
+        .mockResolvedValueOnce({
+          ok: true,
+          result: resultOf({ next: null, summary: { ...summary, total: 1, score: 1 } }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          result: resultOf({
+            correctOptionIds: ['p1'],
+            next: null,
+            summary: { ...summary, attemptId: 'attempt-2', total: 1, score: 1 },
+          }),
+        })
+      renderWithMessages(
+        <RunStartPanel
+          slug="road-signs"
+          questionsPerRun={1}
+          maxErrors={0}
+          timePerQuestionSec={null}
+          askNickname={false}
+          initialNickname={null}
+          resumable={null}
+          pathNext={[step3]}
+        />,
+      )
+
+      await userEvent.click(screen.getByRole('button', { name: 'Begin' }))
+      await userEvent.click(await screen.findByRole('radio', { name: 'Warning' }))
+      await userEvent.click(await screen.findByRole('button', { name: 'See your result' }))
+      expect(
+        screen.getByRole('link', { name: 'Next in Road to Architect: Event sourcing' }),
+      ).toHaveAttribute('href', '/q/event-sourcing/run?path=road-to-architect')
+
+      await userEvent.click(screen.getByRole('button', { name: 'Play again' }))
+      await userEvent.click(await screen.findByRole('radio', { name: 'Red' }))
+      await userEvent.click(await screen.findByRole('button', { name: 'See your result' }))
+
+      // The replayed run's own summary, not the first one left on screen.
+      expect(screen.getByRole('textbox', { name: 'Challenge link' })).toHaveValue(
+        'http://localhost:3000/c/attempt-2',
+      )
+      expect(
+        screen.getByRole('link', { name: 'Next in Road to Architect: Event sourcing' }),
+      ).toHaveAttribute('href', '/q/event-sourcing/run?path=road-to-architect')
     })
   })
 })

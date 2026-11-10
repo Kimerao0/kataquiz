@@ -11,6 +11,7 @@ import {
 import { fetchChallengeComparisonAction } from '@/app/c/[attemptId]/actions'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
+import type { PathPlacement } from '@/lib/paths/queries'
 import type {
   AnswerResult,
   PublicQuestion,
@@ -70,6 +71,8 @@ type RunPlayerProps = {
   resumed?: { answered: number; history: Reviewed[] }
   /** Handed straight to the summary, where Play again sits. */
   onPlayAgain?: () => Promise<ReplayError | null>
+  /** Handed straight to the summary; never set on a challenge run. */
+  pathNext?: PathPlacement[]
 }
 
 /** '1'–'9' to a zero-based option index. Zero is skipped: it misfires. */
@@ -89,7 +92,14 @@ function isButton(target: EventTarget | null): boolean {
   return target instanceof HTMLElement && target.closest('button, a[href]') !== null
 }
 
-export function RunPlayer({ run, quizSlug, challenge, resumed, onPlayAgain }: RunPlayerProps) {
+export function RunPlayer({
+  run,
+  quizSlug,
+  challenge,
+  resumed,
+  onPlayAgain,
+  pathNext = [],
+}: RunPlayerProps) {
   const t = useTranslations('run')
   const tCommon = useTranslations('common')
 
@@ -363,6 +373,7 @@ export function RunPlayer({ run, quizSlug, challenge, resumed, onPlayAgain }: Ru
         comparison={comparison}
         reviewed={reviewed}
         onPlayAgain={onPlayAgain}
+        pathNext={pathNext}
       />
     )
   }

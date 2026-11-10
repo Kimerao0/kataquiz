@@ -288,4 +288,37 @@ describe('challenge invite panel', () => {
     expect(screen.getByText('You left a run unfinished — 3 of 12 answered.')).toBeVisible()
     expect(screen.getByRole('button', { name: 'Start over' })).toBeEnabled()
   })
+
+  // Defends R4.8: a challenge plays someone else's set, so its summary is no
+  // step on a path, whatever paths the quiz is in.
+  it('suggests no path step on the summary of a finished challenge run', async () => {
+    submitAnswerAction.mockResolvedValue({
+      ok: true,
+      result: {
+        correct: true,
+        timedOut: false,
+        correctOptionIds: ['o1'],
+        explanation: null,
+        theoryUrl: null,
+        next: null,
+        summary: { attemptId: 'attempt-2', score: 1, errors: 0, total: 1, passed: true },
+      },
+    })
+    fetchChallengeComparisonAction.mockResolvedValue({
+      ok: true,
+      comparison: {
+        mine: { attemptId: 'attempt-2', score: 1, errors: 0, total: 1, passed: true },
+        theirs: { attemptId: 'attempt-1', score: 0, errors: 1, total: 1, passed: false },
+      },
+    })
+    renderPanel({ askNickname: false })
+
+    await userEvent.click(screen.getByRole('button', { name: 'Take the challenge' }))
+    await userEvent.click(await screen.findByRole('radio', { name: 'Warning' }))
+    await userEvent.click(await screen.findByRole('button', { name: 'See your result' }))
+
+    expect(await screen.findByText('1 of 1 correct · no mistakes')).toBeVisible()
+    expect(screen.queryByText(/Next in/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/Last step of/)).not.toBeInTheDocument()
+  })
 })

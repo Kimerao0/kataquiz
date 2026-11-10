@@ -5,10 +5,12 @@ import Link from 'next/link'
 import { useTranslations } from 'next-intl'
 import { useEffect, useRef, useState } from 'react'
 import type { StartRunResult } from '@/app/(app)/q/[slug]/actions'
+import { PathNext } from '@/components/paths/path-next'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import type { PathPlacement } from '@/lib/paths/queries'
 import type { RunSummary as RunSummaryData } from '@/lib/run/service'
 import { cn } from '@/lib/utils'
 import { type Reviewed, RunReview } from './run-review'
@@ -40,6 +42,8 @@ type RunSummaryProps = {
    * navigation.
    */
   onPlayAgain?: () => Promise<ReplayError | null>
+  /** The next step of each path the quiz is in; never set on a challenge run. */
+  pathNext?: PathPlacement[]
 }
 
 export function RunSummary({
@@ -48,6 +52,7 @@ export function RunSummary({
   comparison,
   reviewed,
   onPlayAgain,
+  pathNext = [],
 }: RunSummaryProps) {
   const t = useTranslations('run')
   // The challenger's own attempt, never the one they were challenged on: the
@@ -84,6 +89,7 @@ export function RunSummary({
           {t('score', { score: summary.score, total: summary.total })} &middot;{' '}
           {t('errorCount', { errors: summary.errors })}
         </p>
+        <PathNext placements={pathNext} />
       </div>
 
       {comparison !== undefined && (

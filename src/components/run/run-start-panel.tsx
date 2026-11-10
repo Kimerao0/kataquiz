@@ -7,6 +7,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import type { PathPlacement } from '@/lib/paths/queries'
 import type { ResumableRun, RunResume, RunStart, RunSummary } from '@/lib/run/service'
 import { RunPlayer } from './run-player'
 import type { Reviewed } from './run-review'
@@ -34,6 +35,8 @@ type RunStartPanelProps = {
   initialNickname: string | null
   /** An unfinished run on this quiz, which the player is offered back. */
   resumable: ResumableRun | null
+  /** The next step of each path the quiz is in, kept for every replay. */
+  pathNext?: PathPlacement[]
 }
 
 function startedFrom(resume: RunResume): Started {
@@ -66,6 +69,7 @@ export function RunStartPanel({
   askNickname,
   initialNickname,
   resumable,
+  pathNext = [],
 }: RunStartPanelProps) {
   const t = useTranslations('run')
   const tQuiz = useTranslations('quiz')
@@ -169,6 +173,7 @@ export function RunStartPanel({
         quizSlug={slug}
         resumed={started.resumed}
         onPlayAgain={startFresh}
+        pathNext={pathNext}
       />
     )
   }
@@ -180,6 +185,7 @@ export function RunStartPanel({
         quizSlug={slug}
         reviewed={started.history}
         onPlayAgain={startFresh}
+        pathNext={pathNext}
       />
     )
   }

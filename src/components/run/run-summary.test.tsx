@@ -1,5 +1,6 @@
 import { act, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import type { PathPlacement } from '@/lib/paths/queries'
 import type { RunSummary as RunSummaryData } from '@/lib/run/service'
 import { renderWithMessages } from '@/test/intl'
 import { type ComparisonState, type ReplayError, RunSummary } from './run-summary'
@@ -249,5 +250,38 @@ describe('run summary play again', () => {
       'href',
       '/q/road-signs',
     )
+  })
+})
+
+describe('run summary path suggestion', () => {
+  const step3: PathPlacement = {
+    pathSlug: 'road-to-architect',
+    pathTitle: 'Road to Architect',
+    position: 3,
+    total: 5,
+    previous: { position: 2, quizId: 'id-2', quizSlug: 'cqrs', quizTitle: 'CQRS' },
+    next: { position: 4, quizId: 'id-4', quizSlug: 'event-sourcing', quizTitle: 'Event sourcing' },
+  }
+
+  it('shows the next step after a finished run', () => {
+    renderWithMessages(
+      <RunSummary summary={mine} quizSlug="road-signs" reviewed={[]} pathNext={[step3]} />,
+    )
+
+    expect(
+      screen.getByRole('link', { name: 'Next in Road to Architect: Event sourcing' }),
+    ).toHaveAttribute('href', '/q/event-sourcing/run?path=road-to-architect')
+  })
+
+  it.each<[string, PathPlacement[] | undefined]>([
+    ['is empty', []],
+    ['is omitted', undefined],
+  ])('shows nothing about paths when pathNext %s', (_, pathNext) => {
+    renderWithMessages(
+      <RunSummary summary={mine} quizSlug="road-signs" reviewed={[]} pathNext={pathNext} />,
+    )
+
+    expect(screen.queryByText(/Next in/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/Last step of/)).not.toBeInTheDocument()
   })
 })

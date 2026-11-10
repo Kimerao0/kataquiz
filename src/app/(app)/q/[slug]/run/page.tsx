@@ -5,11 +5,14 @@ import { useTranslations } from 'next-intl'
 import { getTranslations } from 'next-intl/server'
 import { cache, Suspense } from 'react'
 import { RunStartPanel } from '@/components/run/run-start-panel'
+import { nextSuggestions } from '@/lib/paths/progress'
+import { getPlacements } from '@/lib/paths/queries'
 import { getQuizBySlug } from '@/lib/quizzes/search'
 import { readPlayer } from '@/lib/run/identity'
 import { findResumableRun, lastNicknameFor } from '@/lib/run/service'
 
 type QuizParams = Promise<{ slug: string }>
+type RunSearchParams = Promise<{ [key: string]: string | string[] | undefined }>
 
 // generateMetadata and the page below both need the quiz; cache collapses the
 // two reads into one query per request.
@@ -23,7 +26,13 @@ export async function generateMetadata({ params }: { params: QuizParams }): Prom
   return { title: quiz.title }
 }
 
-export default function RunPage({ params }: { params: QuizParams }) {
+export default function RunPage({
+  params,
+  searchParams,
+}: {
+  params: QuizParams
+  searchParams: RunSearchParams
+}) {
   const t = useTranslations('common')
 
   return (
@@ -38,14 +47,20 @@ export default function RunPage({ params }: { params: QuizParams }) {
         {/* The slug is request data and the session is read per request, so
             everything below streams in and the shell stays prerendered. */}
         <Suspense fallback={<p className="text-ink-quiet text-meta">{t('loading')}</p>}>
-          <RunSetup params={params} />
+          <RunSetup params={params} searchParams={searchParams} />
         </Suspense>
       </div>
     </main>
   )
 }
 
-async function RunSetup({ params }: { params: QuizParams }) {
+async function RunSetup({
+  params,
+  searchParams,
+}: {
+  params: QuizParams
+  searchParams: RunSearchParams
+}) {
   const { slug } = await params
   const quiz = await loadQuiz(slug)
   if (!quiz) notFound()
@@ -55,8 +70,14 @@ async function RunSetup({ params }: { params: QuizParams }) {
   // played nothing, so there is nothing to look up and no cookie to mint. Who
   // is playing is settled again inside startRunAction; here it decides only
   // whether to ask for a nickname, what name to put in the field, and whether
-  // there is a run to pick back up.
-  const player = await readPlayer()
+  // there is a run to pick back up. The path placements do not depend on the
+  // player, so they travel in the same round trip.
+  const [player, placements, query] = await Promise.all([
+    readPlayer(),
+    getPlacements(quiz.id),
+    searchParams,
+  ])
+  const pathNext = nextSuggestions(placements, firstValue(query.path) ?? null)
   // Two independent reads about the same player, so they go together: in
   // series this screen would wait out two round trips of latency instead of
   // one.
@@ -95,7 +116,12 @@ async function RunSetup({ params }: { params: QuizParams }) {
         askNickname={player?.kind !== 'user'}
         initialNickname={initialNickname}
         resumable={resumable}
+        pathNext={pathNext}
       />
     </>
   )
+}
+
+function firstValue(value: string | string[] | undefined) {
+  return Array.isArray(value) ? value[0] : value
 }
