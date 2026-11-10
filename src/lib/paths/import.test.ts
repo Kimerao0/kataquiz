@@ -184,4 +184,22 @@ describe('importPath', () => {
       expect(await pathsTitled(tx, unmatched.title)).toEqual([])
     })
   })
+
+  it('resolves a hidden seed quiz by title', async () => {
+    await withTestDb(async (tx) => {
+      await insertSeedAuthor(tx)
+      const title = `Architect Roadmap 03 ${crypto.randomUUID()}`
+      const hidden = await insertQuiz(tx, { authorId: SEED_AUTHOR_ID, title, isHidden: true })
+
+      const file = pathFile([{ title }])
+      const { pathId } = await importPath({
+        file,
+        authorId: SEED_AUTHOR_ID,
+        resolveBy: 'seedTitle',
+        executor: tx,
+      })
+
+      expect(await readSteps(tx, pathId)).toEqual([{ quizId: hidden.id, position: 1 }])
+    })
+  })
 })

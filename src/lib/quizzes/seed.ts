@@ -9,8 +9,9 @@ import { isPathText, parsePathText } from '@/lib/paths/file'
 import { importPath, PathStepError } from '@/lib/paths/import'
 import { parseQuizText } from '@/lib/quiz-schema'
 import { importQuiz } from './import'
+import { SEED_AUTHOR_ID } from './seed-author'
 
-export const SEED_AUTHOR_ID = 'kataquiz-seed-author'
+export { SEED_AUTHOR_ID } from './seed-author'
 
 // The reason a re-run gives, as opposed to the one a broken file gives: only
 // the second kind is a failure, and the caller has to tell them apart.

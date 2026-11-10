@@ -3,7 +3,7 @@ import { nanoid } from 'nanoid'
 import { db } from '@/db/client'
 import { pathSteps, paths, quizzes } from '@/db/schema'
 import { type Executor, SLUG_SUFFIX_LENGTH, slugify } from '@/lib/quizzes/import'
-import { SEED_AUTHOR_ID } from '@/lib/quizzes/seed'
+import { SEED_AUTHOR_ID } from '@/lib/quizzes/seed-author'
 import type { PathFile, PathStepRef } from './file'
 
 type ResolveBy = 'slug' | 'seedTitle'
@@ -102,7 +102,8 @@ function missingReason(key: string, resolveBy: ResolveBy): string {
   return `no seed quiz titled "${key}"`
 }
 
-// Key (slug or seed title) to quiz id, live quizzes only, in one query.
+// Key (slug or seed title) to quiz id, in one query. Slugs resolve live quizzes
+// only; seed titles include hidden ones, which the path page skips at read time.
 async function liveQuizIds(
   executor: Executor,
   keys: string[],
@@ -122,11 +123,5 @@ function selectLiveQuizzes(executor: Executor, keys: string[], resolveBy: Resolv
   return executor
     .select({ key: quizzes.title, id: quizzes.id })
     .from(quizzes)
-    .where(
-      and(
-        inArray(quizzes.title, keys),
-        eq(quizzes.authorId, SEED_AUTHOR_ID),
-        eq(quizzes.isHidden, false),
-      ),
-    )
+    .where(and(inArray(quizzes.title, keys), eq(quizzes.authorId, SEED_AUTHOR_ID)))
 }
