@@ -2,7 +2,7 @@
 
 feature: paths
 title: Paths
-phase: proving
+phase: approved
 ---
 
 # Paths
@@ -170,3 +170,4 @@ Paths (KQ42-KQ44). Convert the existing settled spec docs/specs/2026-11-02-paths
 - 2026-11-10 — fence widened: `src/lib/quizzes/seed-author.ts`, breaks the `seed.ts` ↔ `paths/import.ts` import cycle (R1 check finding 4)
 - 2026-11-10 — R1 merged 708ca78
 - 2026-11-10 — fence widened: `src/lib/quizzes/progress.ts`, exports `Executor` for `getPathProgress` instead of a redeclared copy
+- 2026-11-10 — R2 merged 8652eb4
