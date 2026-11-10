@@ -6,7 +6,7 @@ export function PathSteps({ pathSlug, steps }: { pathSlug: string; steps: LiveSt
     <ol className="divide-y divide-rule border-rule border-y">
       {steps.map((step) => (
         <li key={step.quizId} className="flex items-baseline gap-4 py-3">
-          <span aria-hidden="true" className="w-6 text-ink-quiet text-meta">
+          <span aria-hidden="true" className="w-6 shrink-0 text-ink-quiet text-meta">
             {step.position}
           </span>
           <Link
