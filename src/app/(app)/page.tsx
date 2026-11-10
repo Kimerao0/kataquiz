@@ -3,10 +3,13 @@ import { useTranslations } from 'next-intl'
 import { getTranslations } from 'next-intl/server'
 import { Suspense } from 'react'
 import { PageFrame } from '@/components/page-frame'
+import { PathCardView } from '@/components/paths/path-card-view'
 import { QuizRow } from '@/components/quiz-row'
 import { Seal } from '@/components/seal'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { pathTier } from '@/lib/paths/progress'
+import { getPlacementsForQuizzes, listPaths, type PathCard } from '@/lib/paths/queries'
 import { getBestTiers } from '@/lib/quizzes/progress'
 import { listPopularTags, PAGE_SIZE, searchQuizzes } from '@/lib/quizzes/search'
 import type { Tier } from '@/lib/run/engine'
@@ -29,6 +32,9 @@ export default function CatalogPage({ searchParams }: { searchParams: CatalogSea
         </Suspense>
       }
     >
+      <Suspense fallback={null}>
+        <PathsStrip />
+      </Suspense>
       <Suspense fallback={<p className="text-ink-quiet text-meta">{tCommon('loading')}</p>}>
         <Results searchParams={searchParams} />
       </Suspense>
@@ -104,7 +110,9 @@ async function Results({ searchParams }: { searchParams: CatalogSearchParams }) 
   const { q, tag, page } = await readQuery(searchParams)
   const t = await getTranslations('catalog')
   const { items, total } = await searchQuizzes({ q, tag, page })
-  const tiers = await viewerTiers(items.map((quiz) => quiz.id))
+  const quizIds = items.map((quiz) => quiz.id)
+  const tiers = await viewerTiers(quizIds)
+  const placements = await getPlacementsForQuizzes(quizIds)
   const lastPage = Math.max(Math.ceil(total / PAGE_SIZE), 1)
 
   return (
@@ -117,7 +125,12 @@ async function Results({ searchParams }: { searchParams: CatalogSearchParams }) 
           <ul className="divide-y divide-rule border-rule border-y">
             {items.map((quiz) => (
               <li key={quiz.id}>
-                <QuizRow quiz={quiz} activeTag={tag} tier={tiers.get(quiz.id)} />
+                <QuizRow
+                  quiz={quiz}
+                  activeTag={tag}
+                  tier={tiers.get(quiz.id)}
+                  paths={placements.get(quiz.id) ?? []}
+                />
               </li>
             ))}
           </ul>
@@ -127,6 +140,40 @@ async function Results({ searchParams }: { searchParams: CatalogSearchParams }) 
       <Pagination q={q} tag={tag} page={page} lastPage={lastPage} />
     </div>
   )
+}
+
+const STRIP_SIZE = 6
+
+async function PathsStrip() {
+  const t = await getTranslations('paths')
+  const { items } = await listPaths({ page: 1, pageSize: STRIP_SIZE })
+  if (items.length === 0) return null
+
+  const tiers = await viewerTiers(items.flatMap((card) => card.quizIds))
+
+  return (
+    <section aria-labelledby="paths-strip-title" className="mb-10 flex flex-col gap-2">
+      <div className="flex items-baseline justify-between gap-4">
+        <h2 id="paths-strip-title" className="text-ink-quiet text-meta">
+          {t('stripTitle')}
+        </h2>
+        <Link href="/paths" className="py-1 text-meta underline underline-offset-4">
+          {t('seeAll')}
+        </Link>
+      </div>
+      <ul className="divide-y divide-rule border-rule border-y">
+        {items.map((card) => (
+          <li key={card.slug}>
+            <PathCardView card={card} tier={cardTier(card, tiers)} />
+          </li>
+        ))}
+      </ul>
+    </section>
+  )
+}
+
+function cardTier(card: PathCard, tiers: Map<string, Tier>): Tier | null {
+  return pathTier(card.quizIds.map((id) => tiers.get(id) ?? null))
 }
 
 // Ribbons are a signed-in player's own record; a visitor gets none and costs

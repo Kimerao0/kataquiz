@@ -254,6 +254,10 @@
     "badgeMore": "+{count}",
     "placement": "Step {position} of {total} in {title}",
     "previous": "Previous: {title}",
-    "next": "Next: {title}"
+    "next": "Next: {title}",
+    "stripTitle": "Paths",
+    "seeAll": "See all",
+    "listTitle": "Paths",
+    "listEmpty": "No paths yet."
   }
 }

@@ -5,8 +5,10 @@ import { useTranslations } from 'next-intl'
 import { getTranslations } from 'next-intl/server'
 import { cache, Suspense } from 'react'
 import { PageFrame } from '@/components/page-frame'
+import { PathPlacements } from '@/components/paths/path-placements'
 import { TierRibbon } from '@/components/tier-ribbon'
 import { buttonVariants } from '@/components/ui/button'
+import { getPlacements } from '@/lib/paths/queries'
 import { getBestTiers } from '@/lib/quizzes/progress'
 import { getQuizBySlug } from '@/lib/quizzes/search'
 import { canSeeStats } from '@/lib/quizzes/stats'
@@ -52,6 +54,7 @@ async function QuizDetail({ params }: { params: QuizParams }) {
   const t = await getTranslations('quiz')
   const viewer = await getCurrentUser()
   const tier = await viewerTier(viewer, quiz.id)
+  const placements = await getPlacements(quiz.id)
   const tCatalog = await getTranslations('catalog')
   const tStats = await getTranslations('stats')
   // A quiz outlives its author's account, so the byline has to stand in for one.
@@ -114,6 +117,8 @@ async function QuizDetail({ params }: { params: QuizParams }) {
             <TierRibbon tier={tier} variant="full" />
           </p>
         )}
+
+        <PathPlacements placements={placements} />
 
         <section aria-label={t('settingsLabel')} className="flex flex-col gap-8">
           <dl className="divide-y divide-rule border-rule border-y">
