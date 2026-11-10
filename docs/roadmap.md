@@ -34,14 +34,11 @@ Closed items: `docs/roadmap-archive-2026-10.md`, `docs/roadmap-archive-2026-11.m
 
 ## Paths — "road to" series of quizzes
 
-Spec: `docs/specs/2026-11-02-paths.md` (settled 2026-11-02). Plan for phase 1:
-`docs/superpowers/plans/2026-11-02-paths-phase-1.md`.
+Spec: `specs/paths.md` (phase 1, KQ42, shipped locally 2026-11-10; archived). Original design:
+`docs/specs/2026-11-02-paths.md`.
 
-- [ ] KQ42: Paths, phase 1 — path files, path page, progress, suggestions, first two paths
-  An ordered list of existing quizzes with its own page (`/p/<slug>`): status per step from KQ40 tiers (done / to perfect / perfected), a path ribbon, Continue. Path files go through `/upload` (steps by slug) and `seeds/` (steps by title). Suggestions on the run summary, quiz page and catalog row; a strip above the catalog plus `/paths`. Ships Road to Software Architect and AWS Cloud Practitioner as seeds.
-  _new `src/lib/paths/`, `src/app/(app)/p/`, `src/app/(app)/paths/`, `src/db/schema.ts`_
 - [ ] KQ43: Paths, phase 2 — build a path in the app
-  An authoring UI that writes the same data as a path file. Close to the quiz editor (KQ04); settle its details when it starts. Blocked on KQ42.
+  An authoring UI that writes the same data as a path file. Close to the quiz editor (KQ04); settle its details in its own spec when it starts.
 - [ ] KQ44: Paths, phase 3 — create a path from a tag
   "Make a path from the quizzes tagged X" produces a normal, editable path, never a live tag-derived grouping, so there is one source of truth. Blocked on KQ43.
 

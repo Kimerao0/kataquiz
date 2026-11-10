@@ -39,6 +39,13 @@ must still resolve.
   `/mistakes/export` returns `kataquiz-mistakes` v1 JSON (including `imageUrl`), 401 for guests.
   Owner-checked on a production build 2026-11-09: header at 375px, tag filter, download.
 
+- [x] KQ42: Paths, phase 1 — path files, path page, progress, suggestions, first two paths
+  Built through the core-workflow chain from `specs/paths.md` in four releases, each proven on a
+  production build: R1 path object (`708ca78`), R2 progress (`8652eb4`), R3 browsing (`c8d90af`),
+  R4 next step after a run (`87b1e76`). Groundwork before the spec: `b85a3a4`, `fa8607c`
+  (migration 0007). Deviations recorded in the spec's Decisions 15–17. Seeds: Road to Software
+  Architect (41 steps) and AWS Cloud Practitioner (26). Not yet pushed to production at close.
+
 ## Dropped
 
 - [-] KQ19: Drop the dead `ChallengeInvite.quizId`

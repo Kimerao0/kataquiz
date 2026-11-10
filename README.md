@@ -108,6 +108,26 @@ The rules are deliberately forgiving, so an author who typed a backtick for some
 
 Neither mechanism is markdown and neither produces HTML. Quiz content is user-supplied and public, so the parser in [`src/lib/quiz-schema/inline-code.ts`](src/lib/quiz-schema/inline-code.ts) returns a list of plain `{ kind, value }` segments and the UI renders them as React children. Nothing in a quiz file is ever interpreted as markup.
 
+## Path file format
+
+A path is an ordered list of existing quizzes, with its own page at `/p/<slug>`. A path file is YAML or JSON like a quiz file, and `/upload` tells the two apart by `kind: path`.
+
+```yaml
+version: 1
+kind: path
+title: Road to TypeScript
+description: From the basics to the type system. # optional
+language: en
+steps:
+  - quiz: typescript-basics-a1b2c3
+  - quiz: typescript-narrowing-d4e5f6
+```
+
+- Uploaded files name each step by **quiz slug** (from the `/q/<slug>` URL). Seed files in `seeds/` name steps by **quiz title** instead (`- title: "…"`), matched among the seed author's quizzes, because seed slugs get a random suffix at import.
+- Any public quiz can be a step, including other people's. At most 100 steps, and a quiz appears at most once.
+- A path is immutable once published: uploading again creates a new path. It spends the same upload limit as a quiz.
+- A hidden or deleted quiz drops out of the path at read time, and the remaining steps renumber.
+
 ## Run rules
 
 - A run samples `questionsPerRun` distinct questions at random from the bank, so every run differs.
