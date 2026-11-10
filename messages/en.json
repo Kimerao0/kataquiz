@@ -234,5 +234,10 @@
     "body": "Something broke on our side, not yours. Nothing you had already finished is lost. Trying again often works.",
     "home": "Browse quizzes",
     "seal": "!"
+  },
+  "paths": {
+    "stepCount": "{count, plural, =1 {# step} other {# steps}}",
+    "continue": "Continue",
+    "emptyBody": "None of the quizzes in this path are available right now."
   }
 }
