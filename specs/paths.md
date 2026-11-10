@@ -75,7 +75,7 @@ Paths (KQ42-KQ44). Convert the existing settled spec docs/specs/2026-11-02-paths
 
 #### Specs
 
-1. [owner-check] On `/upload`, a signed-in author who submits a path YAML naming two public quizzes by slug lands on `/p/<new slug>`, which lists those two quizzes in file order.
+1. [proven] On `/upload`, a signed-in author who submits a path YAML naming two public quizzes by slug lands on `/p/<new slug>`, which lists those two quizzes in file order.
 2. [proven] On `/upload`, a path file whose second step names an unknown or hidden quiz slug is refused with an error naming step 2, and no path is created.
 3. [proven] On `/upload`, a path file that names the same quiz twice is refused with an error naming the repeated step, and a path file with 101 steps is refused with an error on `steps`.
 4. [proven] On `/upload`, an author who has already uploaded 10 files in the last hour, mixing quizzes and paths, has an 11th path upload refused by the rate limit.
@@ -140,18 +140,18 @@ Paths (KQ42-KQ44). Convert the existing settled spec docs/specs/2026-11-02-paths
 
 ## Proofs
 
-| Spec  | Verdict     | Evidence                                       |
-| ----- | ----------- | ---------------------------------------------- |
-| R1.1  | owner-check | .proofs/paths/owner-check.md                   |
-| R1.2  | proven      | .proofs/paths/vitest-logic.txt                 |
-| R1.3  | proven      | .proofs/paths/vitest-logic.txt                 |
-| R1.4  | proven      | .proofs/paths/vitest-logic.txt                 |
-| R1.5  | proven      | .proofs/paths/R1.5-seed-twice.txt              |
-| R1.6  | proven      | .proofs/paths/R1.6-R1.10-served-pages.txt      |
-| R1.7  | proven      | .proofs/paths/R1.7-R1.8-R1.9-fixtures-http.txt |
-| R1.8  | proven      | .proofs/paths/R1.8-R1.9-followup.txt           |
-| R1.9  | proven      | .proofs/paths/R1.9-notfound-markup.txt         |
-| R1.10 | proven      | .proofs/paths/R1.6-R1.10-served-pages.txt      |
+| Spec  | Verdict | Evidence                                       |
+| ----- | ------- | ---------------------------------------------- |
+| R1.1  | proven  | .proofs/paths/R1.1-observation.md              |
+| R1.2  | proven  | .proofs/paths/vitest-logic.txt                 |
+| R1.3  | proven  | .proofs/paths/vitest-logic.txt                 |
+| R1.4  | proven  | .proofs/paths/vitest-logic.txt                 |
+| R1.5  | proven  | .proofs/paths/R1.5-seed-twice.txt              |
+| R1.6  | proven  | .proofs/paths/R1.6-R1.10-served-pages.txt      |
+| R1.7  | proven  | .proofs/paths/R1.7-R1.8-R1.9-fixtures-http.txt |
+| R1.8  | proven  | .proofs/paths/R1.8-R1.9-followup.txt           |
+| R1.9  | proven  | .proofs/paths/R1.9-notfound-markup.txt         |
+| R1.10 | proven  | .proofs/paths/R1.6-R1.10-served-pages.txt      |
 
 ## Changelog
 
