@@ -12,7 +12,7 @@ const steps: LiveStep[] = [
 
 describe('PathSteps', () => {
   it('links every step to its run with the path, in order', () => {
-    renderWithMessages(<PathSteps pathSlug="road-to-react" steps={steps} />)
+    renderWithMessages(<PathSteps pathSlug="road-to-react" steps={steps} tiers={null} />)
 
     const hrefs = screen.getAllByRole('link').map((link) => link.getAttribute('href'))
 
@@ -24,7 +24,7 @@ describe('PathSteps', () => {
   })
 
   it('shows the position and the title on each row', () => {
-    renderWithMessages(<PathSteps pathSlug="road-to-react" steps={steps} />)
+    renderWithMessages(<PathSteps pathSlug="road-to-react" steps={steps} tiers={null} />)
 
     const rows = screen.getAllByRole('listitem')
 

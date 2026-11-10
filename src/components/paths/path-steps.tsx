@@ -12,7 +12,7 @@ export function PathSteps({
 }: {
   pathSlug: string
   steps: LiveStep[]
-  tiers?: Map<string, Tier> | null
+  tiers: Map<string, Tier> | null
 }) {
   const t = useTranslations('paths')
 
@@ -28,7 +28,7 @@ export function PathSteps({
             </span>
             <Link
               href={`/q/${step.quizSlug}/run?path=${encodeURIComponent(pathSlug)}`}
-              className="font-reading font-semibold text-xl underline-offset-4 hover:text-ai hover:underline"
+              className="min-w-0 font-reading font-semibold text-xl underline-offset-4 [overflow-wrap:anywhere] hover:text-ai hover:underline"
             >
               {step.quizTitle}
             </Link>
