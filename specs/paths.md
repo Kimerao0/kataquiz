@@ -69,10 +69,10 @@ Paths (KQ42-KQ44). Convert the existing settled spec docs/specs/2026-11-02-paths
 4. [open] On `/upload`, an author who has already uploaded 10 files in the last hour, mixing quizzes and paths, has an 11th path upload refused by the rate limit.
 5. [open] Running `pnpm db:seed` on a database with the seed quizzes reports Road to Software Architect and AWS Cloud Practitioner as imported, and a second run reports both as skipped, already imported.
 6. [open] On `/p/<slug>` of the seeded Road to Software Architect, the page lists 41 steps from Architect Roadmap 01 to 41 in order; on the seeded AWS Cloud Practitioner page, the 26th and last step is the mock exam.
-7. [open] On `/p/<slug>` of a three-step path whose second quiz is hidden, the page lists two steps numbered 1 and 2; with the quiz deleted instead, it also lists two steps.
-8. [open] On `/p/<slug>` of a path whose every quiz is hidden, the page shows the empty state and no Continue button.
-9. [open] Opening `/p/<slug>` for a hidden path or an unknown slug shows the not-found page.
-10. [open] On `/p/<slug>`, each step links to `/q/<quiz slug>/run?path=<path slug>`, and Continue links to the first step's run.
+7. [built] On `/p/<slug>` of a three-step path whose second quiz is hidden, the page lists two steps numbered 1 and 2; with the quiz deleted instead, it also lists two steps.
+8. [built] On `/p/<slug>` of a path whose every quiz is hidden, the page shows the empty state and no Continue button.
+9. [built] Opening `/p/<slug>` for a hidden path or an unknown slug shows the not-found page.
+10. [built] On `/p/<slug>`, each step links to `/q/<quiz slug>/run?path=<path slug>`, and Continue links to the first step's run.
 
 ### R2 — Progress on the path page
 **What we do:** A signed-in player sees each step's status, the path ribbon and a Continue or Perfect next button that follows their progress.
