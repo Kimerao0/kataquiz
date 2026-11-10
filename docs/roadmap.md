@@ -124,6 +124,10 @@ Spec: `docs/specs/2026-11-02-paths.md` (settled 2026-11-02). Plan for phase 1:
 
 ## Tooling — each of these has already cost a wasted cycle
 
+- [ ] KQ46: `getCurrentUser` runs a session query on every call
+  Not wrapped in React `cache()` and better-auth has no `cookieCache`, so a signed-in catalog render now makes three session lookups (header, paths strip, results). Harmless at this scale; wrapping it in `cache()` fixes every page at once. Found in the paths R3 review.
+  _`src/lib/session.ts:11`_
+
 - [ ] KQ35: The dev server silently serves stale CSS
   `globals.css` edits repeatedly failed to reach the bundle; a whole screenshot round was a picture of CSS that was never applied. Verify design work against `pnpm build`, not `pnpm dev`.
 
