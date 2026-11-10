@@ -49,3 +49,4 @@ next-env.d.ts
 
 # UI screenshots from scripts/shots.mts
 /shots
+.proofs/
