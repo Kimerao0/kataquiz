@@ -252,6 +252,7 @@
     "emptyBody": "None of the quizzes in this path are available right now.",
     "badge": "{title} · {position}/{total}",
     "badgeMore": "+{count}",
+    "badgeMoreLabel": "{count, plural, one {# more path} other {# more paths}}",
     "placement": "Step {position} of {total} in {title}",
     "previous": "Previous: {title}",
     "next": "Next: {title}",

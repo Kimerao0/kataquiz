@@ -21,6 +21,16 @@ describe('PathCardView', () => {
     expect(screen.getByText('3 steps')).toBeInTheDocument()
   })
 
+  it('renders the title as an h2 by default and as an h3 when headingLevel is 3', () => {
+    const { unmount } = renderWithMessages(<PathCardView card={card} tier={null} />)
+    expect(screen.getByRole('heading', { level: 2, name: 'Road to React' })).toBeInTheDocument()
+    unmount()
+
+    renderWithMessages(<PathCardView card={card} tier={null} headingLevel={3} />)
+    expect(screen.getByRole('heading', { level: 3, name: 'Road to React' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { level: 2 })).not.toBeInTheDocument()
+  })
+
   it('shows a tier ribbon only when a tier is given', () => {
     const { unmount } = renderWithMessages(<PathCardView card={card} tier={null} />)
     expect(screen.queryByText(/Your best/)).not.toBeInTheDocument()

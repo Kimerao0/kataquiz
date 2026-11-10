@@ -33,7 +33,7 @@ export default function CatalogPage({ searchParams }: { searchParams: CatalogSea
       }
     >
       <Suspense fallback={null}>
-        <PathsStrip />
+        <PathsStrip searchParams={searchParams} />
       </Suspense>
       <Suspense fallback={<p className="text-ink-quiet text-meta">{tCommon('loading')}</p>}>
         <Results searchParams={searchParams} />
@@ -144,7 +144,11 @@ async function Results({ searchParams }: { searchParams: CatalogSearchParams }) 
 
 const STRIP_SIZE = 6
 
-async function PathsStrip() {
+// Only the plain catalog gets the strip: page 1, no search, no tag.
+async function PathsStrip({ searchParams }: { searchParams: CatalogSearchParams }) {
+  const { q, tag, page } = await readQuery(searchParams)
+  if (q || tag || page !== 1) return null
+
   const t = await getTranslations('paths')
   const { items } = await listPaths({ page: 1, pageSize: STRIP_SIZE })
   if (items.length === 0) return null
@@ -164,7 +168,7 @@ async function PathsStrip() {
       <ul className="divide-y divide-rule border-rule border-y">
         {items.map((card) => (
           <li key={card.slug}>
-            <PathCardView card={card} tier={cardTier(card, tiers)} />
+            <PathCardView card={card} tier={cardTier(card, tiers)} headingLevel={3} />
           </li>
         ))}
       </ul>
@@ -250,9 +254,11 @@ function firstValue(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value
 }
 
+const MAX_PAGE = 10_000
+
 function pageNumber(value: string | undefined) {
   const parsed = Number(value)
-  return Number.isInteger(parsed) && parsed > 0 ? parsed : 1
+  return Number.isSafeInteger(parsed) && parsed > 0 && parsed <= MAX_PAGE ? parsed : 1
 }
 
 function catalogHref(params: { q?: string; tag?: string; page?: number }) {

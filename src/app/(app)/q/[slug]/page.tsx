@@ -53,8 +53,10 @@ async function QuizDetail({ params }: { params: QuizParams }) {
 
   const t = await getTranslations('quiz')
   const viewer = await getCurrentUser()
-  const tier = await viewerTier(viewer, quiz.id)
-  const placements = await getPlacements(quiz.id)
+  const [tier, placements] = await Promise.all([
+    viewerTier(viewer, quiz.id),
+    getPlacements(quiz.id),
+  ])
   const tCatalog = await getTranslations('catalog')
   const tStats = await getTranslations('stats')
   // A quiz outlives its author's account, so the byline has to stand in for one.

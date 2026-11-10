@@ -21,7 +21,12 @@ export function PathBadge({ placements }: { placements: PathPlacement[] }) {
           total: first.total,
         })}
       </Link>
-      {more.length > 0 && <span>{t('badgeMore', { count: more.length })}</span>}
+      {more.length > 0 && (
+        <>
+          <span aria-hidden="true">{t('badgeMore', { count: more.length })}</span>
+          <span className="sr-only">{t('badgeMoreLabel', { count: more.length })}</span>
+        </>
+      )}
     </p>
   )
 }

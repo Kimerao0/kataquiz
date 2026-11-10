@@ -43,4 +43,40 @@ describe('PathBadge', () => {
     expect(screen.getByRole('link', { name: 'Road to React · 2/4' })).toBeInTheDocument()
     expect(screen.getByText('+2')).toBeInTheDocument()
   })
+
+  it('lifts the link above the row stretched link', () => {
+    renderWithMessages(<PathBadge placements={[placement('road-to-react', 'Road to React', 2)]} />)
+
+    const link = screen.getByRole('link', { name: 'Road to React · 2/4' })
+    expect(link).toHaveClass('relative')
+    expect(link).toHaveClass('z-10')
+  })
+
+  it('labels +N for screen readers, hiding the visible text from them', () => {
+    renderWithMessages(
+      <PathBadge
+        placements={[
+          placement('road-to-react', 'Road to React', 2),
+          placement('web-basics', 'Web basics', 1),
+          placement('frontend', 'Frontend', 3),
+        ]}
+      />,
+    )
+
+    expect(screen.getByText('2 more paths')).toBeInTheDocument()
+    expect(screen.getByText('+2')).toHaveAttribute('aria-hidden', 'true')
+  })
+
+  it('uses the singular label for one more path', () => {
+    renderWithMessages(
+      <PathBadge
+        placements={[
+          placement('road-to-react', 'Road to React', 2),
+          placement('web-basics', 'Web basics', 1),
+        ]}
+      />,
+    )
+
+    expect(screen.getByText('1 more path')).toBeInTheDocument()
+  })
 })

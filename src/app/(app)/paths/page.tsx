@@ -40,7 +40,7 @@ async function PathList({ searchParams }: { searchParams: PathsSearchParams }) {
   const { items, total } = await listPaths({ page, pageSize: PAGE_SIZE })
   const lastPage = Math.max(Math.ceil(total / PAGE_SIZE), 1)
 
-  if (items.length === 0 && page === 1) {
+  if (items.length === 0) {
     return <p className="font-reading text-ink-quiet">{t('listEmpty')}</p>
   }
 
@@ -98,9 +98,11 @@ function firstValue(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value
 }
 
+const MAX_PAGE = 10_000
+
 function pageNumber(value: string | undefined) {
   const parsed = Number(value)
-  return Number.isInteger(parsed) && parsed > 0 ? parsed : 1
+  return Number.isSafeInteger(parsed) && parsed > 0 && parsed <= MAX_PAGE ? parsed : 1
 }
 
 function pathsHref(page: number) {
