@@ -13,14 +13,14 @@ export function PathNext({ placements }: { placements: PathPlacement[] }) {
           {placement.next ? (
             <Link
               href={`/q/${placement.next.quizSlug}/run?path=${encodeURIComponent(placement.pathSlug)}`}
-              className="underline-offset-4 hover:text-ai hover:underline"
+              className="underline underline-offset-4 hover:text-ai"
             >
               {t('nextIn', { path: placement.pathTitle, title: placement.next.quizTitle })}
             </Link>
           ) : (
             <Link
               href={`/p/${placement.pathSlug}`}
-              className="underline-offset-4 hover:text-ai hover:underline"
+              className="underline underline-offset-4 hover:text-ai"
             >
               {t('lastStep', { path: placement.pathTitle })}
             </Link>

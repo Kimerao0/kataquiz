@@ -150,9 +150,9 @@ describe('nextSuggestions', () => {
   })
 
   it('ignores a path the quiz is not in and returns up to 3', () => {
-    const placements = makePlacements(2)
+    const placements = makePlacements(5)
 
-    expect(nextSuggestions(placements, 'elsewhere')).toEqual(placements)
+    expect(nextSuggestions(placements, 'elsewhere')).toEqual(placements.slice(0, 3))
   })
 
   it('ignores null and returns up to 3', () => {

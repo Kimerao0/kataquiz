@@ -238,6 +238,44 @@ describe('run start panel', () => {
     expect(screen.queryByRole('button', { name: 'Resume' })).not.toBeInTheDocument()
   })
 
+  it('suggests the next step of the path on a run finished elsewhere', async () => {
+    resumeRunAction.mockResolvedValue({
+      ok: true,
+      run: {
+        status: 'finished',
+        attemptId: 'attempt-old',
+        summary: { attemptId: 'attempt-old', score: 7, errors: 3, total: 10, passed: true },
+        answered: 10,
+        history: [],
+      },
+    })
+    renderPanel({
+      resumable,
+      pathNext: [
+        {
+          pathSlug: 'driving-basics',
+          pathTitle: 'Driving basics',
+          position: 1,
+          total: 2,
+          previous: null,
+          next: {
+            position: 2,
+            quizId: 'quiz-2',
+            quizSlug: 'right-of-way',
+            quizTitle: 'Right of way',
+          },
+        },
+      ],
+    })
+
+    await userEvent.click(screen.getByRole('button', { name: 'Resume' }))
+
+    const link = await screen.findByRole('link', {
+      name: 'Next in Driving basics: Right of way',
+    })
+    expect(link).toHaveAttribute('href', '/q/right-of-way/run?path=driving-basics')
+  })
+
   it('still begins a fresh run with the ordinary start', async () => {
     renderPanel()
 
