@@ -1,12 +1,14 @@
+import { PathStepError } from '@/lib/paths/import'
 import { MAX_UPLOAD_BYTES } from '@/lib/quizzes/import'
 import { UPLOAD_LIMIT, UPLOAD_WINDOW_SEC } from '@/lib/rate-limit'
 import { UnauthorizedError } from '@/lib/session'
 import { uploadQuizAction } from './actions'
 
-const { requireUser, checkRateLimit, importQuiz, parseQuizText } = vi.hoisted(() => ({
+const { requireUser, checkRateLimit, importQuiz, importPath, parseQuizText } = vi.hoisted(() => ({
   requireUser: vi.fn<typeof import('@/lib/session').requireUser>(),
   checkRateLimit: vi.fn<typeof import('@/lib/rate-limit').checkRateLimit>(),
   importQuiz: vi.fn<typeof import('@/lib/quizzes/import').importQuiz>(),
+  importPath: vi.fn<typeof import('@/lib/paths/import').importPath>(),
   parseQuizText: vi.fn<typeof import('@/lib/quiz-schema').parseQuizText>(),
 }))
 
@@ -29,6 +31,12 @@ vi.mock('@/lib/rate-limit', async (importOriginal) => ({
 vi.mock('@/lib/quizzes/import', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/lib/quizzes/import')>()),
   importQuiz,
+}))
+
+// PathStepError stays real: the action recognises it by class.
+vi.mock('@/lib/paths/import', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/paths/import')>()),
+  importPath,
 }))
 
 // Validation stays real — the parser is only wrapped in a spy, so a test can
@@ -64,6 +72,16 @@ questions:
         correct: false
 `
 
+const validPath = `
+version: 1
+kind: path
+title: Road to the Licence
+language: it
+steps:
+  - quiz: road-signs-ab12cd
+  - quiz: right-of-way-ef34gh
+`
+
 function formDataWith(fields: { text?: string; file?: string }): FormData {
   const formData = new FormData()
   if (fields.text !== undefined) formData.set('text', fields.text)
@@ -71,6 +89,16 @@ function formDataWith(fields: { text?: string; file?: string }): FormData {
     formData.set('file', new File([fields.file], 'quiz.yaml', { type: 'application/yaml' }))
   }
   return formData
+}
+
+// Counts calls the way the real limiter counts rows: allowed up to the limit
+// within the window, refused after.
+function limitAfter(limit: number) {
+  let used = 0
+  return async () => {
+    used += 1
+    return used <= limit
+  }
 }
 
 function expectNothingParsedOrWritten() {
@@ -83,6 +111,7 @@ beforeEach(() => {
   requireUser.mockResolvedValue(author)
   checkRateLimit.mockResolvedValue(true)
   importQuiz.mockResolvedValue({ quizId: 'quiz-1', slug: 'road-signs-ab12cd' })
+  importPath.mockResolvedValue({ pathId: 'path-1', slug: 'road-to-the-licence-xy98zw' })
 })
 
 describe('uploadQuizAction', () => {
@@ -157,7 +186,7 @@ describe('uploadQuizAction', () => {
 
     const result = await uploadQuizAction(formDataWith({ file: validQuiz, text: pasted }))
 
-    expect(result).toEqual({ ok: true, slug: 'road-signs-ab12cd' })
+    expect(result).toEqual({ ok: true, kind: 'quiz', slug: 'road-signs-ab12cd' })
     expect(importQuiz).toHaveBeenCalledWith({
       file: expect.objectContaining({ title: 'Italian Driving Licence - Road Signs' }),
       authorId: author.id,
@@ -167,7 +196,7 @@ describe('uploadQuizAction', () => {
   it('returns the slug on a valid upload', async () => {
     const result = await uploadQuizAction(formDataWith({ text: validQuiz }))
 
-    expect(result).toEqual({ ok: true, slug: 'road-signs-ab12cd' })
+    expect(result).toEqual({ ok: true, kind: 'quiz', slug: 'road-signs-ab12cd' })
     expect(importQuiz).toHaveBeenCalledWith({
       file: expect.objectContaining({ title: 'Italian Driving Licence - Road Signs' }),
       authorId: author.id,
@@ -184,5 +213,55 @@ describe('uploadQuizAction', () => {
     expect(result.errors).toEqual(parsed.errors)
     expect(result.errors.join('\n')).toMatch(/version/)
     expect(importQuiz).not.toHaveBeenCalled()
+  })
+
+  it('accepts a path file and returns kind path', async () => {
+    const result = await uploadQuizAction(formDataWith({ text: validPath }))
+
+    expect(result).toEqual({ ok: true, kind: 'path', slug: 'road-to-the-licence-xy98zw' })
+    expect(importPath).toHaveBeenCalledWith({
+      file: expect.objectContaining({
+        title: 'Road to the Licence',
+        steps: [{ quiz: 'road-signs-ab12cd' }, { quiz: 'right-of-way-ef34gh' }],
+      }),
+      authorId: author.id,
+      resolveBy: 'slug',
+    })
+    // Routed before the quiz parser, which would only report a path file as a
+    // broken quiz.
+    expect(parseQuizText).not.toHaveBeenCalled()
+    expect(importQuiz).not.toHaveBeenCalled()
+  })
+
+  it('returns the step error for a hidden quiz', async () => {
+    const error = new PathStepError(2, 'quiz right-of-way-ef34gh is hidden')
+    importPath.mockRejectedValue(error)
+
+    const result = await uploadQuizAction(formDataWith({ text: validPath }))
+
+    expect(result).toEqual({ ok: false, errors: [error.message] })
+    if (result.ok) throw new Error('expected the upload to fail')
+    expect(result.errors[0]).toMatch(/^step 2: /)
+  })
+
+  it('a path upload spends the upload limit', async () => {
+    checkRateLimit.mockImplementation(limitAfter(UPLOAD_LIMIT))
+
+    for (let upload = 0; upload < UPLOAD_LIMIT; upload++) {
+      const text = upload % 2 === 0 ? validQuiz : validPath
+      const result = await uploadQuizAction(formDataWith({ text }))
+      expect(result.ok).toBe(true)
+    }
+    const refused = await uploadQuizAction(formDataWith({ text: validPath }))
+
+    expect(refused).toEqual({ ok: false, errors: ['rateLimited'] })
+    expect(checkRateLimit).toHaveBeenCalledTimes(UPLOAD_LIMIT + 1)
+    expect(checkRateLimit).toHaveBeenLastCalledWith(
+      `upload:${author.id}`,
+      UPLOAD_LIMIT,
+      UPLOAD_WINDOW_SEC,
+    )
+    // Five of the ten allowed uploads were paths; the refused eleventh is not.
+    expect(importPath).toHaveBeenCalledTimes(UPLOAD_LIMIT / 2)
   })
 })

@@ -1,14 +1,21 @@
-import { screen } from '@testing-library/react'
+import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { renderWithMessages } from '@/test/intl'
 import { UploadForm } from './upload-form'
 
-const { uploadQuizAction } = vi.hoisted(() => ({ uploadQuizAction: vi.fn() }))
+const { uploadQuizAction, redirect } = vi.hoisted(() => ({
+  uploadQuizAction: vi.fn(),
+  redirect: vi.fn(),
+}))
 
 // A factory mock, so the real Server Action module — and the pg Pool it builds
 // at import time through @/lib/session — never loads in jsdom. The action has
 // its own tests against the database.
 vi.mock('./actions', () => ({ uploadQuizAction }))
+
+// The real redirect throws a Next.js control-flow error that only the router
+// catches; a spy records where the form sent the author instead.
+vi.mock('next/navigation', () => ({ redirect }))
 
 const PASTED = 'version: 1\ntitle: Road signs\n'
 
@@ -120,5 +127,17 @@ describe('upload form', () => {
     )
     expect(keyWarnings).toEqual([])
     consoleError.mockRestore()
+  })
+
+  it('navigates to /p/<slug> after a path upload', async () => {
+    const slug = 'road-to-the-licence-xy98zw'
+    uploadQuizAction.mockResolvedValue({ ok: true, kind: 'path', slug })
+    renderWithMessages(<UploadForm />)
+
+    await userEvent.type(textarea(), PASTED)
+    await submit()
+
+    await waitFor(() => expect(redirect).toHaveBeenCalledWith(`/p/${slug}`))
+    expect(redirect).not.toHaveBeenCalledWith(`/q/${slug}`)
   })
 })

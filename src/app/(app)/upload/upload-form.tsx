@@ -23,6 +23,8 @@ type SubmitState = { result: UploadResult; hadFile: boolean }
 // to the screen, and the message it carries is left alone.
 const QUESTION_PATH = /^questions\.(\d+)(?:\.(.+))?: ([\s\S]+)$/
 
+const ROUTE_PREFIX = { quiz: '/q', path: '/p' } as const
+
 export function UploadForm() {
   const t = useTranslations('upload')
   const fileRef = useRef<HTMLInputElement>(null)
@@ -42,7 +44,7 @@ export function UploadForm() {
     return { result: await uploadQuizAction(formData), hadFile }
   }
 
-  if (state?.result.ok) redirect(`/q/${state.result.slug}`)
+  if (state?.result.ok) redirect(`${ROUTE_PREFIX[state.result.kind]}/${state.result.slug}`)
 
   const failure =
     state !== null && !state.result.ok

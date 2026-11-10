@@ -8,12 +8,12 @@ import type { QuizFile } from '@/lib/quiz-schema'
 export const MAX_UPLOAD_BYTES = 1_048_576
 
 const SLUG_MAX_LENGTH = 60
-const SLUG_SUFFIX_LENGTH = 6
+export const SLUG_SUFFIX_LENGTH = 6
 const SLUG_FALLBACK = 'quiz'
 
 // The base class of both `db` and a transaction, so the import can run inside
 // a transaction the caller already opened.
-type Executor = PgDatabase<NodePgQueryResultHKT, Db['_']['fullSchema']>
+export type Executor = PgDatabase<NodePgQueryResultHKT, Db['_']['fullSchema']>
 
 export function slugify(title: string): string {
   const slug = title

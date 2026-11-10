@@ -1,12 +1,16 @@
 'use server'
 
 import { getTranslations } from 'next-intl/server'
+import { isPathText, parsePathText } from '@/lib/paths/file'
+import { importPath, PathStepError } from '@/lib/paths/import'
 import { parseQuizText } from '@/lib/quiz-schema'
 import { importQuiz, MAX_UPLOAD_BYTES } from '@/lib/quizzes/import'
 import { checkRateLimit, UPLOAD_LIMIT, UPLOAD_WINDOW_SEC } from '@/lib/rate-limit'
 import { requireUser, type SessionUser, UnauthorizedError } from '@/lib/session'
 
-export type UploadResult = { ok: true; slug: string } | { ok: false; errors: string[] }
+export type UploadResult =
+  | { ok: true; kind: 'quiz' | 'path'; slug: string }
+  | { ok: false; errors: string[] }
 
 export async function uploadQuizAction(formData: FormData): Promise<UploadResult> {
   const t = await getTranslations('upload.errors')
@@ -37,11 +41,28 @@ export async function uploadQuizAction(formData: FormData): Promise<UploadResult
     return { ok: false, errors: [t('tooLarge')] }
   }
 
+  // Before the quiz parser, which would only report a path as a broken quiz.
+  if (isPathText(text)) return uploadPath(text, author.id)
+
   const parsed = parseQuizText(text)
   if (!parsed.ok) return { ok: false, errors: parsed.errors }
 
   const { slug } = await importQuiz({ file: parsed.data, authorId: author.id })
-  return { ok: true, slug }
+  return { ok: true, kind: 'quiz', slug }
+}
+
+async function uploadPath(text: string, authorId: string): Promise<UploadResult> {
+  const parsed = parsePathText(text)
+  if (!parsed.ok) return { ok: false, errors: parsed.errors }
+
+  try {
+    const { slug } = await importPath({ file: parsed.data, authorId, resolveBy: 'slug' })
+    return { ok: true, kind: 'path', slug }
+  } catch (error) {
+    // Any other failure is an outage, not something wrong with the file.
+    if (!(error instanceof PathStepError)) throw error
+    return { ok: false, errors: [error.message] }
+  }
 }
 
 async function readUploadText(formData: FormData): Promise<string> {

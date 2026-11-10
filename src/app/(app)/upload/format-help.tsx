@@ -27,6 +27,13 @@ export function FormatHelp() {
             <li>{t('formatRulePerRun')}</li>
           </ul>
         </div>
+        <div className="flex flex-col gap-1">
+          <h2 className="font-medium text-sm">{t('formatPathTitle')}</h2>
+          <p className="text-muted-foreground text-sm">{t('formatPathIntro')}</p>
+          <pre className="overflow-x-auto rounded-md bg-muted p-3 font-mono text-xs">
+            <code>{t('formatPathExample')}</code>
+          </pre>
+        </div>
       </div>
     </details>
   )
