@@ -2,7 +2,7 @@
 
 feature: paths
 title: Paths
-phase: proving
+phase: approved
 ---
 
 # Paths
@@ -158,3 +158,4 @@ Paths (KQ42-KQ44). Convert the existing settled spec docs/specs/2026-11-02-paths
 - 2026-11-10 — created from `docs/specs/2026-11-02-paths.md` and `docs/superpowers/plans/2026-11-02-paths-phase-1.md`. R1 groundwork already committed before the spec: `b85a3a4` (path file parser), `fa8607c` (`paths` / `path_steps` tables, migration 0007). No spec is proven by them alone.
 - 2026-11-10 — fence widened: `CLAUDE.md`, ac04ee9 reformats it for biome's markdown check (part of `pnpm check`); no feature change
 - 2026-11-10 — fence widened: `src/lib/quizzes/seed-author.ts`, breaks the `seed.ts` ↔ `paths/import.ts` import cycle (R1 check finding 4)
+- 2026-11-10 — R1 merged 708ca78
