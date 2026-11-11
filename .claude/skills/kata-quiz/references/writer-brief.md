@@ -27,7 +27,9 @@ questions:
 ## Content
 
 - 25 questions per quiz unless told otherwise. Cover every subtopic in the source entry, roughly evenly.
-- Mix theory, "what does this code print / in what order", and scenario trade-offs ("system X with constraint Y: what do you choose?"). Follow any per-quiz emphasis in the source (e.g. "[SCENARIO]" means at least 60% scenarios).
+- Lead with theory ("what is X, why does Y work this way") and reasoning/scenario questions ("system X with constraint Y: what do you choose?", "symptom Z: what's the likely cause?"). Follow any per-quiz emphasis in the source (e.g. "[SCENARIO]" means at least 60% scenarios).
+- At most 1 question in 5 has a `code` block (`check.mts` fails above 20% unless the quiz is tagged `advanced`). Keep snippets short and plain; no "guess the exact output" puzzles.
+- No edge-case trivia (obscure corner behaviour, exact log-order puzzles) unless the orchestrator names the quiz as advanced. Target: a solid mid-level developer scores 70-80%.
 - Mostly `single` with 4 options, some `multi` (the prompt says "Select all that apply."), a few `boolean`.
 - Distractors are real misconceptions, as specific and qualified as the correct answer. Players learn to pick the longest, most hedged option, so make some distractors the longest and keep the correct answer tight. Options are shuffled at runtime, so position doesn't matter.
 - `explanation`: 2-4 sentences on why the right answer is right and why the tempting wrong ones are wrong.

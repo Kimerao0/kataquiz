@@ -40,4 +40,4 @@ Keep it short: how many quizzes and questions are live, which checks ran, the an
 
 ## Updating a live quiz
 
-Editing a seed file that's already imported does nothing on prod. To ship a new version, change its title (e.g. append "(2027)") and push. If the user wants the old version removed, raise that separately: the seed script never deletes anything.
+Editing a seed file that's already imported does nothing on prod, because the import skips existing titles. To ship a new version under the same title, delete the old one in a custom data migration (`npx drizzle-kit generate --custom --name=<name>`) that runs before the seed import in `pnpm release`: `DELETE FROM "quizzes" WHERE "author_id" = 'kataquiz-seed-author' AND "title" IN (...)`. Cascades remove questions, attempts and path steps, so play history on that quiz is lost. Paths are immutable: if a path includes the quiz, delete the path by title in the same migration so it re-imports. `drizzle/0008_retire-architect-r1.sql` and `src/db/retire-migrations.test.ts` are the worked example. This is a migration, so it goes on the full track.
