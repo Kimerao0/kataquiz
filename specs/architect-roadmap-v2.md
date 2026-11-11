@@ -2,7 +2,7 @@
 
 feature: architect-roadmap-v2
 title: Architect Roadmap v2
-phase: proving
+phase: approved
 ---
 
 # Architect Roadmap v2
@@ -145,3 +145,4 @@ Follow-up: Kill the old path, and the old quiz, i want a new quiz and new path. 
 - 2026-11-11 — R3.1 reworded
 - 2026-11-11 — R4.1 reworded
 - 2026-11-11 — decisions 11 and 12 added, user-authored paths out of scope (feature-check R1 triage)
+- 2026-11-11 — R1 merged bc3cef9
