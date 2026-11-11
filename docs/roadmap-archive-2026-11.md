@@ -44,7 +44,8 @@ must still resolve.
   production build: R1 path object (`708ca78`), R2 progress (`8652eb4`), R3 browsing (`c8d90af`),
   R4 next step after a run (`87b1e76`). Groundwork before the spec: `b85a3a4`, `fa8607c`
   (migration 0007). Deviations recorded in the spec's Decisions 15–17. Seeds: Road to Software
-  Architect (41 steps) and AWS Cloud Practitioner (26). Not yet pushed to production at close.
+  Architect (41 steps) and AWS Cloud Practitioner (26). Deployed to production 2026-11-11 with `3b757d3`;
+  the release imported both seed paths.
 
 ## Dropped
 

@@ -34,7 +34,7 @@ Closed items: `docs/roadmap-archive-2026-10.md`, `docs/roadmap-archive-2026-11.m
 
 ## Paths — "road to" series of quizzes
 
-Spec: `specs/paths.md` (phase 1, KQ42, shipped locally 2026-11-10; archived). Original design:
+Spec: `specs/paths.md` (phase 1, KQ42, live in production since 2026-11-11; archived). Original design:
 `docs/specs/2026-11-02-paths.md`.
 
 - [ ] KQ43: Paths, phase 2 — build a path in the app
