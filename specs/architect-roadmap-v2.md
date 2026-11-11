@@ -49,7 +49,7 @@ Follow-up: Kill the old path, and the old quiz, i want a new quiz and new path. 
 ### R1 — Delete mechanism, snippet guard, React quizzes 01–06
 **What we do:** Add the snippet cap to the checker, rewrite quizzes 01–06, and ship a migration that deletes their old versions and the path so the new ones and a new path import.
 **Customer impact:** Players of the path get React quizzes 01–06 with at most 5 snippets in 25 and lose their old attempts on those six; the path link changes.
-**Tracker:** <fill>
+**Tracker:** docs/roadmap.md#KQ47
 
 #### Specs
 1. [open] Running `check.mts` on a quiz file with 6 code questions out of 25 and no `advanced` tag prints FAIL with the code-question share.
@@ -65,7 +65,7 @@ Follow-up: Kill the old path, and the old quiz, i want a new quiz and new path. 
 ### R2 — Next.js and React patterns 07–15
 **What we do:** Rewrite 08, 11 and 12, audit 07, 09, 10, 13 and 15 for edge-case trivia and fix the flagged ones, and delete the changed quizzes and the path in a migration.
 **Customer impact:** Players get Next.js and pattern quizzes with at most 5 snippets in 25 and lose their old attempts on the changed ones; the path link changes.
-**Tracker:** <fill>
+**Tracker:** docs/roadmap.md#KQ48
 
 #### Specs
 1. [open] Running `check.mts` on `seeds/architect-0[7-9]-*.yaml seeds/architect-1[0-5]-*.yaml` prints ok for all nine files, each with at most 5 code questions.
@@ -79,7 +79,7 @@ Follow-up: Kill the old path, and the old quiz, i want a new quiz and new path. 
 ### R3 — Node.js 16–23
 **What we do:** Rewrite 16, 17, 18, 19, 21 and 23, audit 20 and 22 for edge-case trivia and fix the flagged ones, and delete the changed quizzes and the path in a migration.
 **Customer impact:** Players get Node.js quizzes with at most 5 snippets in 25 and lose their old attempts on the changed ones; the path link changes.
-**Tracker:** <fill>
+**Tracker:** docs/roadmap.md#KQ49
 
 #### Specs
 1. [open] Running `check.mts` on `seeds/architect-1[6-9]-*.yaml seeds/architect-2[0-3]-*.yaml` prints ok for all eight files, each with at most 5 code questions.
@@ -93,7 +93,7 @@ Follow-up: Kill the old path, and the old quiz, i want a new quiz and new path. 
 ### R4 — Architecture 24–41
 **What we do:** Rewrite 25, audit 24 and 27–41 for edge-case trivia and fix the flagged ones, and delete the changed quizzes and the path in a migration.
 **Customer impact:** Players get architecture quizzes with at most 5 snippets in 25 and lose their old attempts on the changed ones; the path link changes.
-**Tracker:** <fill>
+**Tracker:** docs/roadmap.md#KQ50
 
 #### Specs
 1. [open] Running `check.mts` on `seeds/architect-2[4-9]-*.yaml seeds/architect-3*.yaml seeds/architect-4*.yaml` prints ok for all eighteen files, each with at most a fifth of its questions carrying code.

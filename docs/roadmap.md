@@ -128,6 +128,25 @@ Spec: `specs/paths.md` (phase 1, KQ42, live in production since 2026-11-11; arch
 - [ ] KQ35: The dev server silently serves stale CSS
   `globals.css` edits repeatedly failed to reach the bundle; a whole screenshot round was a picture of CSS that was never applied. Verify design work against `pnpm build`, not `pnpm dev`.
 
+## Architect Roadmap v2
+
+- [ ] KQ47: Architect Roadmap v2 R1 — Delete mechanism, snippet guard, React quizzes 01–06
+  Spec: `specs/architect-roadmap-v2.md` R1 · status: open
+  Specs: R1.1 … R1.9 (the spec file holds the text; never copy it here)
+  Verdicts: <filled by feature-prove>
+- [ ] KQ48: Architect Roadmap v2 R2 — Next.js and React patterns 07–15
+  Spec: `specs/architect-roadmap-v2.md` R2 · status: open
+  Specs: R2.1 … R2.7 (the spec file holds the text; never copy it here)
+  Verdicts: <filled by feature-prove>
+- [ ] KQ49: Architect Roadmap v2 R3 — Node.js 16–23
+  Spec: `specs/architect-roadmap-v2.md` R3 · status: open
+  Specs: R3.1 … R3.7 (the spec file holds the text; never copy it here)
+  Verdicts: <filled by feature-prove>
+- [ ] KQ50: Architect Roadmap v2 R4 — Architecture 24–41
+  Spec: `specs/architect-roadmap-v2.md` R4 · status: open
+  Specs: R4.1 … R4.7 (the spec file holds the text; never copy it here)
+  Verdicts: <filled by feature-prove>
+
 ## Accepted — recorded so they are not rediscovered
 
 These are in `docs/specs/2026-10-27-kataquiz-v1.md` under "Accepted limitations" with the reasoning.
