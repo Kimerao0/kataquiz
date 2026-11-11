@@ -363,24 +363,24 @@ questions:
           correct: false,
         }
   - type: single
-    prompt: A profile form keeps state in its inputs. When the selected user changes, the old user's typed values remain. What is the cleanest fix?
-    explanation: "React keeps state while the component stays at the same position with the same type. Passing `key={user.id}` tells React it is a different component, so it unmounts the old one and mounts a fresh one with clean state. That avoids resetting each field by hand in an effect."
-    theoryUrl: https://react.dev/learn/preserving-and-resetting-state#resetting-state-with-a-key
+    prompt: A tab switch triggers a slow render of a heavy panel, and clicking another tab during that render feels frozen. What does wrapping the state update in `startTransition` (from `useTransition`) change?
+    explanation: "A transition marks the update as non-urgent, so React renders it in the background and can interrupt it when a more urgent update, such as another click or keystroke, arrives. The UI stays responsive while the old content remains visible. It does not make the render itself cheaper or move it off the main thread."
+    theoryUrl: https://react.dev/reference/react/useTransition
     options:
       - {
-          text: "Give the form `key={user.id}` so a new user mounts a fresh instance with fresh state",
+          text: "It marks the update as non-urgent, so React can interrupt the render when a more urgent update arrives",
           correct: true,
         }
       - {
-          text: "Reset every field in a `useEffect` that depends on the user id, as each render has to be corrected",
+          text: "It moves the heavy render to a Web Worker, so the main thread is never blocked",
           correct: false,
         }
       - {
-          text: "Call `forceUpdate` on the form when the id changes, which makes React discard the stale state",
+          text: "It delays the update by a fixed interval, which batches rapid clicks into one render",
           correct: false,
         }
       - {
-          text: "Wrap the form in `memo`, which discards the state whenever the incoming props change",
+          text: "It reduces the cost of the render by skipping every component whose props did not change",
           correct: false,
         }
   - type: single

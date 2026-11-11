@@ -233,24 +233,24 @@ questions:
           correct: false,
         }
   - type: single
-    prompt: A `ProfilePage` holds a `comment` draft in state and must reset it when `userId` changes. Someone proposes `useEffect(() => setComment(''), [userId])`. What is the better alternative?
-    explanation: "Giving the component a `key={userId}` makes React create a fresh instance for each user, so state resets naturally with no extra render. The effect works but shows stale text for one render first."
-    theoryUrl: https://react.dev/learn/you-might-not-need-an-effect#resetting-all-state-when-a-prop-changes
+    prompt: A component has one effect that subscribes to a chat room and also sends a page-view analytics event, both in the same body with a combined dependency array. What is the better structure?
+    explanation: "Each effect should describe one independent synchronization process. Split them into two effects, so changing the room does not re-send the analytics event, and each one has its own dependencies and cleanup."
+    theoryUrl: https://react.dev/learn/lifecycle-of-reactive-effects#each-effect-represents-a-separate-synchronization-process
     options:
       - {
-          text: "Give the component `key={userId}` so React makes a new instance and resets its state",
+          text: "Split them into two effects, each with its own dependencies and cleanup",
           correct: true,
         }
       - {
-          text: "Keep the effect, but use `useLayoutEffect` so the reset happens even earlier",
+          text: "Keep one effect and add an `if` inside it to skip whichever part did not change",
           correct: false,
         }
       - {
-          text: "Store the comment in a ref, since refs are automatically cleared when props change",
+          text: "Keep one effect, since React allows only one `useEffect` call per component",
           correct: false,
         }
       - {
-          text: "Compare `userId` with the previous value in render and mutate `comment` directly",
+          text: "Move the analytics call into the subscription cleanup so that it runs less often",
           correct: false,
         }
   - type: single

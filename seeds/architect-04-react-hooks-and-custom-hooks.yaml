@@ -189,31 +189,24 @@ questions:
           correct: false,
         }
   - type: single
-    prompt: "A handler runs `setCount(count + 1)` three times in a row, and one click only adds 1 to the counter. What explains it?"
-    code: |
-      function add3() {
-        setCount(count + 1)
-        setCount(count + 1)
-        setCount(count + 1)
-      }
-    codeLanguage: tsx
-    explanation: 'State is a snapshot: within one render, `count` is a fixed value, so all three calls queue "set to count + 1" with the same number. Passing an updater, `setCount(c => c + 1)`, makes each call build on the previous queued result and adds 3.'
-    theoryUrl: https://react.dev/learn/queueing-a-series-of-state-updates
+    prompt: "A form component is rendered several times on one page and links each `<label htmlFor>` to its input. Which approach gives stable, unique ids that match between server and client rendering?"
+    explanation: "`useId` generates an id that is unique per component instance and identical on the server and the client, which avoids hydration mismatches. A counter or `Math.random()` can differ between the two renders. It is meant for accessibility attributes, not for list keys."
+    theoryUrl: https://react.dev/reference/react/useId
     options:
       - {
-          text: "React ignores repeated updates to the same state variable inside one handler",
-          correct: false,
-        }
-      - {
-          text: "`count` is the same snapshot value in all three calls, so each one queues the same result",
+          text: "Call `useId` in the component and derive the input and label ids from the result",
           correct: true,
         }
       - {
-          text: "Updates are applied only after the handler finishes, and React keeps only the last one that was queued with a different value",
+          text: "Generate the id with `Math.random()` inside the component body on every render",
           correct: false,
         }
       - {
-          text: "The calls run in parallel and race, so the winner is whichever one finishes last",
+          text: "Use a module-level counter that increments each time the component renders",
+          correct: false,
+        }
+      - {
+          text: "Hard-code the same id in the component and rely on the browser to deduplicate it",
           correct: false,
         }
   - type: single
@@ -280,24 +273,24 @@ questions:
           correct: true,
         }
   - type: single
-    prompt: "An `AuthProvider` is re-rendered often by its parent, although the user rarely changes. It passes `value={{ user, login, logout }}` and every consumer re-renders each time. What is the best improvement?"
-    explanation: "A new object literal changes the context value on every render, so all consumers update. Memoise the value with `useMemo` (and keep the functions stable) so it only changes when `user` does. Wrapping consumers in `memo` does not help, since context updates ignore it."
-    theoryUrl: https://react.dev/reference/react/useContext#optimizing-re-renders-when-passing-objects-and-functions
+    prompt: "A parent needs to call `focus()` on an input that lives inside a child component, but the child should not expose its whole DOM node. Which hook is designed for exposing a limited imperative API through a ref?"
+    explanation: "`useImperativeHandle` lets a component customise what a parent receives through a ref, for example only `focus` and `scrollIntoView`. It is an escape hatch, so most cases are better served by props and state. Reach for it only when the parent truly must trigger an imperative action."
+    theoryUrl: https://react.dev/reference/react/useImperativeHandle
     options:
       - {
-          text: "Wrap every consumer in `memo`, which stops context updates from reaching them",
-          correct: false,
-        }
-      - {
-          text: "Memoise the context value so that its identity only changes when `user` itself changes",
+          text: "`useImperativeHandle`, which defines the limited object the parent receives in `ref.current`",
           correct: true,
         }
       - {
-          text: "Store the value in a `useRef` instead, so the provider never has to produce a new object",
+          text: "`useLayoutEffect`, which copies the child DOM node into the parent before the browser paints",
           correct: false,
         }
       - {
-          text: "Move the value to a module-level variable, which React tracks and updates automatically",
+          text: "`useSyncExternalStore`, which lets a parent read any value held in a child component",
+          correct: false,
+        }
+      - {
+          text: "`useDeferredValue`, which delays the child's ref until the parent has finished rendering",
           correct: false,
         }
   - type: single
@@ -465,33 +458,24 @@ questions:
           correct: false,
         }
   - type: single
-    prompt: "This hook is used by a component that mounts and unmounts often. What is the problem?"
-    code: |
-      function useWindowWidth() {
-        const [w, setW] = useState(window.innerWidth)
-        useEffect(() => {
-          window.addEventListener('resize', () => setW(window.innerWidth))
-        }, [])
-        return w
-      }
-    codeLanguage: tsx
-    explanation: "The listener is never removed, so each mount adds another one that keeps running after unmount and leaks memory. The effect must return a cleanup that calls `removeEventListener` with the same function reference. (`window` at render time is also a server rendering hazard.)"
-    theoryUrl: https://react.dev/learn/synchronizing-with-effects#step-3-add-cleanup-if-needed
+    prompt: "Two components each repeat the same `useState` plus `useEffect` pair that subscribes to the browser online/offline events. What is the strongest reason to extract a custom hook?"
+    explanation: "Both components need the same stateful logic, and a custom hook lets them reuse it while each call keeps its own state. A custom hook is a function that calls hooks, so it cannot be shared as a plain helper. It also does not make the components share one value or skip renders."
+    theoryUrl: https://react.dev/learn/reusing-logic-with-custom-hooks#when-to-use-custom-hooks
     options:
       - {
-          text: "The empty dependency array stops the effect from ever seeing the new width",
-          correct: false,
-        }
-      - {
-          text: "Listeners added in an effect are removed by React automatically, so there is only a style problem",
-          correct: false,
-        }
-      - {
-          text: "No cleanup removes the listener, so old listeners pile up and keep updating unmounted components",
+          text: "It reuses the state and effect logic in one named place, and each component still gets its own state",
           correct: true,
         }
       - {
-          text: "`useState` cannot be given `window.innerWidth`, because state may not hold values from the browser",
+          text: "It makes both components share a single online status value, so React renders it only once",
+          correct: false,
+        }
+      - {
+          text: "It lets React skip the effect cleanup, because hooks defined outside components are never unmounted",
+          correct: false,
+        }
+      - {
+          text: "It is required, because `useEffect` may only be called from functions whose name starts with `use`",
           correct: false,
         }
   - type: single
