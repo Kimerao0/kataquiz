@@ -57,6 +57,13 @@
       "when": 1794301129539,
       "tag": "0007_large_hex",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1794393262692,
+      "tag": "0008_retire-architect-r1",
+      "breakpoints": true
     }
   ]
 }
