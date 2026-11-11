@@ -36,22 +36,25 @@ Follow-up: Kill the old path, and the old quiz, i want a new quiz and new path. 
 - An admin UI or script for deleting content: deletion lives only in migrations.
 - Keeping play history for replaced quizzes: attempts on a deleted quiz are deleted with it.
 - A stable path URL: the path slug changes on every release.
+- User-authored paths that include a retired quiz: they lose that step (decision 11).
 - `seeds/path-road-to-software-architect.yaml` content: titles stay the same, so the file is unchanged.
 
 ## Decisions
 
-| #   | Question                                          | Answer                                                                                                                                                                               | Date       |
-| --- | ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------- |
-| 1   | How are the old quizzes and path retired on prod? | Hard delete in a data migration (cascades to questions, options, attempts, answers, path steps).                                                                                     | 2026-11-11 |
-| 2   | Which quizzes may keep edge-case questions?       | Topic-advanced only: 04 advanced hooks, 05 performance, 14 caching at scale, 21 Node perf/debugging, 26 distributed consistency. All others: theory, reasoning, scenarios.           | 2026-11-11 |
-| 3   | Snippet cap                                       | At most 1/5 of questions with a `code` block, in every quiz of the path, advanced ones included.                                                                                     | 2026-11-11 |
-| 4   | Slug                                              | `architect-roadmap-v2`                                                                                                                                                               | 2026-11-11 |
-| 5   | How does it reach prod?                           | Staged by area, one push per release; each release deletes and recreates the path.                                                                                                   | 2026-11-11 |
-| 6   | Quizzes under the cap with edge-case trivia       | Audit every non-advanced quiz; replace the flagged questions, then delete and reimport that quiz. Unflagged quizzes stay untouched.                                                  | 2026-11-11 |
-| 7   | What does the migration delete?                   | Rows authored by the seed account whose title is in an explicit list, plus the path by title.                                                                                        | 2026-11-11 |
-| 8   | Guard                                             | `check.mts` fails a quiz with more than 20% code questions unless it is tagged `advanced`. No Architect Roadmap quiz carries that tag, so the cap binds the whole path (decision 3). | 2026-11-11 |
-| 9   | Path URL changes per release                      | Accepted.                                                                                                                                                                            | 2026-11-11 |
-| 10  | Can a challenge attempt block the delete?         | No: a challenge attempt always belongs to its source's quiz, so both go in the same cascade.                                                                                         | 2026-11-11 |
+| #   | Question                                                                                                  | Answer                                                                                                                                                                               | Date       |
+| --- | --------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------- |
+| 1   | How are the old quizzes and path retired on prod?                                                         | Hard delete in a data migration (cascades to questions, options, attempts, answers, path steps).                                                                                     | 2026-11-11 |
+| 2   | Which quizzes may keep edge-case questions?                                                               | Topic-advanced only: 04 advanced hooks, 05 performance, 14 caching at scale, 21 Node perf/debugging, 26 distributed consistency. All others: theory, reasoning, scenarios.           | 2026-11-11 |
+| 3   | Snippet cap                                                                                               | At most 1/5 of questions with a `code` block, in every quiz of the path, advanced ones included.                                                                                     | 2026-11-11 |
+| 4   | Slug                                                                                                      | `architect-roadmap-v2`                                                                                                                                                               | 2026-11-11 |
+| 5   | How does it reach prod?                                                                                   | Staged by area, one push per release; each release deletes and recreates the path.                                                                                                   | 2026-11-11 |
+| 6   | Quizzes under the cap with edge-case trivia                                                               | Audit every non-advanced quiz; replace the flagged questions, then delete and reimport that quiz. Unflagged quizzes stay untouched.                                                  | 2026-11-11 |
+| 7   | What does the migration delete?                                                                           | Rows authored by the seed account whose title is in an explicit list, plus the path by title.                                                                                        | 2026-11-11 |
+| 8   | Guard                                                                                                     | `check.mts` fails a quiz with more than 20% code questions unless it is tagged `advanced`. No Architect Roadmap quiz carries that tag, so the cap binds the whole path (decision 3). | 2026-11-11 |
+| 9   | Path URL changes per release                                                                              | Accepted.                                                                                                                                                                            | 2026-11-11 |
+| 10  | Can a challenge attempt block the delete?                                                                 | No: a challenge attempt always belongs to its source's quiz, so both go in the same cascade.                                                                                         | 2026-11-11 |
+| 11  | A user-authored path that includes a retired quiz loses that step (cascade; the new quiz has a new slug). | Accepted, not handled.                                                                                                                                                               | 2026-11-11 |
+| 12  | "A new quiz and new path": new titles or the same ones?                                                   | Same titles; only content and the path slug change.                                                                                                                                  | 2026-11-11 |
 
 ## Releases
 
@@ -81,7 +84,7 @@ Follow-up: Kill the old path, and the old quiz, i want a new quiz and new path. 
 
 #### Specs
 
-1. [open] Running `check.mts` on `seeds/architect-0[7-9]-*.yaml seeds/architect-1[0-5]-*.yaml` prints ok for all nine files, each with at most 5 code questions.
+1. [open] Running `check.mts` on `seeds/architect-0[7-9]-*.yaml seeds/architect-1[0-5]-*.yaml` prints ok for all nine files, each with at most 5 code questions, and none of them carries an `advanced` tag.
 2. [open] The title list in the R2 migration equals the set of quiz files changed in R2, as listed by `git diff --name-only` on `seeds/`.
 3. [open] On a database holding the R1 content, a quiz from 07–15 that R2 left unchanged keeps its attempts after `pnpm release`.
 4. [open] On a database holding the R1 content, `pnpm release` leaves exactly one seed quiz per title for 07–15.
@@ -97,7 +100,7 @@ Follow-up: Kill the old path, and the old quiz, i want a new quiz and new path. 
 
 #### Specs
 
-1. [open] Running `check.mts` on `seeds/architect-1[6-9]-*.yaml seeds/architect-2[0-3]-*.yaml` prints ok for all eight files, each with at most 5 code questions.
+1. [open] Running `check.mts` on `seeds/architect-1[6-9]-*.yaml seeds/architect-2[0-3]-*.yaml` prints ok for all eight files, each with at most 5 code questions, and none of them carries an `advanced` tag.
 2. [open] The title list in the R3 migration equals the set of quiz files changed in R3, as listed by `git diff --name-only` on `seeds/`.
 3. [open] On a database holding the R2 content, a quiz from 16–23 that R3 left unchanged keeps its attempts after `pnpm release`.
 4. [open] On a database holding the R2 content, `pnpm release` leaves exactly one seed quiz per title for 16–23.
@@ -113,7 +116,7 @@ Follow-up: Kill the old path, and the old quiz, i want a new quiz and new path. 
 
 #### Specs
 
-1. [open] Running `check.mts` on `seeds/architect-2[4-9]-*.yaml seeds/architect-3*.yaml seeds/architect-4*.yaml` prints ok for all eighteen files, each with at most a fifth of its questions carrying code.
+1. [open] Running `check.mts` on `seeds/architect-2[4-9]-*.yaml seeds/architect-3*.yaml seeds/architect-4*.yaml` prints ok for all eighteen files, each with at most a fifth of its questions carrying code, and none of them carries an `advanced` tag.
 2. [open] The title list in the R4 migration equals the set of quiz files changed in R4, as listed by `git diff --name-only` on `seeds/`.
 3. [open] On a database holding the R3 content, a quiz from 24–41 that R4 left unchanged keeps its attempts after `pnpm release`.
 4. [open] On a database holding the R3 content, `pnpm release` leaves exactly one seed quiz per title for 24–41.
@@ -129,3 +132,7 @@ Follow-up: Kill the old path, and the old quiz, i want a new quiz and new path. 
 ## Changelog
 
 - 2026-11-11 — created
+- 2026-11-11 — R2.1 reworded
+- 2026-11-11 — R3.1 reworded
+- 2026-11-11 — R4.1 reworded
+- 2026-11-11 — decisions 11 and 12 added, user-authored paths out of scope (feature-check R1 triage)
