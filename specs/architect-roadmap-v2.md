@@ -52,8 +52,8 @@ Follow-up: Kill the old path, and the old quiz, i want a new quiz and new path. 
 **Tracker:** docs/roadmap.md#KQ47
 
 #### Specs
-1. [open] Running `check.mts` on a quiz file with 6 code questions out of 25 and no `advanced` tag prints FAIL with the code-question share.
-2. [open] Running `check.mts` on the same quiz file with an `advanced` tag added prints ok.
+1. [built] Running `check.mts` on a quiz file with 6 code questions out of 25 and no `advanced` tag prints FAIL with the code-question share.
+2. [built] Running `check.mts` on the same quiz file with an `advanced` tag added prints ok.
 3. [open] Running `check.mts` on `seeds/architect-0[1-6]-*.yaml` prints ok for all six files, each with at most 5 code questions, and none of them carries an `advanced` tag.
 4. [open] On a database holding the old seed quizzes 01–06 and the old path, `pnpm release` leaves exactly one seed quiz per title for 01–06, each with the rewritten question set.
 5. [open] On a database holding the old seed quizzes, a quiz uploaded by a non-seed user titled "Architect Roadmap 01: React fundamentals" still exists after the R1 migration.
