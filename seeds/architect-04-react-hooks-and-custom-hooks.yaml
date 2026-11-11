@@ -9,393 +9,509 @@ run:
   timePerQuestionSec: 60
 questions:
   - type: single
-    prompt: "The button is clicked twice. What does the console show?"
-    code: |
-      function C() {
-        const ref = useRef(0)
-        console.log('render', ref.current)
-
-        return <button onClick={() => { ref.current++ }}>+</button>
-      }
-    codeLanguage: tsx
-    explanation: "Changing `ref.current` does not schedule a render, since refs are not state. The component rendered once on mount, so the only log is `render 0`, even though the ref holds 2 afterwards. Use state when a changed value must update the UI."
-    theoryUrl: https://react.dev/reference/react/useRef#caveats
+    prompt: What is the key difference between a value stored in `useRef` and a value stored in `useState`?
+    explanation: "Both survive re-renders, but only a state update schedules a new render. A ref is a mutable box that React does not watch, so changing `ref.current` leaves the screen as it was. Use state for anything the UI displays, a ref for values the UI does not depend on."
+    theoryUrl: https://react.dev/learn/referencing-values-with-refs
     options:
-      - { text: "`render 0`, `render 1`, `render 2`", correct: false }
-      - { text: "`render 0`, `render 2`", correct: false }
-      - { text: "`render 0`", correct: true }
-      - { text: "`render 0`, `render 0`, `render 0`", correct: false }
+      - {
+          text: "Changing a ref's `current` does not trigger a re-render, while a state update does",
+          correct: true,
+        }
+      - {
+          text: "A ref is reset to its initial value on every render, while state is kept between renders",
+          correct: false,
+        }
+      - {
+          text: "A ref is shared by every instance of the component, while state is private to each instance",
+          correct: false,
+        }
+      - {
+          text: "A ref's value is updated synchronously and state is always updated asynchronously, which is the only difference",
+          correct: false,
+        }
   - type: multi
     prompt: Which of these are appropriate uses of `useRef`? Select all that apply.
-    explanation: "Refs are for values that must survive renders without driving the UI: the id of a timer, or a handle to a DOM node for focus and measurement. The visible counter must be state, and a derived value should be computed in render. Neither belongs in a ref."
+    explanation: "Refs fit values that must survive renders without driving the UI: a timer id, or a handle to a DOM node for focus and measurement. A counter shown in the JSX must be state, and a value derived from props or state should simply be computed during render."
     theoryUrl: https://react.dev/learn/referencing-values-with-refs#when-to-use-refs
     options:
       - { text: "Holding the id returned by `setTimeout`, to clear it later", correct: true }
       - { text: "Calling `inputRef.current.focus()` after a click", correct: true }
       - { text: "Storing a counter that is displayed in the JSX", correct: false }
-      - { text: "Caching a value computed from props, so you can skip `useMemo`", correct: false }
+      - {
+          text: "Caching a value computed from props so that it never has to be recalculated",
+          correct: false,
+        }
   - type: single
     prompt: Why does the React documentation advise against reading or writing `ref.current` during rendering?
-    explanation: "Render must be pure, and a mutable ref read in render makes the output depend on something React does not track. In concurrent or double-invoked renders (StrictMode) the value may differ between passes. Read and write refs in event handlers and effects instead."
+    explanation: "Render must be a pure calculation of props, state and context. A mutable ref breaks that guarantee, so two renders with the same inputs can differ, and features like StrictMode double-rendering or concurrent rendering become unpredictable. Read and write refs in event handlers and effects."
     theoryUrl: https://react.dev/reference/react/useRef#caveats
     options:
       - {
-          text: "`ref.current` is `null` until the first effect, so reading it during render always throws",
-          correct: false,
-        }
-      - { text: "Refs are frozen objects, so writes are silently ignored", correct: false }
-      - {
-          text: "Refs can only be read inside the same component that created them",
+          text: "Refs are not initialised until after the first render has finished",
           correct: false,
         }
       - {
-          text: "It breaks render purity: the output would depend on a value React does not track",
+          text: "It makes rendering impure, so the output no longer depends only on props, state and context",
           correct: true,
         }
-  - type: single
-    prompt: "In React 19, how can a function component receive a `ref` from its parent and attach it to an inner `<input>`?"
-    code: |
-      function TextInput({ ref }: { ref?: React.Ref<HTMLInputElement> }) {
-        return <input ref={ref} />
-      }
-    codeLanguage: tsx
-    explanation: "Since React 19, function components receive `ref` as a regular prop, so you can pass it to the inner element directly. `forwardRef` is no longer needed for new code and will be deprecated in a future release."
-    theoryUrl: https://react.dev/blog/2024/12/05/react-19#ref-as-a-prop
-    options:
       - {
-          text: "Only by wrapping the component in `forwardRef`, as in every React version",
+          text: "Reading `ref.current` during render throws an error in development builds",
           correct: false,
         }
-      - { text: "As a normal prop named `ref`, as shown in the snippet", correct: true }
-      - { text: "Through `useImperativeHandle`, which is mandatory for any ref", correct: false }
-      - { text: "It is impossible; refs only work on DOM elements, not components", correct: false }
+      - {
+          text: "Any ref access during render forces an extra synchronous re-render of the component",
+          correct: false,
+        }
   - type: single
-    prompt: "Which statement about `useMemo` is correct?"
-    explanation: "`useMemo` is a performance hint: it caches the result for the same dependencies, but React may discard the cache (for example when memory is tight or for offscreen content). Your code must still be correct if the calculation runs again."
+    prompt: "In React 19, how does a function component receive a `ref` from its parent so it can attach it to an inner `<input>`?"
+    explanation: "In React 19, `ref` is a regular prop for function components, so the component destructures it and forwards it. `forwardRef` is no longer needed for new code. In React 18 and earlier, `ref` was reserved and had to go through `forwardRef`."
+    theoryUrl: https://react.dev/reference/react/forwardRef
+    options:
+      - {
+          text: "It must always be wrapped in `forwardRef`, because function components cannot read `ref` at all",
+          correct: false,
+        }
+      - {
+          text: "It is passed through the `useImperativeHandle` hook, which is the only supported way to expose a DOM node",
+          correct: false,
+        }
+      - {
+          text: "It arrives as an ordinary prop, so the component can pass it straight on to the inner `<input>`",
+          correct: true,
+        }
+      - {
+          text: "It is read from a context that React creates for every component that renders a host element",
+          correct: false,
+        }
+  - type: single
+    prompt: Which statement about `useMemo` is correct?
+    explanation: "`useMemo` caches a calculated value between renders and recomputes it only when a dependency changes. It is a performance hint, not a semantic guarantee: React may discard the cache, so your code must stay correct if the calculation re-runs."
     theoryUrl: https://react.dev/reference/react/useMemo#caveats
     options:
-      - { text: "It guarantees the callback runs once per dependency value", correct: false }
       - {
-          text: "It makes the component skip a re-render when its dependencies are unchanged",
+          text: "It guarantees the callback runs exactly once per component instance, so it is safe for side effects",
           correct: false,
         }
       - {
-          text: "It is a cache hint: React may recompute, so correctness must not depend on it",
+          text: "It caches the result between renders and is a performance optimisation, not a semantic guarantee",
           correct: true,
         }
-      - { text: "It runs the callback asynchronously, after the render commits", correct: false }
+      - {
+          text: "It prevents the component from re-rendering when its dependencies have not changed",
+          correct: false,
+        }
+      - {
+          text: "It runs the calculation asynchronously after render so that it never blocks painting",
+          correct: false,
+        }
   - type: single
     prompt: 'A component filters a list of 20 items with a trivial predicate. A teammate wraps it in `useMemo` "for performance". What is the most accurate view?'
-    explanation: "Memoisation has its own cost, comparing dependencies and holding the cache, and for a cheap computation it is a net loss. Measure first: the docs suggest `console.time` with throttled CPU, and memoise when the calculation takes noticeable time, for example 1ms or more."
-    theoryUrl: https://react.dev/reference/react/useMemo#how-to-tell-if-a-calculation-is-expensive
-    options:
-      - { text: "It is a good habit, since `useMemo` is free and always helps", correct: false }
-      - { text: "It is required for the list to keep its keys stable", correct: false }
-      - { text: "It is mostly overhead here; measure before adding it", correct: true }
-      - { text: "It is wrong because `useMemo` cannot be used with arrays", correct: false }
-  - type: single
-    prompt: "`Search` memoises the filtered results, but the profiler shows the calculation still runs on every parent render. What is the likely cause?"
-    code: |
-      function Search({ items, query }: Props) {
-        const results = useMemo(
-          () => items.filter((i) => i.name.includes(query)),
-          [items, query]
-        )
-        return <List rows={results} />
-      }
-      // parent: <Search items={data.filter(Boolean)} query={q} />
-    codeLanguage: tsx
-    explanation: "`data.filter(Boolean)` creates a new array on every parent render, so `items` changes by reference every time and the memo is invalidated. Memoise the array in the parent, or pass stable data. The dependency comparison is `Object.is`, not deep equality."
-    theoryUrl: https://react.dev/reference/react/useMemo#memoizing-a-dependency-of-another-hook
+    explanation: "Memoisation has its own cost: the cache, the dependency comparison and the extra code to read. For a cheap calculation that cost can exceed the saving. Measure first and reach for `useMemo` when the calculation is demonstrably slow or when you need a stable reference."
+    theoryUrl: https://react.dev/reference/react/useMemo#should-you-add-usememo-everywhere
     options:
       - {
-          text: "`useMemo` is ignored in components that receive an array prop, since React cannot compare arrays",
+          text: "It is a best practice, because `useMemo` is free and should wrap every derived value",
           correct: false,
         }
-      - { text: "`query` is a string, and strings are always treated as changed", correct: false }
       - {
-          text: "The parent passes a new `items` array every render, so the dependency changes",
+          text: "It is probably unnecessary: the saving is negligible and the hook adds its own overhead",
           correct: true,
         }
-      - { text: "The callback closes over `items`, which disables caching", correct: false }
+      - {
+          text: "It is harmful, because `useMemo` is only allowed for values that cross a component boundary",
+          correct: false,
+        }
+      - {
+          text: "It is required, otherwise React will recompute the filter on every keystroke anywhere in the app",
+          correct: false,
+        }
   - type: single
-    prompt: "What does `useCallback(fn, deps)` actually do?"
-    explanation: "It returns the same function instance between renders while `deps` are unchanged. It does not stop the inline function from being created on each render, and it does not make the function run faster. It pays off when that identity matters, for example as a prop of a `memo` component or as an effect dependency."
+    prompt: "`Search` memoises its filtered results with `useMemo(..., [options])`, but the profiler shows the filter still runs on every parent render. What is the most likely cause?"
+    explanation: "Dependencies are compared with `Object.is`. If the parent builds `options` as a new object or array literal on each render, the reference changes every time and the cache never hits. Stabilise the prop at the source, or depend on the primitive values inside it."
+    theoryUrl: https://react.dev/reference/react/useMemo#skipping-re-rendering-of-components
+    options:
+      - {
+          text: "`useMemo` only works inside components that are wrapped in `memo`",
+          correct: false,
+        }
+      - {
+          text: "`useMemo` is ignored in development builds, so profiling there is meaningless",
+          correct: false,
+        }
+      - {
+          text: "The parent passes a freshly created `options` object each render, so the dependency always looks changed",
+          correct: true,
+        }
+      - {
+          text: "The filter function is too fast, and React skips caching results that take under a millisecond",
+          correct: false,
+        }
+  - type: single
+    prompt: What does `useCallback(fn, deps)` actually do?
+    explanation: "It returns the same function reference between renders as long as the dependencies are unchanged, which is equivalent to `useMemo(() => fn, deps)`. It does not make the function faster or stop it from being created; the benefit exists only where a stable reference matters."
     theoryUrl: https://react.dev/reference/react/useCallback
     options:
-      - { text: "It caches the return value of `fn`, like `useMemo`", correct: false }
       - {
-          text: "It returns the same function identity while the dependencies are unchanged",
+          text: "It caches the function's return value so that repeated calls with the same arguments are free",
+          correct: false,
+        }
+      - {
+          text: "It returns the same function reference across renders until one of its dependencies changes",
           correct: true,
         }
       - {
-          text: "It prevents the function from being created again on every render",
+          text: "It delays running the function until the browser is idle, which reduces work during render",
           correct: false,
         }
-      - { text: "It runs `fn` once, and ignores later calls", correct: false }
+      - {
+          text: "It stops the function from being re-created at all, so no allocation happens during render",
+          correct: false,
+        }
   - type: single
     prompt: "`onSave` is wrapped in `useCallback` and passed to a child that is NOT wrapped in `memo`. What is the performance effect?"
-    explanation: "A child without `memo` re-renders whenever its parent does, regardless of prop identity. The `useCallback` has no benefit here, only the cost of a dependency comparison. It becomes useful if the child is wrapped in `memo` or the function is an effect dependency."
+    explanation: "A child that is not memoised re-renders whenever its parent does, regardless of whether its props changed. The stable reference is never consulted, so `useCallback` adds cost and no benefit. It pays off when the receiver is `memo`ised or uses the function as an effect dependency."
     theoryUrl: https://react.dev/reference/react/useCallback#skipping-re-rendering-of-components
     options:
-      - { text: "The child no longer re-renders when the parent does", correct: false }
-      - { text: "The child re-renders only when `onSave` is actually called", correct: false }
-      - { text: "None: the child re-renders anyway, since it is not memoised", correct: true }
       - {
-          text: "It is slower than an inline function, so it should be removed everywhere",
+          text: "None: the child re-renders whenever the parent does anyway, so the hook only adds work",
+          correct: true,
+        }
+      - {
+          text: "The child skips re-rendering, because React compares function props by reference in every component",
+          correct: false,
+        }
+      - {
+          text: "The child re-renders less often, because stable props let React batch its updates together",
+          correct: false,
+        }
+      - {
+          text: "The parent skips re-rendering, because `useCallback` marks its own subtree as unchanged",
           correct: false,
         }
   - type: single
-    prompt: "The button is clicked twice. What does the component display after the second click?"
+    prompt: "A handler runs `setCount(count + 1)` three times in a row, and one click only adds 1 to the counter. What explains it?"
     code: |
-      function C() {
-        const [count, setCount] = useState(0)
-        const inc = useCallback(() => setCount(count + 1), [])
-
-        return <button onClick={() => { inc() }}>{count}</button>
+      function add3() {
+        setCount(count + 1)
+        setCount(count + 1)
+        setCount(count + 1)
       }
     codeLanguage: tsx
-    explanation: "With an empty dependency array, `inc` keeps the closure of the first render, where `count` is 0. Every click calls `setCount(1)`, so the display is 1 after one or any number of clicks. Fix with `setCount(c => c + 1)`, or add `count` to the dependencies."
-    theoryUrl: https://react.dev/reference/react/useCallback#updating-state-from-a-memoized-callback
+    explanation: 'State is a snapshot: within one render, `count` is a fixed value, so all three calls queue "set to count + 1" with the same number. Passing an updater, `setCount(c => c + 1)`, makes each call build on the previous queued result and adds 3.'
+    theoryUrl: https://react.dev/learn/queueing-a-series-of-state-updates
     options:
-      - { text: "2", correct: false }
-      - { text: "0", correct: false }
-      - { text: "1", correct: true }
-      - { text: "NaN", correct: false }
+      - {
+          text: "React ignores repeated updates to the same state variable inside one handler",
+          correct: false,
+        }
+      - {
+          text: "`count` is the same snapshot value in all three calls, so each one queues the same result",
+          correct: true,
+        }
+      - {
+          text: "Updates are applied only after the handler finishes, and React keeps only the last one that was queued with a different value",
+          correct: false,
+        }
+      - {
+          text: "The calls run in parallel and race, so the winner is whichever one finishes last",
+          correct: false,
+        }
   - type: single
-    prompt: "A checkout form has `items`, `coupon`, `shipping`, and `status` state, and several transitions (add item, apply coupon, change shipping, submit, fail) that touch more than one field each. What is the best state tool?"
-    explanation: "When multiple pieces of state change together and updates follow named transitions, `useReducer` centralises the logic in a pure function, makes it testable, and keeps handlers short. Many `useState` calls would scatter and duplicate the coordination."
+    prompt: "A checkout form has `items`, `coupon`, `shipping` and `status` state, and several transitions (add item, apply coupon, change shipping, submit, fail) that each touch more than one field. What is the best way to model the state?"
+    explanation: "When many events update several related fields, `useReducer` puts every transition in one pure function, so invalid combinations are easier to prevent and the logic is testable without rendering. Separate `useState` calls scatter the rules across handlers."
     theoryUrl: https://react.dev/learn/extracting-state-logic-into-a-reducer
     options:
-      - { text: "`useRef` for each field, to avoid re-renders", correct: false }
-      - { text: "`useReducer`, with action types for each transition", correct: true }
-      - { text: "A single `useState` holding a string that encodes everything", correct: false }
-      - { text: "`useMemo` to combine the fields into one object", correct: false }
+      - {
+          text: "One `useReducer`, where actions describe events and the reducer owns the transitions",
+          correct: true,
+        }
+      - {
+          text: "Four independent `useState` calls, updated one after another inside each handler",
+          correct: false,
+        }
+      - {
+          text: "A single `useRef` object mutated by the handlers, with a counter state to force re-renders",
+          correct: false,
+        }
+      - {
+          text: "A context provider with no reducer, because context is what makes state updates atomic",
+          correct: false,
+        }
   - type: single
-    prompt: 'In development with StrictMode, the user clicks "Add" once. What does the list length show with this reducer?'
-    code: |
-      function reducer(state: { items: number[] }, action: { type: 'add' }) {
-        state.items.push(1)
-        return { items: state.items }
-      }
-
-      function C() {
-        const [state, dispatch] = useReducer(reducer, { items: [] })
-        return <button onClick={() => dispatch({ type: 'add' })}>{state.items.length}</button>
-      }
-    codeLanguage: tsx
-    explanation: "StrictMode calls reducers twice to expose impure code. This reducer mutates the existing array, so the second call pushes again: the length becomes 2 in development, but 1 in production, a bug that depends on the environment. Reducers must be pure and return new arrays."
-    theoryUrl: https://react.dev/reference/react/useReducer#my-reducer-or-initializer-function-runs-twice
+    prompt: "In development with StrictMode, React calls your reducer twice for the same action. What is this meant to expose?"
+    explanation: "Reducers, like components and state updater functions, must be pure. Calling them twice and comparing the results surfaces hidden mutations or side effects, such as pushing into the existing array. It only happens in development."
+    theoryUrl: https://react.dev/reference/react/StrictMode#fixing-bugs-found-by-double-rendering-in-development
     options:
-      - { text: "1, since there is a single dispatch", correct: false }
-      - { text: "2, because the impure reducer runs twice on the same array", correct: true }
-      - { text: "0, because React discards mutated state", correct: false }
-      - { text: "It throws, as StrictMode forbids calling `push` in a reducer", correct: false }
+      - {
+          text: "A reducer that is too slow, since the double call doubles the timing so it is easier to measure",
+          correct: false,
+        }
+      - {
+          text: "A reducer that mutates state or has side effects, because the second call would see the first call's changes",
+          correct: true,
+        }
+      - {
+          text: "A missing `default` case in the `switch`, which only shows up when the same action arrives twice",
+          correct: false,
+        }
+      - {
+          text: "An action that is dispatched twice by mistake, which React deliberately repeats to help you find the duplicate",
+          correct: false,
+        }
   - type: single
-    prompt: "What does the component render and how many renders happen after one click?"
-    code: |
-      function reducer(state: number, action: 'inc') {
-        return state + 1
-      }
-
-      function C() {
-        const [count, dispatch] = useReducer(reducer, 0)
-        console.log('render', count)
-        return <button onClick={() => { dispatch('inc'); dispatch('inc') }}>+</button>
-      }
-    codeLanguage: tsx
-    explanation: "Both dispatches are queued and processed in one batch by the reducer, so the second one sees the result of the first. The click causes a single render with count 2: the logs are `render 0` then `render 2`."
-    theoryUrl: https://react.dev/reference/react/useReducer#dispatch
-    options:
-      - { text: "`render 0`, `render 1`, `render 2`", correct: false }
-      - { text: "`render 0`, `render 1`", correct: false }
-      - { text: "`render 0`, `render 2`", correct: true }
-      - { text: "`render 0` only, because `dispatch` is asynchronous", correct: false }
-  - type: single
-    prompt: "What do the three `Show` components log?"
-    code: |
-      const Ctx = createContext('default')
-
-      function Show() {
-        console.log(useContext(Ctx))
-        return null
-      }
-
-      <>
-        <Show />
-        <Ctx.Provider value={undefined as any}><Show /></Ctx.Provider>
-        <Ctx value="x"><Show /></Ctx>
-      </>
-    codeLanguage: tsx
-    explanation: "The default value is used only when there is no provider above the component. A provider whose value is `undefined` does supply `undefined`, it does not fall back to the default. In React 19, `<Ctx value>` works as a provider, so the last one logs `x`."
-    theoryUrl: https://react.dev/reference/react/createContext#createcontext
-    options:
-      - { text: "`default`, `default`, `x`", correct: false }
-      - { text: "`default`, `undefined`, `x`", correct: true }
-      - { text: "`undefined`, `undefined`, `x`", correct: false }
-      - { text: "`default`, `undefined`, `default`", correct: false }
-  - type: single
-    prompt: "A memoised `Cons` reads a context whose value is a number in state, and a memoised `Other` does not read it. The provider's value changes. What re-renders?"
-    explanation: "Context bypasses `memo`: every component that calls `useContext` on that context re-renders when its value changes, even if the parent skips. `Other` takes no props and does not consume the context, so `memo` keeps it from re-rendering."
+    prompt: "A memoised `Cons` reads a context whose value is a number held in state, and a memoised `Other` does not read it. The provider's value changes. What re-renders?"
+    explanation: "Context bypasses `memo`: every component that calls `useContext` for that context re-renders when the value changes, even if its props are identical. `Other` does not consume it, so `memo` keeps it out of the update."
     theoryUrl: https://react.dev/reference/react/useContext#updating-data-passed-via-context
     options:
-      - { text: "Both, because the provider re-rendered", correct: false }
-      - { text: "Only `Other`, because `Cons` is protected by `memo`", correct: false }
-      - { text: "Neither, because `memo` blocks all updates", correct: false }
-      - { text: "Only `Cons`, since consumers re-render despite `memo`", correct: true }
+      - {
+          text: "Both, because a context change re-renders the whole subtree below the provider",
+          correct: false,
+        }
+      - {
+          text: "Neither, because `memo` blocks re-renders caused by anything other than props",
+          correct: false,
+        }
+      - {
+          text: "Only `Other`, because consumers of context are skipped when they are memoised",
+          correct: false,
+        }
+      - {
+          text: "Only `Cons`, since it is the one that reads the context; `memo` does not shield it from context updates",
+          correct: true,
+        }
   - type: single
-    prompt: "An `AuthProvider` re-renders often because it holds frequently changing state, and every consumer re-renders with it. It passes `value={{ user, login, logout }}`. What is the best improvement?"
-    explanation: "An inline object is new on every provider render, so all consumers update even if `user` did not change. Memoise the value with `useMemo` (and stabilise the functions), and split rarely changing data from frequently changing data into separate contexts."
+    prompt: "An `AuthProvider` is re-rendered often by its parent, although the user rarely changes. It passes `value={{ user, login, logout }}` and every consumer re-renders each time. What is the best improvement?"
+    explanation: "A new object literal changes the context value on every render, so all consumers update. Memoise the value with `useMemo` (and keep the functions stable) so it only changes when `user` does. Wrapping consumers in `memo` does not help, since context updates ignore it."
     theoryUrl: https://react.dev/reference/react/useContext#optimizing-re-renders-when-passing-objects-and-functions
     options:
       - {
-          text: "Memoise the value object and split slow-changing data from fast-changing data",
+          text: "Wrap every consumer in `memo`, which stops context updates from reaching them",
+          correct: false,
+        }
+      - {
+          text: "Memoise the context value so that its identity only changes when `user` itself changes",
           correct: true,
         }
       - {
-          text: "Wrap every consumer in `memo`; consumers then ignore context changes",
+          text: "Store the value in a `useRef` instead, so the provider never has to produce a new object",
           correct: false,
         }
-      - { text: "Replace the object with a global variable read in render", correct: false }
-      - { text: "Move the provider below the consumers so they stop updating", correct: false }
+      - {
+          text: "Move the value to a module-level variable, which React tracks and updates automatically",
+          correct: false,
+        }
   - type: single
-    prompt: "In React 19, what can `use(Context)` do that `useContext(Context)` cannot?"
-    explanation: "`use` is not bound by the rules of hooks for conditions and loops: it may be called conditionally, or after an early return. It reads the same context value. It is not faster, and it does not work around Provider boundaries."
+    prompt: In React 19, what can `use(Context)` do that `useContext(Context)` cannot?
+    explanation: "`use` is not a normal hook: it may be called inside conditions and loops, and after an early return. `useContext` must follow the rules of hooks. Both read the same context value and subscribe the component the same way."
     theoryUrl: https://react.dev/reference/react/use#reading-context-with-use
     options:
       - {
-          text: "Skip the provider lookup, and read only the context's default value, which makes it cheaper",
+          text: "Read a context from outside any provider by falling back to the default value",
           correct: false,
         }
       - {
-          text: "Be called conditionally, such as after an early `return` or inside an `if`",
+          text: "Be called conditionally or in a loop, for example after an early return",
           correct: true,
         }
-      - { text: "Subscribe to context changes without re-rendering the component", correct: false }
-      - { text: "Read the default value even when a provider exists above", correct: false }
+      - {
+          text: "Update the context value from the consumer without a setter in the provider",
+          correct: false,
+        }
+      - {
+          text: "Read the context without re-rendering when the value changes, since it is non-reactive",
+          correct: false,
+        }
   - type: multi
     prompt: Which of these violate the rules of hooks? Select all that apply.
-    explanation: "Hooks must be called at the top level, in the same order on every render, and only from components or custom hooks. A hook inside an `if`, a loop, or an event handler breaks the order or the context. Calling a hook at the top of a custom hook is fine."
+    explanation: "Hooks must be called at the top level of a component or custom hook, on every render, in the same order. Calling them inside a condition or a loop breaks that. A hook inside a regular event handler is also invalid; a hook at the top of a custom hook is fine."
     theoryUrl: https://react.dev/reference/rules/rules-of-hooks
     options:
-      - { text: "Calling `useState` inside an `if (isOpen)` block", correct: true }
+      - { text: "Calling `useState` inside an `if` block", correct: true }
+      - { text: "Calling `useEffect` inside the callback passed to `onClick`", correct: true }
+      - { text: "Calling `useRef` at the top of a custom hook named `useTimer`", correct: false }
       - {
-          text: "Calling `useEffect` at the top level of a custom hook named `useOnline`",
-          correct: false,
-        }
-      - { text: "Calling `useContext` inside an `onClick` handler", correct: true }
-      - { text: "Calling `useRef` inside a `for` loop to create several refs", correct: true }
-  - type: single
-    prompt: "Why does React require hooks to be called in the same order on every render?"
-    explanation: "Hooks are stored in a list on the component's fiber, and React matches each call to its slot by position, not by name. A conditional hook shifts the calls that follow, so they read another hook's state. That is why the rules forbid conditions and loops."
-    theoryUrl: https://react.dev/reference/rules/rules-of-hooks#only-call-hooks-at-the-top-level
-    options:
-      - {
-          text: "Because hook names are hashed at build time and compared at runtime",
-          correct: false,
-        }
-      - {
-          text: "Because React identifies each hook by its call position, not by a name",
-          correct: true,
-        }
-      - {
-          text: "Because hooks run in parallel, and order is the only synchronisation",
-          correct: false,
-        }
-      - {
-          text: "Because the linter rewrites the code and needs a predictable order",
+          text: "Calling several hooks one after another at the top of a component",
           correct: false,
         }
   - type: single
-    prompt: "A component returns early before a hook and `show` goes from `false` to `true`. What happens?"
-    code: |
-      function C({ show }: { show: boolean }) {
-        if (!show) return null
-        const [n] = useState(0)
-        return <span>{n}</span>
-      }
-    codeLanguage: tsx
-    explanation: "On the first render no hook ran, on the next one a hook runs, so the number of hooks differs between renders and React throws an error about rendering more hooks than during the previous render. Move all hooks above the early return."
+    prompt: Why does React require hooks to be called in the same order on every render?
+    explanation: "Hooks have no names: React stores each component's hook data as an ordered list and matches the nth call to the nth slot. If the order shifts, a call reads another hook's slot and state gets mixed up."
     theoryUrl: https://react.dev/reference/rules/rules-of-hooks#only-call-hooks-at-the-top-level
     options:
-      - { text: "React creates the state lazily, and renders `0`", correct: false }
       - {
-          text: "It renders `null` forever, since the first render decides the shape of the hook list",
+          text: "Because React identifies a hook by its position in the call sequence, not by a name",
+          correct: true,
+        }
+      - {
+          text: "Because hooks run on a background thread and must be queued in a fixed order",
           correct: false,
         }
       - {
-          text: "React throws an error, because the hook count changed between renders",
+          text: "Because the compiler hoists hooks to the top of the file and reorders anything that is out of sequence",
+          correct: false,
+        }
+      - {
+          text: "Because each hook registers a unique string id from its variable name that must match the previous render",
+          correct: false,
+        }
+  - type: single
+    prompt: "A component has `if (!user) return null` before a `useState` call. The first render has no user, and a later render has one. What happens?"
+    explanation: 'The first render called fewer hooks than the second, so React''s slot list no longer matches and it throws "Rendered more hooks than during the previous render". Put all hooks before any early return, or split the part that needs the hooks into a child component.'
+    theoryUrl: https://react.dev/reference/rules/rules-of-hooks#only-call-hooks-at-the-top-level
+    options:
+      - {
+          text: "React throws an error, because more hooks ran than during the previous render",
           correct: true,
         }
-      - { text: "React silently ignores the hook and renders an empty span", correct: false }
+      - {
+          text: "The state is created late and works normally, since hooks are initialised lazily on first use",
+          correct: false,
+        }
+      - {
+          text: "The new hook silently takes the initial value of the first hook, so no error is shown",
+          correct: false,
+        }
+      - {
+          text: "React remounts the component to get a clean hook list, and the user sees only a brief flash",
+          correct: false,
+        }
   - type: boolean
     prompt: "If two components both call the same custom hook `useCounter()`, they share one counter value."
-    answer: false
-    explanation: "A custom hook shares logic, not state. Each call to the hook creates its own state, so every component gets an independent counter. To share state, lift it up or use context."
+    explanation: "False. A custom hook shares logic, not state: each call creates its own state inside the calling component. To share one value between components you need to lift the state up, use context or an external store."
     theoryUrl: https://react.dev/learn/reusing-logic-with-custom-hooks#custom-hooks-let-you-share-stateful-logic-not-state-itself
+    answer: false
   - type: single
-    prompt: "Why must a custom hook's name start with `use`?"
-    explanation: "The `use` prefix is the convention that lets the linter and the tooling know that the function may call hooks, so it can check the rules of hooks inside it and at its call sites. React runtime does not check the name."
+    prompt: Why must a custom hook's name start with `use`?
+    explanation: "The prefix is how the linter, and the humans reading the code, know the function calls hooks and must follow the rules of hooks. Without it the lint rules cannot check calls to it. React itself does not look at names at runtime."
     theoryUrl: https://react.dev/learn/reusing-logic-with-custom-hooks#hook-names-always-start-with-use
     options:
       - {
-          text: "The React runtime refuses to run hooks inside functions without the prefix, throwing at call time",
+          text: "React inspects function names at runtime and only gives state to those that start with `use`",
           correct: false,
         }
-      - { text: "It registers the function as a hook in a global table", correct: false }
       - {
-          text: "The linter relies on it to know the rules of hooks apply to that function",
+          text: "It signals that the function calls hooks, so the linter can enforce the rules of hooks on it",
           correct: true,
         }
-      - { text: "It makes the function memoised automatically", correct: false }
+      - {
+          text: "It makes React cache the result of the function between renders, the way `useMemo` does",
+          correct: false,
+        }
+      - {
+          text: "It is only a naming habit with no consequence, and tooling treats every function the same way",
+          correct: false,
+        }
   - type: single
-    prompt: "You write `useLocalStorage(key, initial)` for a Next.js app and initialise state with `localStorage.getItem(key) ?? initial` during render. The page throws on the server or shows a hydration mismatch. What is the right design?"
-    explanation: "Render must be identical on the server and in the first client render, and `localStorage` exists only in the browser. Render with `initial` first, and read storage in an effect after hydration, or use `useSyncExternalStore` with a server snapshot. Reading it in render causes the crash or mismatch."
+    prompt: 'A shared `formatPrice(amount, locale)` helper calls no hooks. A teammate proposes renaming it `useFormatPrice` "to make it a proper hook". What is the best response?'
+    explanation: "A function that calls no hooks should stay a plain function: it can be called anywhere, including conditions and handlers. Calling it `use...` would imply restrictions it does not have and force callers to follow the rules of hooks for no reason."
+    theoryUrl: https://react.dev/learn/reusing-logic-with-custom-hooks#should-all-functions-called-during-rendering-start-with-use
+    options:
+      - {
+          text: "Rename it, because every function used while rendering a component should start with `use`",
+          correct: false,
+        }
+      - {
+          text: "Rename it, because plain helpers are recomputed on every render and hooks are cached",
+          correct: false,
+        }
+      - {
+          text: "Keep it a plain function, since the `use` prefix is for functions that call hooks",
+          correct: true,
+        }
+      - {
+          text: "Keep it, but only because the rules of hooks are not enforced for names with a locale argument",
+          correct: false,
+        }
+  - type: single
+    prompt: "You write `useLocalStorage(key, initial)` for a Next.js app and initialise state with `localStorage.getItem(key) ?? initial` during render. The page throws on the server or shows a hydration mismatch. What is the sound fix?"
+    explanation: "On the server there is no `localStorage`, and the client's first render must match the server's HTML. Start from `initial`, then read storage in an effect (or use `useSyncExternalStore` with a server snapshot) so the stored value arrives after hydration."
     theoryUrl: https://react.dev/reference/react/useSyncExternalStore#adding-support-for-server-rendering
     options:
       - {
-          text: "Wrap the read in `try/catch` and return `undefined` on the server",
-          correct: false,
-        }
-      - {
-          text: "Use `useSyncExternalStore` with a server snapshot, or read storage in an effect",
+          text: "Render the same initial value on server and first client render, then read storage after mount",
           correct: true,
         }
       - {
-          text: "Mark the component `'use client'`, which skips server rendering entirely",
+          text: "Wrap the `localStorage` call in a `try/catch`, which makes the server and client output identical",
           correct: false,
         }
       - {
-          text: "Read `localStorage` in `useMemo`, since memoised code never runs on the server during render",
+          text: "Add `suppressHydrationWarning` to the root element so React keeps the client value everywhere",
+          correct: false,
+        }
+      - {
+          text: "Read `localStorage` inside `useMemo`, because memoised values are skipped during server rendering",
           correct: false,
         }
   - type: single
-    prompt: "Which implementation of `useDebounce(value, delay)` is correct?"
-    explanation: "The effect starts a timer for the latest value and the cleanup clears the previous one, so only a value that stayed stable for `delay` ms is committed. Without the cleanup, every timer fires. Calling `setTimeout` in render would run side effects during render."
-    theoryUrl: https://react.dev/learn/reusing-logic-with-custom-hooks
+    prompt: "A `useDebounce(value, delay)` hook sets a timer inside `useEffect` whenever `value` changes. Why must the effect return a cleanup that clears the timer?"
+    explanation: "Without cleanup, every change leaves its timer running, so each stale value is eventually applied and the hook fires once per keystroke, only later. Clearing the previous timer means only the last value within the delay survives. It also prevents a timer firing after unmount."
+    theoryUrl: https://react.dev/learn/synchronizing-with-effects#how-to-handle-the-effect-firing-twice-in-development
     options:
       - {
-          text: "`useEffect(() => { const t = setTimeout(() => setD(value), delay); return () => clearTimeout(t) }, [value, delay])`",
+          text: "So the timer is cancelled when the value changes again or on unmount, leaving only the latest value",
           correct: true,
         }
       - {
-          text: "`useEffect(() => { setTimeout(() => setD(value), delay) }, [value, delay])`",
+          text: "Because React refuses to schedule a new effect until the previous one has returned a cleanup function",
           correct: false,
         }
-      - { text: "`useMemo(() => setTimeout(() => setD(value), delay), [value])`", correct: false }
-      - { text: "`setTimeout(() => setD(value), delay)` directly in the hook body", correct: false }
+      - {
+          text: "Because timers created in effects are cleared automatically only if the delay is shorter than a second",
+          correct: false,
+        }
+      - {
+          text: "To release the memory held by the effect closure, which is otherwise never collected after unmount",
+          correct: false,
+        }
   - type: single
-    prompt: "A custom hook `useToggle()` returns `[value, toggle]`, and another, `useForm()`, returns `{ values, errors, handleChange, reset }`. What is the usual reasoning for tuple versus object?"
-    explanation: "A tuple lets callers name the pieces freely, which suits hooks with two or three values and several uses on a page, like `useState`. An object keeps each field named, which scales better and lets callers pick only what they need, as in a form hook."
+    prompt: "This hook is used by a component that mounts and unmounts often. What is the problem?"
+    code: |
+      function useWindowWidth() {
+        const [w, setW] = useState(window.innerWidth)
+        useEffect(() => {
+          window.addEventListener('resize', () => setW(window.innerWidth))
+        }, [])
+        return w
+      }
+    codeLanguage: tsx
+    explanation: "The listener is never removed, so each mount adds another one that keeps running after unmount and leaks memory. The effect must return a cleanup that calls `removeEventListener` with the same function reference. (`window` at render time is also a server rendering hazard.)"
+    theoryUrl: https://react.dev/learn/synchronizing-with-effects#step-3-add-cleanup-if-needed
+    options:
+      - {
+          text: "The empty dependency array stops the effect from ever seeing the new width",
+          correct: false,
+        }
+      - {
+          text: "Listeners added in an effect are removed by React automatically, so there is only a style problem",
+          correct: false,
+        }
+      - {
+          text: "No cleanup removes the listener, so old listeners pile up and keep updating unmounted components",
+          correct: true,
+        }
+      - {
+          text: "`useState` cannot be given `window.innerWidth`, because state may not hold values from the browser",
+          correct: false,
+        }
+  - type: single
+    prompt: "`useToggle()` returns `[value, toggle]` while `useForm()` returns `{ values, errors, handleChange, reset }`. What is the usual reasoning for tuple versus object?"
+    explanation: "A tuple lets the caller name the pieces freely, as with `useState`, which suits small hooks that may be used several times in one component. An object suits many return values, where names carry meaning and callers pick only what they need."
     theoryUrl: https://react.dev/learn/reusing-logic-with-custom-hooks
     options:
-      - { text: "Objects are slower, so tuples are always preferred", correct: false }
       - {
-          text: "React requires hooks that return more than two values to return objects, to keep ordering stable",
+          text: "Tuples are faster for React to compare, so hooks should always return arrays when they can",
           correct: false,
         }
-      - { text: "Tuples are required for any hook that uses state", correct: false }
       - {
-          text: "Tuples suit a few values callers rename; objects scale better with many named values",
+          text: "Objects cannot be returned from hooks that hold state, so a tuple is the only supported shape",
+          correct: false,
+        }
+      - {
+          text: "The shape does not matter, because destructuring always produces the same names for both",
+          correct: false,
+        }
+      - {
+          text: "Tuples suit a few values callers rename, while objects suit many values picked by name",
           correct: true,
         }

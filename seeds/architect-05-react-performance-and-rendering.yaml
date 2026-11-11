@@ -6,458 +6,527 @@ tags: [architect-roadmap, react, performance, rendering, memo, react-compiler, r
 run:
   questionsPerRun: 10
   maxErrors: 3
-  timePerQuestionSec: 90
+  timePerQuestionSec: 60
 questions:
-  - type: single
-    prompt: "No memoisation and no React Compiler. The button is clicked twice. How many times in total does `Child` render, counting the first mount?"
-    code: |
-      function Child() {
-        console.log('Child')
-        return null
-      }
-
-      function P() {
-        const [n, setN] = useState(0)
-        return (
-          <>
-            <button onClick={() => setN(n + 1)}>+</button>
-            <Child />
-          </>
-        )
-      }
-    codeLanguage: tsx
-    explanation: "When a component re-renders, React re-renders all of its children by default, even if their props did not change. `P` renders three times (mount plus two clicks) and `Child` follows each time, so it logs three times."
-    theoryUrl: https://react.dev/learn/render-and-commit
-    options:
-      - { text: "1", correct: false }
-      - { text: "2", correct: false }
-      - { text: "3", correct: true }
-      - { text: "6", correct: false }
-  - type: single
-    prompt: "No React Compiler. The button is clicked once. How many times does `MC` render in total, counting the mount?"
-    code: |
-      const MC = memo(function MC({ o }: { o: { a: number } }) {
-        console.log('MC')
-        return null
-      })
-
-      function P() {
-        const [n, setN] = useState(0)
-        return (
-          <>
-            <button onClick={() => setN(n + 1)}>+</button>
-            <MC o={{ a: 1 }} />
-          </>
-        )
-      }
-    codeLanguage: tsx
-    explanation: "`memo` compares props with `Object.is`. The inline `{ a: 1 }` is a new object on each render of `P`, so the shallow comparison fails and `MC` re-renders anyway. It logs on mount and again after the click: 2."
-    theoryUrl: https://react.dev/reference/react/memo#minimizing-props-changes
-    options:
-      - { text: "1, because the object has the same content", correct: false }
-      - { text: "2, because the prop is a new object each time", correct: true }
-      - { text: "0, because `memo` components never render on their own", correct: false }
-      - { text: "3, one for the mount and one for each state setter call", correct: false }
-  - type: single
-    prompt: "No React Compiler. Same setup, but the prop is created with `useMemo`. The button is clicked once. How many times does `MC` render in total?"
-    code: |
-      function P() {
-        const [n, setN] = useState(0)
-        const o = useMemo(() => ({ a: 1 }), [])
-
-        return (
-          <>
-            <button onClick={() => setN(n + 1)}>+</button>
-            <MC o={o} />   {/* MC is wrapped in memo() */}
-          </>
-        )
-      }
-    codeLanguage: tsx
-    explanation: "`useMemo` with an empty array returns the same object on each render, so the memoised child sees equal props with `Object.is` and skips. `MC` renders only on mount: once."
-    theoryUrl: https://react.dev/reference/react/memo
-    options:
-      - { text: "1", correct: true }
-      - { text: "2", correct: false }
-      - { text: "0", correct: false }
-      - { text: "It depends on the content of the object", correct: false }
-  - type: single
-    prompt: "No React Compiler. The button inside `Wrap` is clicked once. How many times does `Child` render in total (including mount)?"
-    code: |
-      function Wrap({ children }: { children: React.ReactNode }) {
-        const [n, setN] = useState(0)
-        return (
-          <div>
-            <button onClick={() => setN(n + 1)}>{n}</button>
-            {children}
-          </div>
-        )
-      }
-
-      function P() {
-        return <Wrap><Child /></Wrap>
-      }
-    codeLanguage: tsx
-    explanation: "The `<Child />` element is created by `P`, which does not re-render. `Wrap` receives the same element reference as `children`, so React sees an identical element and skips rendering it. `Child` renders once, while `Wrap` renders twice."
-    theoryUrl: https://react.dev/learn/render-and-commit
-    options:
-      - { text: "2, because it is rendered inside `Wrap`", correct: false }
-      - { text: "1, since `children` keeps the same element reference", correct: true }
-      - { text: "0, because `children` is never rendered by `Wrap`", correct: false }
-      - { text: "3, one per state change and one for the initial render", correct: false }
-  - type: single
-    prompt: "How many renders of `P5` happen in total after one click (counting the mount)?"
-    code: |
-      function P5() {
-        const [a, setA] = useState(0)
-        const [b, setB] = useState(0)
-        console.log('P5')
-
-        return (
-          <button onClick={() => {
-            setA(a + 1)
-            setB(b + 1)
-            setA((x) => x + 1)
-          }}>go</button>
-        )
-      }
-    codeLanguage: tsx
-    explanation: "React batches all state updates in the same event handler into one re-render. Three `set` calls, on two different state variables, still result in a single extra render, so `P5` logs twice: the mount and the click."
-    theoryUrl: https://react.dev/learn/queueing-a-series-of-state-updates#react-batches-state-updates
-    options:
-      - { text: "4: the mount plus three updates", correct: false }
-      - { text: "3: the mount plus one per state variable", correct: false }
-      - { text: "2: the mount plus a single batched render", correct: true }
-      - { text: "1: updates in handlers do not render until the next event", correct: false }
-  - type: single
-    prompt: "The state update runs after an `await`, in an async handler. How many renders of `P` happen after one click (counting the mount)?"
-    code: |
-      function P() {
-        const [a, setA] = useState(0)
-        const [b, setB] = useState(0)
-        console.log('P')
-
-        return (
-          <button onClick={async () => {
-            await Promise.resolve()
-            setA(1)
-            setB(1)
-          }}>go</button>
-        )
-      }
-    codeLanguage: tsx
-    explanation: "Since React 18, updates are batched automatically everywhere: in timeouts, promises and native handlers too, not only in React event handlers. The two setters run in the same tick, so there is one extra render and two logs in total."
-    theoryUrl: https://react.dev/blog/2022/03/29/react-v18#new-feature-automatic-batching
-    options:
-      - { text: "2: mount plus one batched render", correct: true }
-      - { text: "3: mount plus one render per setter after the `await`", correct: false }
-      - { text: "1: updates after `await` never render", correct: false }
-      - { text: "4: each setter renders twice after an async call", correct: false }
-  - type: single
-    prompt: "How many times does `P` render in total after two clicks (counting the mount)?"
-    code: |
-      function P() {
-        const [a, setA] = useState(0)
-        console.log('P', a)
-        return <button onClick={() => setA(0)}>same</button>
-      }
-    codeLanguage: tsx
-    explanation: "Setting state to a value equal to the current one, with `Object.is`, makes React bail out: it does not re-render the component or its children. Only the mount logs `P 0`."
-    theoryUrl: https://react.dev/reference/react/useState#setstate-caveats
-    options:
-      - { text: "3", correct: false }
-      - { text: "2", correct: false }
-      - { text: "1", correct: true }
-      - { text: "0", correct: false }
-  - type: single
-    prompt: "No React Compiler. The button is clicked once. How many times does `M` render in total?"
-    code: |
-      const M = memo(function M({ children }: { children: React.ReactNode }) {
-        console.log('M')
-        return <>{children}</>
-      })
-
-      function P() {
-        const [n, setN] = useState(0)
-        return (
-          <>
-            <button onClick={() => setN(n + 1)}>+</button>
-            <M><span>hi</span></M>
-          </>
-        )
-      }
-    codeLanguage: tsx
-    explanation: "`children` is a JSX element created inline by `P` on each render, so it is a new object every time. The shallow comparison of `memo` sees a changed `children` prop, and `M` renders again: 2 times in total. Memoising `M` helps only if its props, children included, are stable."
-    theoryUrl: https://react.dev/reference/react/memo#minimizing-props-changes
-    options:
-      - { text: "1, because `memo` ignores the `children` prop", correct: false }
-      - { text: "2, because inline JSX children are a new element each render", correct: true }
-      - { text: "0, because `M` renders only inside `P`'s commit", correct: false }
-      - {
-          text: "3, because both `M` and `span` count as separate renders on every click",
-          correct: false,
-        }
-  - type: single
-    prompt: "The component runs in `StrictMode` in development. How many `P8` logs appear after mount plus one click?"
-    code: |
-      function P8() {
-        const [n, setN] = useState(0)
-        console.log('P8', n)
-        return <button onClick={() => setN(n + 1)}>{n}</button>
-      }
-    codeLanguage: tsx
-    explanation: "In development, StrictMode renders every component twice to expose impure rendering (React DevTools may dim the second log, but a plain console shows both). The mount logs twice and the click re-render logs twice: 4 logs. Production renders once each."
-    theoryUrl: https://react.dev/reference/react/StrictMode#fixing-bugs-found-by-double-rendering-in-development
-    options:
-      - { text: "2", correct: false }
-      - { text: "3", correct: false }
-      - { text: "4", correct: true }
-      - { text: "1", correct: false }
-  - type: single
-    prompt: "The button changes `id` from `'a'` to `'b'`. What is logged after the click, depending on whether `Inp` has `key={id}` or not?"
-    code: |
-      function Inp({ id }: { id: string }) {
-        const [t] = useState(() => { console.log('init state', id); return id })
-        console.log('Inp', id)
-        return null
-      }
-
-      // variant 1: <Inp key={id} id={id} />
-      // variant 2: <Inp id={id} />
-    codeLanguage: tsx
-    explanation: "With `key={id}` the key changes, so React unmounts the old instance and mounts a new one: its initializer runs again (`init state b`, then `Inp b`). Without the key it is the same instance with a new prop: only `Inp b` is logged and the state `t` stays `'a'`."
-    theoryUrl: https://react.dev/learn/preserving-and-resetting-state#option-2-resetting-state-with-a-key
-    options:
-      - {
-          text: "Variant 1 logs `Inp b` only; variant 2 logs `init state b`, `Inp b`",
-          correct: false,
-        }
-      - { text: "Both variants log `init state b` and `Inp b`", correct: false }
-      - { text: "Both variants log `Inp b` only", correct: false }
-      - {
-          text: "Variant 1 logs `init state b`, `Inp b`; variant 2 logs `Inp b` only",
-          correct: true,
-        }
-  - type: single
-    prompt: "No React Compiler. `MB` is wrapped in `memo`. The button is clicked once. In which variant does `MB` render a second time?"
-    code: |
-      // variant 1
-      const cb = useCallback(() => {}, [])
-      // variant 2
-      const cb = useCallback(() => { console.log(n) }, [n])
-
-      return <>
-        <button onClick={() => setN(n + 1)}>+</button>
-        <MB onClick={cb} />
-      </>
-    codeLanguage: tsx
-    explanation: "In variant 1 the callback keeps its identity, so the memoised child is skipped. In variant 2 the callback depends on `n`, which changed, so a new function is created and the child's prop changes, so `MB` re-renders. A `useCallback` with changing dependencies gives no benefit."
-    theoryUrl: https://react.dev/reference/react/useCallback#skipping-re-rendering-of-components
-    options:
-      - { text: "Only variant 1", correct: false }
-      - { text: "Only variant 2", correct: true }
-      - { text: "Both variants", correct: false }
-      - { text: "Neither variant", correct: false }
-  - type: single
-    prompt: "Parent `P12` renders `<Counter />` and `<Child />` as siblings. `Counter` holds its own state. After one click inside `Counter`, how many times in total have `P12`, `Counter` and `Child` rendered?"
-    code: |
-      function Counter() {
-        const [n, setN] = useState(0)
-        console.log('Counter')
-        return <button onClick={() => setN(n + 1)}>{n}</button>
-      }
-      function P12() {
-        console.log('P12')
-        return <><Counter /><Child /></>
-      }
-    codeLanguage: tsx
-    explanation: "State changes re-render the component that owns the state and its subtree. The parent and the sibling are not part of it. `P12` and `Child` render once, `Counter` twice. Moving state down into a small component is a cheap way to narrow re-renders."
-    theoryUrl: https://react.dev/learn/render-and-commit
-    options:
-      - { text: "`P12`: 2, `Counter`: 2, `Child`: 2", correct: false }
-      - { text: "`P12`: 1, `Counter`: 2, `Child`: 1", correct: true }
-      - { text: "`P12`: 1, `Counter`: 2, `Child`: 2", correct: false }
-      - { text: "`P12`: 2, `Counter`: 2, `Child`: 1", correct: false }
-  - type: single
-    prompt: "The button is clicked once. How many times does `P13` render in total?"
-    code: |
-      function P13() {
-        const [o, setO] = useState({ n: 0 })
-        console.log('P13', o.n)
-
-        return (
-          <button onClick={() => {
-            o.n++
-            setO(o)
-          }}>go</button>
-        )
-      }
-    codeLanguage: tsx
-    explanation: "The object is mutated and the same reference is set, so `Object.is` says nothing changed and React bails out without re-rendering. Only the mount logged. The mutated `o.n` is 1, but the screen is stale until some other render happens."
-    theoryUrl: https://react.dev/learn/updating-objects-in-state
-    options:
-      - { text: "2, logging `P13 1` on the second", correct: false }
-      - { text: "1, because mutating and re-setting the same object bails out", correct: true }
-      - { text: "2, logging `P13 0` on the second", correct: false }
-      - { text: "0, because mutated state cancels the first render too", correct: false }
   - type: multi
     prompt: Which of these cause a React function component to re-render? Select all that apply.
-    explanation: "A component renders when its own state changes, when its parent renders (unless it is memoised and its props are unchanged), and when a context it consumes changes. Mutating a plain variable or a ref does not schedule a render."
-    theoryUrl: https://react.dev/learn/render-and-commit#step-1-trigger-a-render
+    explanation: "A component re-renders when its own state is set to a new value, when its parent renders (by default, even with identical props), or when a context it reads changes. Mutating a module variable or a ref's `current` does not notify React, so nothing re-renders."
+    theoryUrl: https://react.dev/learn/render-and-commit
     options:
-      - { text: "Its own state is set to a new value", correct: true }
-      - { text: "Its parent re-renders and it is not memoised", correct: true }
-      - { text: "A context value it reads with `useContext` changes", correct: true }
-      - { text: "`ref.current` is assigned a new value inside an event handler", correct: false }
+      - { text: "Its own state is updated with a new value", correct: true }
+      - { text: "Its parent component re-renders", correct: true }
+      - { text: "A context value that it reads through `useContext` changes", correct: true }
+      - { text: "A plain variable declared outside the component is mutated", correct: false }
   - type: single
-    prompt: "A component re-renders but returns exactly the same JSX as before. What does React do with the real DOM?"
-    explanation: "Rendering calls your component and compares the new element tree with the previous one. DOM changes happen in the commit phase, and only for differences. With identical output React touches nothing in the DOM. A render is not a repaint."
-    theoryUrl: https://react.dev/learn/render-and-commit#step-3-react-commits-changes-to-the-dom
-    options:
-      - { text: "It rebuilds the DOM subtree, to be safe", correct: false }
-      - {
-          text: "It replaces the root DOM node of the component, but not its children",
-          correct: false,
-        }
-      - { text: "It re-applies every attribute, but does not recreate nodes", correct: false }
-      - { text: "It leaves the DOM untouched, because nothing differs", correct: true }
-  - type: single
-    prompt: "How does `memo` decide whether to skip a re-render?"
-    explanation: "It compares each prop of the new and the previous render with `Object.is`, a shallow check. Primitives with equal values match; objects, arrays and functions match only if they are the same reference. You can pass a custom comparison as a second argument, but it is rarely a good idea."
-    theoryUrl: https://react.dev/reference/react/memo#usage
+    prompt: A parent holds a counter in state and renders `<Footer />`, which takes no props and has no state. The counter changes. What happens to `Footer`?
+    explanation: "By default React re-renders all children of a component that re-rendered, regardless of whether their props changed. `Footer` runs again unless it is wrapped in `memo` (or the compiler memoises it). The re-run is cheap, and the DOM is only touched if the output differs."
+    theoryUrl: https://react.dev/reference/react/memo
     options:
       - {
-          text: "It deep-compares all props and state, using a structural equality check",
-          correct: false,
-        }
-      - { text: "It compares each prop shallowly with `Object.is`", correct: true }
-      - {
-          text: "It compares the rendered output, and skips the commit when it is equal",
-          correct: false,
-        }
-      - { text: "It skips whenever the parent did not call `setState` itself", correct: false }
-  - type: single
-    prompt: "What does the React Compiler do?"
-    explanation: "It is a build-time tool that analyses components and hooks and inserts memoisation automatically, equivalent to `useMemo`, `useCallback` and `memo` at fine granularity. It assumes the code follows the Rules of React. It does not change runtime semantics or make a bad algorithm faster."
-    theoryUrl: https://react.dev/learn/react-compiler
-    options:
-      - {
-          text: "It compiles JSX to native code, so the virtual DOM is not needed and updates skip reconciliation",
+          text: "It is skipped, because React sees that no props were passed to it",
           correct: false,
         }
       - {
-          text: "At build time it memoises components and values, assuming the Rules of React",
+          text: "It is skipped, since only components that read the counter are re-rendered",
+          correct: false,
+        }
+      - {
+          text: "It re-renders along with its parent, unless something such as `memo` prevents it",
           correct: true,
         }
-      - { text: "At runtime it detects slow components and caches them", correct: false }
-      - { text: "It removes `useEffect` calls that it considers unnecessary", correct: false }
+      - {
+          text: "It re-renders only in development, where React forces children to update to help catch bugs",
+          correct: false,
+        }
   - type: single
-    prompt: "Your team enables the React Compiler on a mature codebase full of `useMemo` and `useCallback`. What does the React team recommend?"
-    explanation: "Leave existing manual memoisation in place, since removing it can change compiled output, and rely on the compiler for new code. `useMemo` and `useCallback` remain useful as an escape hatch, for example to control an effect's dependencies precisely."
-    theoryUrl: https://react.dev/learn/react-compiler
+    prompt: A component re-renders but returns exactly the same JSX as before. What does React do with the real DOM?
+    explanation: "React separates rendering (calling your component) from committing (updating the DOM). After rendering it compares the new output with the previous one and applies only the differences. Identical output means no DOM mutations, although the render work still happened."
+    theoryUrl: https://react.dev/learn/render-and-commit#epilogue-browser-paint
     options:
       - {
-          text: "Delete every manual `useMemo` and `useCallback` right away; they are now harmful",
+          text: "It replaces the component's DOM nodes with fresh ones to be sure they are in sync",
           correct: false,
         }
       - {
-          text: "Keep existing memoisation, rely on the compiler for new code, and use manual memo as an escape hatch",
+          text: "It leaves the DOM untouched, because it only commits the differences between renders",
           correct: true,
         }
-      - { text: "Disable the compiler for any file that imports a hook", correct: false }
-      - { text: "Wrap the whole app in a single `memo` so the compiler can start", correct: false }
-  - type: single
-    prompt: "After enabling the React Compiler, one component behaves wrongly because it mutates a prop object during render. What should you do?"
-    explanation: 'The compiler''s assumptions rely on the Rules of React, and mutating props during render violates them. The right fix is to make the render pure. As a temporary escape you can opt a component out with the `"use no memo"` directive.'
-    theoryUrl: https://react.dev/reference/react-compiler/directives/use-no-memo
-    options:
       - {
-          text: 'Fix the mutation; if urgent, opt the component out with `"use no memo"`',
-          correct: true,
-        }
-      - { text: "Wrap the mutation in `useMemo`, which the compiler then skips", correct: false }
-      - {
-          text: "Switch the component to a class, since the compiler handles only functions",
+          text: "It re-sets every attribute on those nodes but keeps the nodes themselves in place",
           correct: false,
         }
-      - { text: "Raise the compiler's optimisation level to include mutation", correct: false }
+      - {
+          text: "It skips the render phase in the future, since it remembers that this component never changes",
+          correct: false,
+        }
   - type: single
-    prompt: "Which two assumptions let React's reconciliation diff two trees in linear time instead of the generic quadratic or worse algorithm?"
-    explanation: "React assumes that elements of different types produce different trees (so it replaces the subtree), and that a stable `key` identifies the same child across renders. These heuristics trade perfect minimal diffs for speed and are why keys and component types matter."
+    prompt: "A state setter is called with the same value the state already holds, for example `setOpen(true)` when `open` is already `true`. What is the accurate description of what React does?"
+    explanation: "React compares the new value with `Object.is` and bails out: it does not render the children or fire effects. It may still call the component function once more before bailing out, which is why you should not rely on a render count here."
+    theoryUrl: https://react.dev/reference/react/useState#im-updating-state-but-the-screen-doesnt-update
+    options:
+      - {
+          text: "It always re-renders the component and its whole subtree, because every setter call is a request to render",
+          correct: false,
+        }
+      - {
+          text: "It throws a warning in development, because setting identical state is considered a bug",
+          correct: false,
+        }
+      - {
+          text: "It skips the update entirely and guarantees the component function is never called again",
+          correct: false,
+        }
+      - {
+          text: "It bails out without rendering the children or running effects, though the component may run once more",
+          correct: true,
+        }
+  - type: single
+    prompt: "A handler calls `setA(1)`, `setB(2)` and then, after `await fetch(...)`, calls `setC(3)` and `setD(4)` in the same async function. Roughly how many renders does React 18+ perform?"
+    explanation: "React 18 batches all updates automatically, including those in promises, timeouts and after `await`. The two updates before the `await` share one render and the two after it share another, so you get two renders, not four. Older versions batched only inside React event handlers."
+    theoryUrl: https://react.dev/learn/queueing-a-series-of-state-updates
+    options:
+      - {
+          text: "Four, one per setter call, since batching only works inside synchronous event handlers",
+          correct: false,
+        }
+      - {
+          text: "One, because React waits for the whole async function to finish and then applies everything",
+          correct: false,
+        }
+      - {
+          text: "Two, with the updates before the `await` batched and the updates after it batched",
+          correct: true,
+        }
+      - {
+          text: "Zero, because updates after an `await` are dropped unless wrapped in `flushSync`",
+          correct: false,
+        }
+  - type: single
+    prompt: How does `memo` decide whether to skip re-rendering a component?
+    explanation: "`memo` compares the previous and next props one by one with `Object.is` (a shallow comparison). A primitive that is equal passes, but an object, array or function created during the parent's render is a new reference each time and counts as changed."
+    theoryUrl: https://react.dev/reference/react/memo#skipping-re-rendering-when-props-are-unchanged
+    options:
+      - {
+          text: "It compares each prop with `Object.is`, so unchanged references are treated as equal",
+          correct: true,
+        }
+      - {
+          text: "It deep-compares the props, walking nested objects and arrays to see whether their contents differ",
+          correct: false,
+        }
+      - {
+          text: "It serialises the props to JSON and compares the strings, which is why functions cannot be passed",
+          correct: false,
+        }
+      - {
+          text: "It checks whether the parent's state changed, and skips the child when it did not",
+          correct: false,
+        }
+  - type: single
+    prompt: "A list row is wrapped in `memo`, but the parent renders `<Row style={{ color: 'red' }} />` and the rows still re-render on every parent render. Why?"
+    explanation: "The object literal is a new object on each parent render, so the shallow comparison sees a changed prop and `memo` never skips. Hoist the constant outside the component, or memoise it, so the reference stays stable."
+    theoryUrl: https://react.dev/reference/react/memo#minimizing-props-changes
+    options:
+      - {
+          text: "`memo` does not support the `style` prop, since it is handled directly by the DOM",
+          correct: false,
+        }
+      - {
+          text: "`memo` only works on components that receive no object props, and rejects everything else",
+          correct: false,
+        }
+      - {
+          text: "The inline object is a new reference every render, so the shallow props check always fails",
+          correct: true,
+        }
+      - {
+          text: "`memo` is skipped while the parent has any state, which makes it useless for rows in a stateful list",
+          correct: false,
+        }
+  - type: single
+    prompt: "A memoised `Card` is used as `<Card><Icon /></Card>` inside a parent that re-renders often. `Card` still re-renders every time. What is the most likely reason?"
+    explanation: "`<Icon />` is a JSX element, so it is a new object on every parent render, and it arrives in `Card` as the `children` prop. The shallow comparison sees a changed prop. Memoise the element, or lift it out of the re-rendering parent, to keep the reference stable."
+    theoryUrl: https://react.dev/reference/react/memo#minimizing-props-changes
+    options:
+      - {
+          text: "The `children` prop is a freshly created element each time, which defeats the shallow comparison",
+          correct: true,
+        }
+      - {
+          text: "`memo` never works on components that accept `children`, since React cannot compare them",
+          correct: false,
+        }
+      - {
+          text: "`Icon` has no `memo` of its own, and a memoised parent needs memoised children to work",
+          correct: false,
+        }
+      - {
+          text: "`memo` only compares the first prop it sees, and `children` is always read last",
+          correct: false,
+        }
+  - type: single
+    prompt: When is `useMemo` or `useCallback` actually worth adding by hand?
+    explanation: "They pay off when a stable reference is needed: a prop for a `memo`ised child, or a dependency of an effect or another hook. The other case is a calculation you measured as slow. Wrapping everything adds comparison costs and noise for little gain."
+    theoryUrl: https://react.dev/reference/react/useMemo#should-you-add-usememo-everywhere
+    options:
+      - {
+          text: "Whenever a component defines a function or object, to avoid creating it again",
+          correct: false,
+        }
+      - {
+          text: "Only in components with more than a handful of props, where comparisons become expensive",
+          correct: false,
+        }
+      - {
+          text: "When a measured slow calculation, or a value whose stable reference feeds a `memo` child or a dependency array",
+          correct: true,
+        }
+      - {
+          text: "Whenever a component re-renders more than once per second, because that rate is too fast",
+          correct: false,
+        }
+  - type: single
+    prompt: "A search page has a text input and, as its sibling, a heavy chart. Typing is laggy because the input's state lives in the page component, which re-renders the chart on each keystroke. What is the best first fix?"
+    code: |
+      function Page() {
+        const [q, setQ] = useState('')
+        return (<>
+          <input value={q} onChange={e => setQ(e.target.value)} />
+          <Chart />
+        </>)
+      }
+    codeLanguage: tsx
+    explanation: "The state is only needed by the input, so move it down into its own component (state colocation). Then the page no longer re-renders on keystrokes and the chart is untouched. That removes the cause, where `memo` or `useMemo` would only patch the symptom."
+    theoryUrl: https://react.dev/learn/sharing-state-between-components
+    options:
+      - {
+          text: "Move the input and its state into a small component, so typing no longer re-renders the page",
+          correct: true,
+        }
+      - {
+          text: "Wrap `Chart` in `useCallback`, so that React stops calling it when the query changes",
+          correct: false,
+        }
+      - {
+          text: "Replace `useState` with `useRef` for the query, which keeps the input value but never re-renders the page",
+          correct: false,
+        }
+      - {
+          text: "Debounce the `onChange` handler by 500 ms, which is the standard way to stop a render per keystroke",
+          correct: false,
+        }
+  - type: single
+    prompt: "A list re-renders on every keystroke in an unrelated search box that sits above it. What is the first thing to check?"
+    explanation: "Start by finding why it renders: usually the typing state lives in a common ancestor, so everything below re-renders. Confirm with the Profiler, which shows what triggered each render, then fix the structure before adding memoisation."
+    theoryUrl: https://react.dev/reference/react/Profiler
+    options:
+      - {
+          text: "Add `memo` to every component in the list, so that none of them can re-render",
+          correct: false,
+        }
+      - {
+          text: "Where the search state lives, and which component re-renders the list, checked with the Profiler",
+          correct: true,
+        }
+      - {
+          text: "Switch the list to `useMemo` and wait to see whether the problem goes away without any measurement",
+          correct: false,
+        }
+      - {
+          text: "Move the list to a separate file, since React re-renders only the components defined in the same file",
+          correct: false,
+        }
+  - type: single
+    prompt: Why is "wrap every component in `memo`" a poor default performance strategy?
+    explanation: "Each `memo` adds a props comparison on every render and complexity to maintain, and it saves nothing when a prop is unstable, such as an inline object or `children`. It helps only where renders are costly and props are stable, so profile and target those spots."
+    theoryUrl: https://react.dev/reference/react/memo#should-you-add-memo-everywhere
+    options:
+      - {
+          text: "It adds a comparison to every render and often does nothing, since unstable props defeat it",
+          correct: true,
+        }
+      - {
+          text: "It is forbidden by the rules of React, which allow `memo` only on components with state",
+          correct: false,
+        }
+      - {
+          text: "It makes the component skip every update, including ones caused by its own state changes",
+          correct: false,
+        }
+      - {
+          text: "It breaks hooks inside the component, since `memo` hides the component from React's hook list",
+          correct: false,
+        }
+  - type: single
+    prompt: What does the React Compiler do?
+    explanation: "It is a build-time tool that analyses components and hooks written according to the Rules of React and automatically inserts memoisation, so values and elements keep stable references when their inputs have not changed. It does not change your runtime semantics."
+    theoryUrl: https://react.dev/learn/react-compiler/introduction
+    options:
+      - {
+          text: "It rewrites class components into function components, so hooks can be used everywhere",
+          correct: false,
+        }
+      - {
+          text: "It runs in the browser and records which props change, to skip renders that will give the same result",
+          correct: false,
+        }
+      - {
+          text: "It moves rendering to the server, so that the client has less code to run for each component",
+          correct: false,
+        }
+      - {
+          text: "At build time, it adds automatic memoisation to components and hooks that follow the Rules of React",
+          correct: true,
+        }
+  - type: single
+    prompt: Your team enables the React Compiler on a mature codebase full of `useMemo` and `useCallback`. What does the React team recommend for the existing manual memoisation?
+    explanation: "Leave the existing calls in place. Removing them can change the compiled output (for example, memoised values used as effect dependencies), so it needs care. For new code you can rely on the compiler and skip manual memoisation unless you need precise control."
+    theoryUrl: https://react.dev/learn/react-compiler/introduction#should-i-try-out-the-compiler
+    options:
+      - {
+          text: "Remove all of it at once, because the compiler throws an error when it finds manual memoisation",
+          correct: false,
+        }
+      - {
+          text: "Keep what is there for now, write new code without it, and remove old calls only with testing",
+          correct: true,
+        }
+      - {
+          text: "Keep it forever and add it to new code as well, since the compiler only works on memoised components",
+          correct: false,
+        }
+      - {
+          text: "Wrap it all in `useEffect`, which the compiler uses as its starting point for analysis",
+          correct: false,
+        }
+  - type: single
+    prompt: After enabling the React Compiler, one component behaves wrongly because it mutates a prop object during render. What is the right way to deal with it?
+    explanation: "The compiler assumes components are pure and follow the Rules of React, so mutating props during render is the bug and the compiler only exposes it. Fix the mutation (copy, then change the copy). Opting out of that component is a stopgap."
+    theoryUrl: https://react.dev/reference/rules/components-and-hooks-must-be-pure
+    options:
+      - {
+          text: "Report it as a compiler bug and disable the compiler for the whole project until it is fixed",
+          correct: false,
+        }
+      - {
+          text: "Wrap the mutated object in `useRef` so that the compiler can no longer see the change",
+          correct: false,
+        }
+      - {
+          text: "Add manual `useMemo` calls around the mutation, since manual memoisation takes priority over the compiler",
+          correct: false,
+        }
+      - {
+          text: "Fix the component so it does not mutate props, and use an opt-out only as a temporary measure",
+          correct: true,
+        }
+  - type: single
+    prompt: Which two assumptions let React diff two trees in roughly linear time instead of with a generic tree-diff algorithm?
+    explanation: "React assumes elements of different types produce different trees, so it tears the old subtree down and rebuilds it. It also relies on keys to recognise which child in a list is the same across renders. Generic tree diffing is far more expensive."
     theoryUrl: https://react.dev/learn/preserving-and-resetting-state
     options:
-      - { text: "Components are pure, and props are always immutable objects", correct: false }
       - {
-          text: "Elements at a position keep their state, and updates always happen top-down",
+          text: "Components are pure, and the DOM never changes between renders except through React",
           correct: false,
         }
       - {
-          text: "Elements of different types give different trees, and keys identify children across renders",
+          text: "Elements of different types give different trees, and keys identify stable children in a list",
           correct: true,
         }
       - {
-          text: "Children are compared by content hash, and only the root is compared by type",
+          text: "Trees never grow deeper than a fixed limit, and each component renders at most once per frame",
+          correct: false,
+        }
+      - {
+          text: "Parents always re-render before children, and siblings are always compared in alphabetical order",
           correct: false,
         }
   - type: single
-    prompt: "A list of 500 rows with local state is reordered by sorting. With `key={row.id}` versus `key={index}`, what changes?"
-    explanation: "With stable ids, React matches each row to its existing instance and just moves it, keeping state and DOM. With index keys, the instance at each position stays and receives another row's props, so local state ends up attached to the wrong row, and rows update unnecessarily."
+    prompt: A list of 500 rows, each with local input state, is reordered by sorting. With `key={row.id}` versus `key={index}`, what changes?
+    explanation: "With stable ids, React moves each row with its state to its new position. With index keys, position N always maps to the same instance, so the typed text stays at position N while the data moves, and the wrong row appears to own the input."
     theoryUrl: https://react.dev/learn/rendering-lists#why-does-react-need-keys
     options:
-      - { text: "Nothing: keys only silence a warning", correct: false }
-      - { text: "Index keys are faster, since they are cheaper to compute", correct: false }
       - {
-          text: "Id keys remount all rows on every sort, while index keys move the existing instances to their new positions",
+          text: "Nothing: both keys give the same result, as React rebuilds the list from scratch on any reorder",
           correct: false,
         }
       - {
-          text: "Id keys move instances with their state; index keys keep positions, and state sticks to the wrong rows",
+          text: "With `id` keys each row keeps its own state when it moves, while with index keys state stays at the position",
           correct: true,
         }
-  - type: single
-    prompt: "A page has a text input and, as its sibling, a very heavy chart. Typing is laggy because the input's state lives in the page component, which re-renders the chart each keystroke. What is the best first fix?"
-    explanation: "Moving state down is the cheapest, most robust fix: put the input and its state into its own component, so keystrokes re-render only it. Alternatives like `memo` on the chart also work but depend on stable props. A `useEffect` copy of the state does not reduce renders."
-    theoryUrl: https://overreacted.io/before-you-memo/
-    options:
       - {
-          text: "Move the input state into a small component, so the chart is not re-rendered",
-          correct: true,
-        }
-      - { text: "Add a `useEffect` that debounces the input's state updates", correct: false }
-      - { text: "Replace the state with a ref, and force a render on blur", correct: false }
-      - { text: "Wrap the input in `useMemo` so it does not re-render", correct: false }
-  - type: single
-    prompt: "A table must show 10,000 rows and scrolling is janky; profiling shows time spent mounting rows. Which approach addresses the cause?"
-    explanation: "The cost is the number of mounted DOM nodes and components. Virtualisation (windowing) renders only the rows near the viewport. `memo` helps update cost, not initial mount of everything, and `useMemo` does not reduce the number of elements rendered."
-    theoryUrl: https://web.dev/articles/virtualize-long-lists-react-window
-    options:
-      - { text: "Wrap each row in `memo`, so rows never render", correct: false }
-      - { text: "Cache the array of rows with `useMemo`", correct: false }
-      - {
-          text: "Move the rows into context, so the table does not own them and rendering becomes cheaper",
+          text: "With `id` keys every row is remounted on sorting, while index keys let React reuse every instance",
           correct: false,
         }
-      - { text: "Virtualise the list, rendering only the rows near the viewport", correct: true }
+      - {
+          text: "Only the DOM order changes with `id` keys, and local state is reset in both cases",
+          correct: false,
+        }
   - type: single
-    prompt: "A search input filters a heavy list of results. Typing feels laggy because every keystroke renders the list. Which React API keeps the input responsive without debouncing?"
-    explanation: "`useDeferredValue(query)` lets the input update immediately with the urgent value, while the list renders with the deferred value in a lower-priority render that can be interrupted by new typing. `useTransition` achieves similar results when you control the state setter."
+    prompt: A profile form keeps state in its inputs. When the selected user changes, the old user's typed values remain. What is the cleanest fix?
+    explanation: "React keeps state while the component stays at the same position with the same type. Passing `key={user.id}` tells React it is a different component, so it unmounts the old one and mounts a fresh one with clean state. That avoids resetting each field by hand in an effect."
+    theoryUrl: https://react.dev/learn/preserving-and-resetting-state#resetting-state-with-a-key
+    options:
+      - {
+          text: "Give the form `key={user.id}` so a new user mounts a fresh instance with fresh state",
+          correct: true,
+        }
+      - {
+          text: "Reset every field in a `useEffect` that depends on the user id, as each render has to be corrected",
+          correct: false,
+        }
+      - {
+          text: "Call `forceUpdate` on the form when the id changes, which makes React discard the stale state",
+          correct: false,
+        }
+      - {
+          text: "Wrap the form in `memo`, which discards the state whenever the incoming props change",
+          correct: false,
+        }
+  - type: single
+    prompt: "A component is declared inside another component's body and rendered in its output. Each parent re-render makes its inputs lose focus and state. Why?"
+    explanation: "Every parent render creates a new function, so React sees a different component type at that position and unmounts and remounts the whole subtree, losing DOM state and focus. Declare components at module level and pass data as props."
+    theoryUrl: https://react.dev/learn/your-first-component#nesting-and-organizing-components
+    options:
+      - {
+          text: "Nested components have no access to the browser focus API, which only works at module level",
+          correct: false,
+        }
+      - {
+          text: "Its identity is new on each render, so React treats it as a different type and remounts it",
+          correct: true,
+        }
+      - {
+          text: "React forbids state in components that are declared inside other components and discards it",
+          correct: false,
+        }
+      - {
+          text: "The inner component is rendered twice per update, and the second render resets the DOM node",
+          correct: false,
+        }
+  - type: single
+    prompt: A table must show 10,000 rows and scrolling is janky; profiling shows most of the time is spent mounting rows. Which approach addresses the cause?
+    explanation: "The cost comes from creating thousands of DOM nodes that are off screen. Virtualisation (windowing) renders only the rows near the viewport and swaps them as you scroll. `memo` helps re-renders, not the cost of the initial mount."
+    theoryUrl: https://react.dev/learn/rendering-lists
+    options:
+      - {
+          text: "Wrap each row in `memo`, so rows that are not visible skip their work",
+          correct: false,
+        }
+      - {
+          text: "Render only the rows in or near the viewport, with a windowing library",
+          correct: true,
+        }
+      - {
+          text: "Move the table state into a context, so that React batches the row updates",
+          correct: false,
+        }
+      - {
+          text: "Replace the `key` on each row with the index, which is cheaper for React to compare",
+          correct: false,
+        }
+  - type: single
+    prompt: A search input filters a heavy list, and typing lags because every keystroke renders the whole list. What does `useDeferredValue` do for this?
+    explanation: "It lets React render the urgent update (the input) first and then re-render the heavy part with the lagging value in the background, interruptibly. Unlike debouncing there is no fixed delay, and the work adapts to the device. The list needs to be memoised for it to skip work."
     theoryUrl: https://react.dev/reference/react/useDeferredValue
     options:
       - {
-          text: "`useDeferredValue` on the query, so the list renders at lower priority",
+          text: "It waits a fixed number of milliseconds before updating, exactly as a debounce would",
+          correct: false,
+        }
+      - {
+          text: "It runs the filtering on a separate thread, so the main thread stays free for typing",
+          correct: false,
+        }
+      - {
+          text: "It keeps the old value for the heavy render, which is interruptible when a new keystroke arrives",
           correct: true,
         }
       - {
-          text: "`useLayoutEffect`, so the list renders before the paint and keeps typing responsive",
+          text: "It skips the intermediate values for good, so the list only ever sees the final text of a typing burst",
           correct: false,
         }
-      - { text: "`flushSync`, so each keystroke renders synchronously", correct: false }
-      - { text: "`useRef`, to hold the query and skip renders entirely", correct: false }
   - type: single
-    prompt: "An admin dashboard ships a 1.2 MB charting library that only 5% of users open, on a secondary tab. What is the most suitable improvement for load performance?"
-    explanation: "`React.lazy` with a dynamic `import()`, inside `<Suspense>`, splits the code so the chart bundle downloads only when the tab renders. `memo` and `useMemo` reduce rendering work, not the bytes downloaded."
+    prompt: An admin dashboard ships a 1.2 MB charting library that only 5% of users open, on a secondary tab. What is the most suitable improvement for load performance?
+    explanation: "Code-splitting with `lazy` (or a dynamic `import()`) keeps the library out of the initial bundle and fetches it when the tab is opened, so everyone else downloads and parses less. `memo` and `useMemo` affect render work, not bundle size."
     theoryUrl: https://react.dev/reference/react/lazy
     options:
-      - { text: "Wrap the chart component in `memo`", correct: false }
-      - { text: "Load the chart with `React.lazy` and a `<Suspense>` fallback", correct: true }
-      - { text: "Import it normally and compute its data with `useMemo`", correct: false }
-      - { text: "Render the chart inside `StrictMode` to defer its work", correct: false }
+      - {
+          text: "Load the chart lazily, only when the tab is opened, so it leaves the initial bundle",
+          correct: true,
+        }
+      - {
+          text: "Wrap the chart components in `memo`, which stops the library from being downloaded until needed",
+          correct: false,
+        }
+      - {
+          text: "Move the chart's data into `useMemo`, so the library has less to compute when the tab is first shown",
+          correct: false,
+        }
+      - {
+          text: "Keep the library in the main bundle, because splitting it adds a request that makes the tab slower for everyone",
+          correct: false,
+        }
+  - type: single
+    prompt: In development with StrictMode, you notice every component renders twice and logs appear twice. What is happening, and does it affect production?
+    explanation: "StrictMode deliberately renders components twice in development to expose impure renders: if the second result differs, something is mutating or reading changing data. This does not happen in production builds, so it is not a performance problem."
+    theoryUrl: https://react.dev/reference/react/StrictMode#fixing-bugs-found-by-double-rendering-in-development
+    options:
+      - {
+          text: "It is a bug in your code, because a correct component renders exactly once, in every environment",
+          correct: false,
+        }
+      - {
+          text: "It is a deliberate development check for impure renders and does not occur in production",
+          correct: true,
+        }
+      - {
+          text: "React double-renders in production too, but hides the second log to keep the console clean",
+          correct: false,
+        }
+      - {
+          text: "It happens because a parent re-rendered, and StrictMode only changes how the second pass is logged",
+          correct: false,
+        }
+  - type: single
+    prompt: "A memoised `Sidebar` reads a `ThemeContext` whose provider value is `{ mode, toggle }` built inline. The provider's parent re-renders often while `mode` rarely changes, yet `Sidebar` re-renders every time. What is the cause and fix?"
+    explanation: "The inline object is a new reference on each provider render, so the context value always counts as changed, and `memo` cannot block context updates. Memoise the value with `useMemo` (and keep `toggle` stable) so it only changes with `mode`."
+    theoryUrl: https://react.dev/reference/react/useContext#optimizing-re-renders-when-passing-objects-and-functions
+    options:
+      - {
+          text: "The value is a new object each render, so memoise it and keep its callbacks stable",
+          correct: true,
+        }
+      - {
+          text: "`Sidebar` ignores `memo` for context, so it needs `useCallback` around the whole component to fix it",
+          correct: false,
+        }
+      - {
+          text: "Context re-renders every consumer on every parent render by design, so nothing can be improved",
+          correct: false,
+        }
+      - {
+          text: "`mode` is a string, and strings in context values are always compared by length, which fails here",
+          correct: false,
+        }
+  - type: single
+    prompt: "A team puts a value that changes dozens of times per second, such as the mouse position, in a context so any component can read it. Dozens of consumers now re-render constantly. What is the soundest direction?"
+    explanation: "Context re-renders every consumer on each change and has no selector. For fast-changing data, keep it as local state near the one component that needs it, or use an external store read with a selector (`useSyncExternalStore`), so only components that care re-render."
+    theoryUrl: https://react.dev/reference/react/useSyncExternalStore
+    options:
+      - {
+          text: "Keep it in context and wrap each consumer in `memo`, which stops context updates from reaching them",
+          correct: false,
+        }
+      - {
+          text: "Keep the fast-changing value out of context: use local state or a store with selector-based subscriptions",
+          correct: true,
+        }
+      - {
+          text: "Split the one context into several providers nested inside each other, which makes each update cheaper",
+          correct: false,
+        }
+      - {
+          text: "Throttle the provider's state updates to every second, which is the intended way to use context",
+          correct: false,
+        }

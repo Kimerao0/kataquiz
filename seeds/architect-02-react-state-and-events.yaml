@@ -13,19 +13,43 @@ questions:
     explanation: "Each render sees a fixed value of the state, and an event handler closes over the values from the render it belongs to. Calling the setter does not change the variable you already hold, it asks React for a new render with the new value."
     theoryUrl: https://react.dev/learn/state-as-a-snapshot
     options:
-      - { text: "Within one render the state value is fixed, and a setter call schedules a new render", correct: true }
-      - { text: "React saves a copy of the state to the browser storage after every render", correct: false }
-      - { text: "The state variable is updated immediately when the setter is called, but the screen refreshes later", correct: false }
-      - { text: "State can only be read once per render, and further reads return the initial value", correct: false }
+      - {
+          text: "Within one render the state value is fixed, and a setter call schedules a new render",
+          correct: true,
+        }
+      - {
+          text: "React saves a copy of the state to the browser storage after every render",
+          correct: false,
+        }
+      - {
+          text: "The state variable is updated immediately when the setter is called, but the screen refreshes later",
+          correct: false,
+        }
+      - {
+          text: "State can only be read once per render, and further reads return the initial value",
+          correct: false,
+        }
   - type: single
     prompt: A button handler must add 3 to a counter in three separate steps. Which approach gives the expected result, and why?
     explanation: "With `setCount(count + 1)` repeated, every call uses the same snapshot value, so the total is only +1. The updater form `setCount(c => c + 1)` receives the latest pending value each time, so the three calls stack."
     theoryUrl: https://react.dev/learn/queueing-a-series-of-state-updates
     options:
-      - { text: "Call `setCount(count + 1)` three times, since each call sees the updated value", correct: false }
-      - { text: "Call `setCount(c => c + 1)` three times, since each updater gets the latest value", correct: true }
-      - { text: "Call `setCount(count + 3)` once, because React only applies the last setter call made in a handler", correct: false }
-      - { text: "Wrap each call in `setTimeout` so React has time to apply the previous one", correct: false }
+      - {
+          text: "Call `setCount(count + 1)` three times, since each call sees the updated value",
+          correct: false,
+        }
+      - {
+          text: "Call `setCount(c => c + 1)` three times, since each updater gets the latest value",
+          correct: true,
+        }
+      - {
+          text: "Call `setCount(count + 3)` once, because React only applies the last setter call made in a handler",
+          correct: false,
+        }
+      - {
+          text: "Wrap each call in `setTimeout` so React has time to apply the previous one",
+          correct: false,
+        }
   - type: single
     prompt: Why does clicking the button below not update the screen?
     code: |
@@ -43,27 +67,51 @@ questions:
     explanation: "`push` mutates the existing array and `setItems` receives the same reference. React compares old and new state by reference, sees no change, and skips the render. Pass a new array instead: `setItems([...items, 'b'])`."
     theoryUrl: https://react.dev/learn/updating-arrays-in-state
     options:
-      - { text: "`setItems` receives the same array reference, so React sees no change", correct: true }
-      - { text: "`push` is asynchronous, so the array is still empty when React renders", correct: false }
+      - {
+          text: "`setItems` receives the same array reference, so React sees no change",
+          correct: true,
+        }
+      - {
+          text: "`push` is asynchronous, so the array is still empty when React renders",
+          correct: false,
+        }
       - { text: "Arrays cannot be stored in state, only primitive values", correct: false }
-      - { text: "State updates made inside event handlers are ignored until the next click", correct: false }
+      - {
+          text: "State updates made inside event handlers are ignored until the next click",
+          correct: false,
+        }
   - type: single
     prompt: Why does React recommend treating state objects and arrays as immutable?
     explanation: "React detects changes by comparing references. If you mutate in place, the reference stays the same and React cannot tell that something changed. Creating a new object or array makes the change visible and keeps previous snapshots intact."
     theoryUrl: https://react.dev/learn/updating-objects-in-state
     options:
-      - { text: "JavaScript forbids changing objects that come from `useState`, and throws an error", correct: false }
+      - {
+          text: "JavaScript forbids changing objects that come from `useState`, and throws an error",
+          correct: false,
+        }
       - { text: "Mutation is slower than copying in modern engines", correct: false }
-      - { text: "React compares by reference, so a mutated object looks unchanged and does not re-render", correct: true }
-      - { text: "Spreading an object is the only way to trigger the setter, and mutation is just a style problem", correct: false }
+      - {
+          text: "React compares by reference, so a mutated object looks unchanged and does not re-render",
+          correct: true,
+        }
+      - {
+          text: "Spreading an object is the only way to trigger the setter, and mutation is just a style problem",
+          correct: false,
+        }
   - type: single
     prompt: "State is `{ user: { name: 'Ada', address: { city: 'Rome' } } }`. Which update changes only the city, immutably?"
     explanation: "Every level on the path to the changed value must be copied, and untouched fields are carried over with spread. Mutating the nested object and re-setting the same root keeps the same reference, so nothing re-renders."
     theoryUrl: https://react.dev/learn/updating-objects-in-state#updating-a-nested-object
     options:
-      - { text: "`const next = { ...state }; next.user.address.city = 'Milan'; setState(next)`", correct: false }
+      - {
+          text: "`const next = { ...state }; next.user.address.city = 'Milan'; setState(next)`",
+          correct: false,
+        }
       - { text: "`setState({ ...state, user: { city: 'Milan' } })`", correct: false }
-      - { text: "`setState({ ...state, user: { ...state.user, address: { ...state.user.address, city: 'Milan' } } })`", correct: true }
+      - {
+          text: "`setState({ ...state, user: { ...state.user, address: { ...state.user.address, city: 'Milan' } } })`",
+          correct: true,
+        }
       - { text: "`setState({ ...state, 'user.address.city': 'Milan' })`", correct: false }
   - type: single
     prompt: Which expression removes the todo with a given id from state without mutating the original array?
@@ -79,10 +127,22 @@ questions:
     explanation: "`map` builds a new array. For the matching item you return a new object with the flag flipped, and the others are returned as they are. Flipping `todo.done` directly mutates state and the same array reference is re-set."
     theoryUrl: https://react.dev/learn/updating-arrays-in-state#replacing-items-in-an-array
     options:
-      - { text: "Find the todo, set `todo.done = !todo.done`, then call `setTodos(todos)`", correct: false }
-      - { text: "`setTodos(todos.map(t => t.id === id ? { ...t, done: !t.done } : t))`", correct: true }
-      - { text: "`setTodos(todos.forEach(t => { if (t.id === id) t.done = !t.done }))`", correct: false }
-      - { text: "Store `done` in a separate module-level object and read it while rendering", correct: false }
+      - {
+          text: "Find the todo, set `todo.done = !todo.done`, then call `setTodos(todos)`",
+          correct: false,
+        }
+      - {
+          text: "`setTodos(todos.map(t => t.id === id ? { ...t, done: !t.done } : t))`",
+          correct: true,
+        }
+      - {
+          text: "`setTodos(todos.forEach(t => { if (t.id === id) t.done = !t.done }))`",
+          correct: false,
+        }
+      - {
+          text: "Store `done` in a separate module-level object and read it while rendering",
+          correct: false,
+        }
   - type: single
     prompt: "Why does `Child` keep showing the old name after the parent passes a new `name` prop?"
     code: |
@@ -94,19 +154,34 @@ questions:
     explanation: "`useState` uses its argument only on the first render. Later prop values are ignored for the state. If the UI should follow the prop, use the prop directly or derive the value while rendering."
     theoryUrl: https://react.dev/learn/choosing-the-state-structure#avoid-redundant-state
     options:
-      - { text: "The initial value is only used on mount, so later `name` changes never reach `shown`", correct: true }
+      - {
+          text: "The initial value is only used on mount, so later `name` changes never reach `shown`",
+          correct: true,
+        }
       - { text: "Props are frozen after the first render and cannot change", correct: false }
-      - { text: "React skips re-rendering children when the parent passes a string", correct: false }
+      - {
+          text: "React skips re-rendering children when the parent passes a string",
+          correct: false,
+        }
       - { text: "`useState` subscribes to the prop only when the setter is called", correct: false }
   - type: single
     prompt: A profile page renders `<ProfileForm userId={id} />` whose draft text lives in `useState`. After switching to another user, the previous draft is still there. What is the cleanest fix?
     explanation: "Passing `key={userId}` tells React that a different user is a different component instance, so its state starts fresh. An effect that clears the draft works, but renders once with stale data first and adds complexity."
     theoryUrl: https://react.dev/learn/preserving-and-resetting-state#option-2-resetting-state-with-a-key
     options:
-      - { text: "Add an effect on `userId` that calls `setDraft('')` after each render", correct: false }
+      - {
+          text: "Add an effect on `userId` that calls `setDraft('')` after each render",
+          correct: false,
+        }
       - { text: "Pass `key={userId}` so each user gets a fresh component instance", correct: true }
-      - { text: "Move the draft into a module-level variable and clear it manually on navigation", correct: false }
-      - { text: "Replace `useState` with `useRef` so the draft is no longer tied to props", correct: false }
+      - {
+          text: "Move the draft into a module-level variable and clear it manually on navigation",
+          correct: false,
+        }
+      - {
+          text: "Replace `useState` with `useRef` so the draft is no longer tied to props",
+          correct: false,
+        }
   - type: single
     prompt: A search box and a results list are sibling components, and both need the current query. Where should the query state live?
     explanation: "Shared state belongs in the closest common parent, passed down as props together with a callback to change it. Duplicating it in both siblings leads to values drifting apart, and a global store is overkill here."
@@ -115,7 +190,10 @@ questions:
       - { text: "In `SearchBox`, exposed to `Results` through a ref", correct: false }
       - { text: "In their closest common parent", correct: true }
       - { text: "In both components, kept in sync with an effect", correct: false }
-      - { text: "In a global store, because sibling components cannot receive props from the same parent", correct: false }
+      - {
+          text: "In a global store, because sibling components cannot receive props from the same parent",
+          correct: false,
+        }
   - type: single
     prompt: A deeply nested widget needs a value owned by a distant ancestor, and the components in between do not use it. What is the sensible order of options?
     explanation: "Lifting state up is right, but passing props through many layers that ignore them is prop drilling. Restructuring with composition (`children`) often removes most of it, and Context is the next step when drilling is still painful."
@@ -123,15 +201,27 @@ questions:
     options:
       - { text: "Copy the value into local state of each widget when it mounts", correct: false }
       - { text: "Keep it in the ancestor, try composition first, then Context", correct: true }
-      - { text: "Always start with Context for every shared value, even between two siblings", correct: false }
-      - { text: "Read the value from the DOM with a query selector inside the widget that needs it", correct: false }
+      - {
+          text: "Always start with Context for every shared value, even between two siblings",
+          correct: false,
+        }
+      - {
+          text: "Read the value from the DOM with a query selector inside the widget that needs it",
+          correct: false,
+        }
   - type: single
     prompt: What is a "controlled" input in React?
     explanation: "A controlled input gets its current value from React state through the `value` prop and reports changes through `onChange`. React is the single source of truth. An uncontrolled input keeps its own value in the DOM."
     theoryUrl: https://react.dev/reference/react-dom/components/input#controlling-an-input-with-a-state-variable
     options:
-      - { text: "An input whose value comes from a state variable and is updated in `onChange`", correct: true }
-      - { text: "An input that React validates and blocks when the typed value is invalid", correct: false }
+      - {
+          text: "An input whose value comes from a state variable and is updated in `onChange`",
+          correct: true,
+        }
+      - {
+          text: "An input that React validates and blocks when the typed value is invalid",
+          correct: false,
+        }
       - { text: "An input wrapped in a `form` element with a submit handler", correct: false }
       - { text: "An input read with a ref only when the form is submitted", correct: false }
   - type: single
@@ -156,8 +246,14 @@ questions:
     theoryUrl: https://react.dev/learn/responding-to-events#passing-event-handlers-as-props
     options:
       - { text: "`handleSave` runs on every click, as expected", correct: false }
-      - { text: "`handleSave` runs while rendering, and no function is attached for the click", correct: true }
-      - { text: "React throws an error because handlers cannot be called with parentheses", correct: false }
+      - {
+          text: "`handleSave` runs while rendering, and no function is attached for the click",
+          correct: true,
+        }
+      - {
+          text: "React throws an error because handlers cannot be called with parentheses",
+          correct: false,
+        }
       - { text: "It works, but only the first click is handled", correct: false }
   - type: single
     prompt: A card has an `onClick` that navigates, and inside it a "Delete" button must not trigger that navigation. What should the button's handler do?
@@ -174,7 +270,7 @@ questions:
     theoryUrl: https://react.dev/learn/responding-to-events#preventing-default-behavior
     options:
       - { text: "`e.stopPropagation()` in `handleSubmit`", correct: false }
-      - { text: "`type=\"button\"` on the form element", correct: false }
+      - { text: '`type="button"` on the form element', correct: false }
       - { text: "`e.preventDefault()` in `handleSubmit`", correct: true }
       - { text: "A `useEffect` that cancels the navigation after render", correct: false }
   - type: single
@@ -197,8 +293,14 @@ questions:
     theoryUrl: https://react.dev/reference/react-dom/components/input#reading-the-input-values-when-submitting-a-form
     options:
       - { text: "Uncontrolled inputs, reading all values with `FormData` on submit", correct: true }
-      - { text: "One `useState` per field, plus a `useEffect` that collects them into one object", correct: false }
-      - { text: "Controlled inputs with the whole form wrapped in `memo` to avoid any extra render", correct: false }
+      - {
+          text: "One `useState` per field, plus a `useEffect` that collects them into one object",
+          correct: false,
+        }
+      - {
+          text: "Controlled inputs with the whole form wrapped in `memo` to avoid any extra render",
+          correct: false,
+        }
       - { text: "Keep every value in a global store updated on each keystroke", correct: false }
   - type: single
     prompt: A component keeps `firstName`, `lastName` and `fullName` in state, and updates all three in the handlers. What is the best change?
@@ -208,7 +310,10 @@ questions:
       - { text: "Compute it during render from the other two", correct: true }
       - { text: "Keep all three and sync `fullName` with a `useEffect`", correct: false }
       - { text: "Move all three into refs so they can never get out of sync", correct: false }
-      - { text: "Leave it: storing computed values in state is the recommended pattern", correct: false }
+      - {
+          text: "Leave it: storing computed values in state is the recommended pattern",
+          correct: false,
+        }
   - type: multi
     prompt: Which of these values should live in `useState`? Select all that apply.
     explanation: "State is for values that change over time and must update the screen when they do, such as typed text or an open/closed flag. A timer id used only for cleanup is bookkeeping (a ref), and a value computed from other state is derived and should not be stored."
@@ -229,7 +334,10 @@ questions:
     theoryUrl: https://react.dev/learn/render-and-commit
     options:
       - { text: "`Counter` and its children only", correct: true }
-      - { text: "The whole tree from the root, because React always starts at the top", correct: false }
+      - {
+          text: "The whole tree from the root, because React always starts at the top",
+          correct: false,
+        }
       - { text: "`Counter` and its parent, because updates propagate upwards", correct: false }
       - { text: "`Counter` and all its sibling components", correct: false }
   - type: single
@@ -237,10 +345,22 @@ questions:
     explanation: "`price` is the value from the current render, and the setter only schedules a new render. Send the `newPrice` variable you just computed, since that is the value you actually want."
     theoryUrl: https://react.dev/learn/state-as-a-snapshot
     options:
-      - { text: "`setPrice` is slow, so you should wait for it with `await setPrice(newPrice)`", correct: false }
-      - { text: "The variable `price` still holds the current render's value, so send `newPrice` instead", correct: true }
-      - { text: "React ignores the first call of a setter in each handler, so call it twice", correct: false }
-      - { text: "State only updates when the component is mounted, so move the call into an effect", correct: false }
+      - {
+          text: "`setPrice` is slow, so you should wait for it with `await setPrice(newPrice)`",
+          correct: false,
+        }
+      - {
+          text: "The variable `price` still holds the current render's value, so send `newPrice` instead",
+          correct: true,
+        }
+      - {
+          text: "React ignores the first call of a setter in each handler, so call it twice",
+          correct: false,
+        }
+      - {
+          text: "State only updates when the component is mounted, so move the call into an effect",
+          correct: false,
+        }
   - type: single
     prompt: "A form starts with `useState()` (so the value is `undefined`) and renders `<input value={text} onChange={...} />`. After the first keystroke React warns about a change from uncontrolled to controlled. What is the fix?"
     explanation: "`value={undefined}` makes the input uncontrolled, and once a string arrives it becomes controlled. Initialize the state with an empty string so the input is controlled from the first render."
@@ -248,5 +368,11 @@ questions:
     options:
       - { text: "Initialize the state with `''`", correct: true }
       - { text: "Remove `onChange` so React stops tracking the input", correct: false }
-      - { text: "Wrap the input in a `form` element so that React treats it as uncontrolled", correct: false }
-      - { text: "Ignore it; the warning only appears in development and is harmless in all cases", correct: false }
+      - {
+          text: "Wrap the input in a `form` element so that React treats it as uncontrolled",
+          correct: false,
+        }
+      - {
+          text: "Ignore it; the warning only appears in development and is harmless in all cases",
+          correct: false,
+        }
