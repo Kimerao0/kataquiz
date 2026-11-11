@@ -74,7 +74,7 @@ Follow-up: Kill the old path, and the old quiz, i want a new quiz and new path. 
 6. [proven] On a database holding the old seed quizzes, seed quiz 07 and its attempts still exist after the R1 migration.
 7. [proven] On a fresh database, `pnpm release` runs the R1 migration without error and imports every seed, the path included.
 8. [proven] After `pnpm release` on a database holding the old content, the "Road to Software Architect" page lists 41 steps and step 1 opens the rewritten React fundamentals quiz.
-9. [owner-check] Reading quizzes 01, 02, 03 and 06, no question turns on an edge case or a trick output; quizzes 04 and 05 may.
+9. [proven] Reading quizzes 01, 02, 03 and 06, no question turns on an edge case or a trick output; quizzes 04 and 05 may.
 
 ### R2 — Next.js and React patterns 07–15
 
@@ -126,17 +126,17 @@ Follow-up: Kill the old path, and the old quiz, i want a new quiz and new path. 
 
 ## Proofs
 
-| Spec | Verdict     | Evidence                                                                |
-| ---- | ----------- | ----------------------------------------------------------------------- |
-| R1.1 | proven      | .proofs/architect-roadmap-v2/R1.1-six-code-no-advanced-fails.txt        |
-| R1.2 | proven      | .proofs/architect-roadmap-v2/R1.2-six-code-advanced-ok.txt              |
-| R1.3 | proven      | .proofs/architect-roadmap-v2/R1.3-seeds-01-06-ok.txt                    |
-| R1.4 | proven      | .proofs/architect-roadmap-v2/R1.4-one-seed-quiz-per-title-rewritten.txt |
-| R1.5 | proven      | .proofs/architect-roadmap-v2/R1.5-other-user-quiz-survives.txt          |
-| R1.6 | proven      | .proofs/architect-roadmap-v2/R1.6-quiz-07-attempts-survive.txt          |
-| R1.7 | proven      | .proofs/architect-roadmap-v2/R1.7-fresh-release.txt                     |
-| R1.8 | proven      | .proofs/architect-roadmap-v2/R1.8-path-page.png                         |
-| R1.9 | owner-check | .proofs/architect-roadmap-v2/owner-check.md                             |
+| Spec | Verdict | Evidence                                                                |
+| ---- | ------- | ----------------------------------------------------------------------- |
+| R1.1 | proven  | .proofs/architect-roadmap-v2/R1.1-six-code-no-advanced-fails.txt        |
+| R1.2 | proven  | .proofs/architect-roadmap-v2/R1.2-six-code-advanced-ok.txt              |
+| R1.3 | proven  | .proofs/architect-roadmap-v2/R1.3-seeds-01-06-ok.txt                    |
+| R1.4 | proven  | .proofs/architect-roadmap-v2/R1.4-one-seed-quiz-per-title-rewritten.txt |
+| R1.5 | proven  | .proofs/architect-roadmap-v2/R1.5-other-user-quiz-survives.txt          |
+| R1.6 | proven  | .proofs/architect-roadmap-v2/R1.6-quiz-07-attempts-survive.txt          |
+| R1.7 | proven  | .proofs/architect-roadmap-v2/R1.7-fresh-release.txt                     |
+| R1.8 | proven  | .proofs/architect-roadmap-v2/R1.8-path-page.png                         |
+| R1.9 | proven  | .proofs/architect-roadmap-v2/R1.9-observation.md                        |
 
 ## Changelog
 
