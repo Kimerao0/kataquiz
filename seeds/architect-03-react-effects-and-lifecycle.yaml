@@ -6,446 +6,241 @@ tags: [architect-roadmap, react, useeffect, lifecycle, race-conditions]
 run:
   questionsPerRun: 10
   maxErrors: 3
-  timePerQuestionSec: 90
+  timePerQuestionSec: 45
 questions:
   - type: single
-    prompt: "The app is mounted in `StrictMode` in development. What is logged on mount?"
+    prompt: What is `useEffect` meant for?
+    explanation: "Effects let a component synchronize with something outside React, such as the network, the browser DOM APIs, timers or a third-party widget. They are not the place for logic that can be computed while rendering or handled in an event."
+    theoryUrl: https://react.dev/learn/synchronizing-with-effects
+    options:
+      - { text: "Synchronizing a component with an external system, like the network", correct: true }
+      - { text: "Running any code that should happen after the user clicks something", correct: false }
+      - { text: "Computing values derived from props and state, to avoid repeated work", correct: false }
+      - { text: "Declaring which state a component owns, so React can preserve it between renders", correct: false }
+  - type: single
+    prompt: When does the function passed to `useEffect` run, relative to rendering?
+    explanation: "React first renders the component and commits the result to the DOM, and runs effects after that, usually after the browser has painted. For that reason an effect never blocks the screen from updating."
+    theoryUrl: https://react.dev/reference/react/useEffect
+    options:
+      - { text: "During rendering, right before the JSX is returned", correct: false }
+      - { text: "After React has committed the render to the DOM", correct: true }
+      - { text: "Before the first render, so the component can load its data in advance", correct: false }
+      - { text: "Only when the component is clicked or receives focus for the first time", correct: false }
+  - type: single
+    prompt: What is the difference between `useEffect(fn)`, `useEffect(fn, [])` and `useEffect(fn, [id])`?
+    explanation: "Without an array the effect runs after every render. With an empty array it runs after the first render only, and with `[id]` it runs after the first render and again whenever `id` has changed."
+    theoryUrl: https://react.dev/reference/react/useEffect#parameters
+    options:
+      - { text: "After every render, only after mount, and after mount plus whenever `id` changes", correct: true }
+      - { text: "Only on mount, after every render, and whenever `id` changes, in that order", correct: false }
+      - { text: "They are equivalent, since React skips effects whose result did not change", correct: false }
+      - { text: "After every render in all three cases, with the array only used by the linter", correct: false }
+  - type: single
+    prompt: "A user opens a page, leaves and comes back several times, and now each window resize is handled many times over. What is the likely cause?"
     code: |
-      function Conn() {
-        useEffect(() => {
-          console.log('connect')
-          return () => console.log('disconnect')
-        }, [])
-        return null
-      }
+      useEffect(() => {
+        function onResize() { setWidth(window.innerWidth) }
+        window.addEventListener('resize', onResize)
+      }, [])
     codeLanguage: tsx
-    explanation: "In development, StrictMode mounts, immediately runs the cleanup, and mounts again, to check that the effect is symmetric and can be stopped and restarted. The logs are `connect`, `disconnect`, `connect`. Production runs the effect once."
+    explanation: "The effect subscribes but never unsubscribes. Each mount adds another listener that outlives the component. Returning a cleanup function that calls `removeEventListener` fixes it."
+    theoryUrl: https://react.dev/learn/synchronizing-with-effects#step-3-add-cleanup-if-needed
+    options:
+      - { text: "The empty dependency array makes React register the listener on every render", correct: false }
+      - { text: "There is no cleanup, so every mount leaves one more listener on `window`", correct: true }
+      - { text: "`setWidth` cannot be called from an event listener registered in an effect", correct: false }
+      - { text: "`window` is recreated on each navigation, which duplicates the handlers", correct: false }
+  - type: boolean
+    prompt: An effect's cleanup function runs only when the component unmounts, never between two runs of the same effect.
+    answer: false
+    explanation: "React runs the cleanup of the previous effect before running the effect again with new dependencies, and also on unmount. This is what keeps subscriptions in sync with the latest values."
+    theoryUrl: https://react.dev/reference/react/useEffect#my-cleanup-logic-runs-even-though-my-component-didnt-unmount
+  - type: single
+    prompt: In development with StrictMode, React mounts a component, runs its effect, cleans up, and runs the effect again. Why?
+    explanation: "It is a development-only stress test. If your effect has a proper cleanup, running it twice behaves like running it once. When something looks wrong after the second run, you probably forgot the cleanup. It does not happen in production."
     theoryUrl: https://react.dev/reference/react/StrictMode#fixing-bugs-found-by-double-rendering-in-development
     options:
-      - { text: "`connect` only", correct: false }
-      - { text: "`connect`, `disconnect`, `connect`", correct: true }
-      - { text: "`connect`, `connect`", correct: false }
-      - { text: "`disconnect`, `connect`", correct: false }
+      - { text: "To check that effects clean up properly, and it only happens in development", correct: true }
+      - { text: "Because the first run happens on the server and the second one on the client", correct: false }
+      - { text: "Because effects run twice in production too, to guarantee the dependencies are stable", correct: false }
+      - { text: "Because of a React bug that is fixed by wrapping the app in `Suspense`", correct: false }
   - type: single
-    prompt: "The button is clicked once, after the initial mount logs were already printed. What is logged by the click, in order?"
-    code: |
-      function Child({ n }: { n: number }) {
-        console.log('render child', n)
-        useEffect(() => {
-          console.log('effect child', n)
-          return () => console.log('cleanup child', n)
-        }, [n])
-        return null
-      }
-
-      function Parent() {
-        const [n, setN] = useState(0)
-        console.log('render parent', n)
-        useEffect(() => {
-          console.log('effect parent', n)
-          return () => console.log('cleanup parent', n)
-        }, [n])
-        return <><button onClick={() => setN(n + 1)}>+</button><Child n={n} /></>
-      }
-    codeLanguage: tsx
-    explanation: "Render phase first, top-down: `render parent 1`, `render child 1`. After commit, React runs all cleanups of the previous effects (child, then parent), still with the old values 0, and only then runs the new effects, children before parents."
-    theoryUrl: https://react.dev/reference/react/useEffect#my-effect-runs-twice-when-the-component-mounts
+    prompt: In development the network tab shows two requests for the same data fetched in `useEffect` on mount. How should you treat it?
+    explanation: "It is the StrictMode remount in dev and not a production bug. The right response is to make the effect robust (ignore stale results or abort), or to use a data-fetching library or framework that handles it, rather than to hack around the double run."
+    theoryUrl: https://react.dev/learn/synchronizing-with-effects#fetching-data
     options:
-      - {
-          text: "`render parent 1`, `render child 1`, `cleanup child 0`, `cleanup parent 0`, `effect child 1`, `effect parent 1`",
-          correct: true,
-        }
-      - {
-          text: "`render parent 1`, `cleanup parent 0`, `effect parent 1`, `render child 1`, `cleanup child 0`, `effect child 1`",
-          correct: false,
-        }
-      - {
-          text: "`render parent 1`, `render child 1`, `effect parent 1`, `effect child 1`, `cleanup parent 0`, `cleanup child 0`",
-          correct: false,
-        }
-      - {
-          text: "`cleanup child 0`, `cleanup parent 0`, `render parent 1`, `render child 1`, `effect child 1`, `effect parent 1`",
-          correct: false,
-        }
+      - { text: "Remove StrictMode so the effect runs once, since it is a bug in your component", correct: false }
+      - { text: "Add a module-level flag so the request is only ever sent once per page load", correct: false }
+      - { text: "Expect it in dev, and make the effect handle cleanup correctly", correct: true }
+      - { text: "Move the request to a `setTimeout` so React cannot detect it", correct: false }
   - type: single
-    prompt: "A component receives `id` 1, then 2, then is unmounted. What is the sequence of logs?"
-    code: |
-      useEffect(() => {
-        console.log('effect', id)
-        return () => console.log('cleanup', id)
-      }, [id])
-    codeLanguage: typescript
-    explanation: "Each effect run has its own cleanup closed over the values it saw. Changing `id` runs `cleanup 1` before `effect 2`; unmounting runs `cleanup 2`. The cleanup never sees the new `id`."
-    theoryUrl: https://react.dev/learn/lifecycle-of-reactive-effects
+    prompt: A product page fetches data in an effect keyed on `id`. When users click quickly between products, the page sometimes shows the data of the previous product. What is the most likely cause, and the fix?
+    explanation: "Responses can arrive out of order. An older request finishing last overwrites the newer data. The fix is to discard stale responses in cleanup, either with an `ignore` flag or by aborting the request."
+    theoryUrl: https://react.dev/learn/you-might-not-need-an-effect#fetching-data
     options:
-      - { text: "`effect 1`, `effect 2`, `cleanup 1`, `cleanup 2`", correct: false }
-      - { text: "`effect 1`, `cleanup 2`, `effect 2`, `cleanup 2`", correct: false }
-      - { text: "`effect 1`, `cleanup 1`, `effect 2`, `cleanup 2`", correct: true }
-      - { text: "`effect 1`, `effect 2`, `cleanup 2`", correct: false }
+      - { text: "A race condition: add a cleanup that ignores or aborts the outdated request", correct: true }
+      - { text: "The effect runs too early, so you should wait one tick with `setTimeout` before fetching", correct: false }
+      - { text: "React caches state between products, so call `setData(null)` before every fetch", correct: false }
+      - { text: "The browser reorders requests, so switch the request from `fetch` to `XMLHttpRequest`", correct: false }
   - type: single
-    prompt: "After several seconds, what count does this component display?"
-    code: |
-      function Timer() {
-        const [count, setCount] = useState(0)
-
-        useEffect(() => {
-          const id = setInterval(() => setCount(count + 1), 1000)
-          return () => clearInterval(id)
-        }, [])
-
-        return <p>{count}</p>
-      }
-    codeLanguage: tsx
-    explanation: "The effect runs once, and its closure captured `count = 0`. Every tick calls `setCount(0 + 1)`, so the display goes to 1 and stays there. Fix it with the updater form `setCount(c => c + 1)`, which needs no dependency."
-    theoryUrl: https://react.dev/learn/removing-effect-dependencies
-    options:
-      - { text: "It counts up 1, 2, 3, as expected", correct: false }
-      - { text: "It shows 1 and stays there", correct: true }
-      - { text: "It stays at 0, because the effect runs only once", correct: false }
-      - { text: "It throws, because the interval is not cleared on re-render", correct: false }
-  - type: single
-    prompt: "How many times does the effect run after one click on the button (counting the initial mount)?"
-    code: |
-      function E() {
-        const [n, setN] = useState(0)
-        const opts = { a: 1 }
-
-        useEffect(() => {
-          console.log('effect run')
-        }, [opts])
-
-        return <button onClick={() => setN(n + 1)}>{n}</button>
-      }
-    codeLanguage: tsx
-    explanation: "`opts` is a new object on every render, and dependencies are compared with `Object.is`. The effect therefore re-runs after every render: twice in total. Move the object inside the effect, outside the component, or depend on its primitive fields."
-    theoryUrl: https://react.dev/learn/removing-effect-dependencies
-    options:
-      - {
-          text: "Once, because React compares the object's content, which never changes",
-          correct: false,
-        }
-      - { text: "Twice, because `opts` is a new reference on each render", correct: true }
-      - { text: "Zero times, because object dependencies are ignored", correct: false }
-      - { text: "Three times, once per render and once for `n`", correct: false }
-  - type: single
-    prompt: "What is logged when this component mounts?"
-    code: |
-      function H() {
-        const [n, setN] = useState(0)
-        console.log('render', n)
-
-        useEffect(() => {
-          console.log('effect', n)
-          setN(0)
-        }, [n])
-
-        return null
-      }
-    codeLanguage: tsx
-    explanation: "`setN(0)` sets the value that `n` already has. React bails out with `Object.is`, so there is no new render and `n` does not change, which means the effect does not re-run. No loop: the output is `render 0`, `effect 0`."
-    theoryUrl: https://react.dev/reference/react/useState#setstate-caveats
-    options:
-      - { text: "`render 0`, `effect 0`", correct: true }
-      - {
-          text: "`render 0`, `effect 0`, `render 0`, `effect 0`, and so on forever",
-          correct: false,
-        }
-      - { text: "`render 0`, `render 0`, `effect 0`", correct: false }
-      - { text: "`effect 0`, `render 0`", correct: false }
-  - type: single
-    prompt: "What is the order of the three logs on mount?"
-    code: |
-      function G() {
-        console.log('render')
-        useEffect(() => { console.log('effect') })
-        useLayoutEffect(() => { console.log('layout') })
-        return <div />
-      }
-    codeLanguage: tsx
-    explanation: "Render happens first. After the DOM is updated, layout effects run synchronously, before the browser paints. Regular effects run afterwards, once the browser has had the chance to paint."
-    theoryUrl: https://react.dev/reference/react/useLayoutEffect
-    options:
-      - { text: "`render`, `effect`, `layout`", correct: false }
-      - { text: "`layout`, `render`, `effect`", correct: false }
-      - { text: "`render`, `layout`, `effect`", correct: true }
-      - { text: "`effect`, `render`, `layout`", correct: false }
-  - type: single
-    prompt: "What is wrong with this effect, and what does it cause?"
-    code: |
-      function Counter() {
-        const [count, setCount] = useState(0)
-
-        useEffect(() => {
-          setCount((c) => c + 1)
-        })
-
-        return <p>{count}</p>
-      }
-    codeLanguage: tsx
-    explanation: "Without a dependency array the effect runs after every render. It sets state, which causes a render, which runs the effect again: an infinite loop. An empty array or the right dependencies would stop it, but a state update that serves only itself is a sign the effect is not needed."
-    theoryUrl: https://react.dev/reference/react/useEffect#examples-dependencies
-    options:
-      - { text: "It runs only on mount; the code is fine", correct: false }
-      - {
-          text: "It re-runs after every render and sets state each time: an infinite loop",
-          correct: true,
-        }
-      - {
-          text: "It throws on the first update because updaters are not allowed in effects",
-          correct: false,
-        }
-      - { text: "React runs it once per second to protect the main thread", correct: false }
-  - type: single
-    prompt: "A list is rendered with a `filter` input. A teammate wrote an effect that sets `visibleItems` state whenever `items` or `query` change. What is the better design?"
-    code: |
-      const [visible, setVisible] = useState(items)
-      useEffect(() => {
-        setVisible(items.filter((i) => i.name.includes(query)))
-      }, [items, query])
-    codeLanguage: tsx
-    explanation: "`visible` is derived data: computing `items.filter(...)` during render gives the correct value on the first pass. The effect version renders once with stale data and then again after the update. If the filter is expensive, wrap the computation in `useMemo`, still no effect."
-    theoryUrl: https://react.dev/learn/you-might-not-need-an-effect#updating-state-based-on-props-or-state
-    options:
-      - { text: "Keep the effect, but add `visible` to the dependency array", correct: false }
-      - {
-          text: "Replace the effect with `useLayoutEffect`, so the update lands before paint and avoids a flicker",
-          correct: false,
-        }
-      - {
-          text: "Compute `const visible = items.filter(...)` during render, with no state and no effect",
-          correct: true,
-        }
-      - {
-          text: "Move the filtering into the input's `onChange` and store only `visible`",
-          correct: false,
-        }
-  - type: single
-    prompt: 'A user clicks "Buy". The team puts the POST request in an effect that watches a `purchased` state flag set by the click handler. What is the best advice?'
-    explanation: "The POST is caused by a specific user action, so it belongs in the click handler, where you know exactly why it runs. An effect keyed to a flag adds indirection and may re-run for unrelated reasons (including StrictMode's extra mount). Effects are for synchronising with something because the component is displayed."
-    theoryUrl: https://react.dev/learn/you-might-not-need-an-effect#sharing-logic-between-event-handlers
-    options:
-      - { text: "Keep the effect, it is the standard place for network requests", correct: false }
-      - {
-          text: "Send the request in the click handler, because the user action causes it",
-          correct: true,
-        }
-      - {
-          text: "Use `useLayoutEffect` instead, so the request goes out before paint and cannot be delayed",
-          correct: false,
-        }
-      - { text: "Send it in render with a guard variable, to avoid the double run", correct: false }
-  - type: single
-    prompt: "A `ProfilePage` holds a `comment` draft in state, and must reset it when `userId` changes. A teammate proposes an effect `useEffect(() => setComment(''), [userId])`. What is the better alternative?"
-    explanation: "With the effect, the page first renders with the old comment for the new user, then resets: wasted work and a flash of stale content. Moving the draft into a child and using `<Profile key={userId} />` makes React discard the old state, so it starts fresh in the same render."
-    theoryUrl: https://react.dev/learn/you-might-not-need-an-effect#resetting-all-state-when-a-prop-changes
-    options:
-      - {
-          text: "Compare `userId` with a ref in render and call `setComment` there",
-          correct: false,
-        }
-      - {
-          text: "Pass `key={userId}` to the component that owns the draft, to reset it",
-          correct: true,
-        }
-      - { text: "Use `useMemo` keyed on `userId` to clear the comment", correct: false }
-      - {
-          text: "Keep the effect; it is the only way to react to prop changes, since render must stay pure",
-          correct: false,
-        }
-  - type: single
-    prompt: "A component displays the browser's online status via `navigator.onLine` and the `online`/`offline` events. Which is the idiomatic hook for subscribing to such an external source?"
-    explanation: "`useSyncExternalStore` subscribes to a store outside React and returns a consistent snapshot, also during concurrent rendering and server rendering (with `getServerSnapshot`). A hand-written `useEffect` + `useState` works for simple cases but can tear or miss updates between render and subscribe."
-    theoryUrl: https://react.dev/reference/react/useSyncExternalStore
-    options:
-      - { text: "`useRef`, reading `navigator.onLine` in render", correct: false }
-      - { text: "`useMemo`, recomputed on every render", correct: false }
-      - { text: "`useReducer`, dispatching from a global event listener", correct: false }
-      - {
-          text: "`useSyncExternalStore`, with a subscribe function and a snapshot getter",
-          correct: true,
-        }
-  - type: single
-    prompt: "A component fetches data in `useEffect` on mount. In development with StrictMode, the network tab shows two requests. How should this be treated?"
-    explanation: "The double mount is a deliberate dev-only check that your effect can be cleaned up. The right response is to make the effect robust: abort the request or ignore its result in the cleanup. A `useRef` flag that blocks the second run hides the symptom, and removing StrictMode removes the safety net."
-    theoryUrl: https://react.dev/learn/synchronizing-with-effects#how-to-handle-the-effect-firing-twice-in-development
-    options:
-      - { text: "Add a `useRef` flag so the second effect is skipped", correct: false }
-      - {
-          text: "Remove StrictMode; the double run is a bug in React 19 that the next release will fix",
-          correct: false,
-        }
-      - {
-          text: "Expected in development: add a cleanup that aborts or ignores the first request",
-          correct: true,
-        }
-      - { text: "Move the fetch into render so it is not an effect", correct: false }
-  - type: single
-    prompt: "The `id` changes from `a` to `b` quickly. The request for `a` takes 30ms and the request for `b` takes 5ms. With this code, what does the final screen show?"
+    prompt: "What does the cleanup do in this effect?"
     code: |
       useEffect(() => {
         let ignore = false
-        fetchData(id).then((result) => {
-          if (!ignore) setData(result)
+        fetchUser(id).then(user => {
+          if (!ignore) setUser(user)
         })
         return () => { ignore = true }
       }, [id])
-    codeLanguage: typescript
-    explanation: "When `id` changes, the cleanup sets `ignore = true` for the old effect run, so the late response for `a` is dropped and `b`'s data wins. Without the flag, the slower `a` response arrives last and overwrites it, showing stale data for the wrong id."
-    theoryUrl: https://react.dev/learn/synchronizing-with-effects#fetching-data
+    codeLanguage: tsx
+    explanation: "When `id` changes (or the component unmounts) the cleanup of the previous effect sets its own `ignore` to true, so the late response of the old request is discarded. Only the latest request can update the state."
+    theoryUrl: https://react.dev/learn/you-might-not-need-an-effect#fetching-data
     options:
-      - { text: "The data for `a`, because it was requested first", correct: false }
-      - { text: "The data for `b`, since the response for `a` is ignored", correct: true }
-      - { text: "Both, one after the other", correct: false }
-      - {
-          text: "Nothing, since both requests are cancelled by `ignore` once the component re-renders",
-          correct: false,
-        }
+      - { text: "It cancels the network request so that the server does no work", correct: false }
+      - { text: "It marks the outdated request so that its late result no longer updates the state", correct: true }
+      - { text: "It resets `user` to `null` before the next request starts", correct: false }
+      - { text: "It prevents the effect from running again until `id` changes twice in a row", correct: false }
   - type: single
-    prompt: "What does `AbortController` add over the `ignore` flag in the previous fetch effect?"
-    explanation: "The flag only discards the result; the old request still runs to completion and consumes bandwidth and server time. Aborting in the cleanup also cancels the in-flight request, and `fetch` rejects with an `AbortError` that you must treat as expected."
+    prompt: What does `AbortController` add over the `ignore` flag in a fetch effect?
+    explanation: "The `ignore` flag only discards the result, and the request still runs to completion. Aborting actually cancels the in-flight request, saving bandwidth and server work. You usually need to ignore the resulting `AbortError`."
     theoryUrl: https://developer.mozilla.org/en-US/docs/Web/API/AbortController
     options:
-      - { text: "It prevents the effect from running twice in StrictMode", correct: false }
-      - {
-          text: "It is required for correctness, because `ignore` cannot stop stale updates from landing",
-          correct: false,
-        }
-      - { text: "It makes the response arrive in order, by queuing requests", correct: false }
-      - {
-          text: "It cancels the in-flight request, so a rejection `AbortError` needs handling",
-          correct: true,
-        }
+      - { text: "It cancels the in-flight request itself, not just its result", correct: true }
+      - { text: "It makes the request run faster, since the browser gives it a higher priority", correct: false }
+      - { text: "It retries the request automatically when it fails with a network error", correct: false }
+      - { text: "It prevents state updates after unmount, which an `ignore` flag cannot do", correct: false }
   - type: single
-    prompt: "What is the problem with this effect?"
-    code: |
-      useEffect(async () => {
-        const res = await fetch(`/api/user/${id}`)
-        setUser(await res.json())
-      }, [id])
-    codeLanguage: typescript
-    explanation: "An `async` function returns a promise, and React expects an effect to return either nothing or a cleanup function. The promise is treated as an invalid cleanup, so React warns and you also lose the ability to clean up. Define an inner async function, and call it."
-    theoryUrl: https://react.dev/reference/react/useEffect#parameters
+    prompt: A list component has a `query` prop and an effect that filters `items` and stores the result in a `visibleItems` state. What is the better design?
+    explanation: "A value that can be computed from props and state should be computed while rendering. The effect causes an extra render with stale data and more code to keep in sync. If the filtering is expensive, `useMemo` can cache it."
+    theoryUrl: https://react.dev/learn/you-might-not-need-an-effect#updating-state-based-on-props-or-state
     options:
-      - { text: "`fetch` cannot be called from inside an effect", correct: false }
-      - {
-          text: "The effect returns a promise, but React expects a cleanup function or nothing",
-          correct: true,
-        }
-      - { text: "The `id` dependency makes the effect run on every render", correct: false }
-      - { text: "`await` is not allowed in an arrow function", correct: false }
+      - { text: "Compute `visibleItems` during render from `items` and `query`", correct: true }
+      - { text: "Keep the effect, but add `visibleItems` to its dependency array", correct: false }
+      - { text: "Keep the effect and wrap `setVisibleItems` in `useCallback` to avoid extra renders", correct: false }
+      - { text: "Move the filter into a `useRef` that is updated after each render", correct: false }
   - type: single
-    prompt: "A tooltip must measure its content and be positioned before the user sees it; with `useEffect` the user briefly sees it in the wrong place. What fixes it?"
-    explanation: "`useEffect` runs after the browser has painted, so a measurement followed by a state update produces a visible flicker. `useLayoutEffect` runs after DOM updates but before paint, so the corrected position is rendered before the user sees anything. Use it sparingly, as it blocks painting."
-    theoryUrl: https://react.dev/reference/react/useLayoutEffect#measuring-layout-before-the-browser-repaints-the-screen
+    prompt: 'A user clicks "Buy" and the app must send a POST request. The team sets a `purchased` flag in the click handler and sends the request in an effect that watches the flag. What is the better advice?'
+    explanation: "Logic caused by a specific user action belongs in the event handler, where you know exactly what happened. Effects are for things that must happen because the component is displayed, not for reacting to a click through state."
+    theoryUrl: https://react.dev/learn/you-might-not-need-an-effect#sharing-logic-between-event-handlers
     options:
-      - { text: "`useLayoutEffect`, because it runs before the browser paints", correct: true }
-      - { text: "`setTimeout(0)` inside `useEffect`, to run after the paint", correct: false }
-      - { text: "`useMemo` to measure during render", correct: false }
-      - { text: "`useInsertionEffect`, which is the faster `useEffect`", correct: false }
+      - { text: "Send the request directly in the click handler, since the click is what causes it", correct: true }
+      - { text: "Keep the effect, but add a `useRef` to guard against sending the request twice", correct: false }
+      - { text: "Keep the effect, since effects are the recommended place for all network requests", correct: false }
+      - { text: "Move the flag to a global store, so that the effect runs even after the component unmounts", correct: false }
   - type: single
-    prompt: "How many click handlers are registered on `window` after the component has rendered three times (mount plus two clicks)?"
+    prompt: A `ProfilePage` holds a `comment` draft in state and must reset it when `userId` changes. Someone proposes `useEffect(() => setComment(''), [userId])`. What is the better alternative?
+    explanation: "Giving the component a `key={userId}` makes React create a fresh instance for each user, so state resets naturally with no extra render. The effect works but shows stale text for one render first."
+    theoryUrl: https://react.dev/learn/you-might-not-need-an-effect#resetting-all-state-when-a-prop-changes
+    options:
+      - { text: "Give the component `key={userId}` so React makes a new instance and resets its state", correct: true }
+      - { text: "Keep the effect, but use `useLayoutEffect` so the reset happens even earlier", correct: false }
+      - { text: "Store the comment in a ref, since refs are automatically cleared when props change", correct: false }
+      - { text: "Compare `userId` with the previous value in render and mutate `comment` directly", correct: false }
+  - type: single
+    prompt: "An effect reconnects to a socket on every single render, even though the data did not change. The code is `useEffect(() => connect(options), [options])`, with `options = { room, user }` created in the component body. Why?"
+    explanation: "A new object is created on each render, and React compares dependencies by reference, so `options` is always \"changed\". Depend on the primitive values (`room`, `user`), or create the object inside the effect."
+    theoryUrl: https://react.dev/learn/removing-effect-dependencies#does-some-reactive-value-change-unintentionally
+    options:
+      - { text: "`options` is a new object each render, so its reference always differs from the last one", correct: true }
+      - { text: "Objects are not allowed in dependency arrays and force the effect to run every time", correct: false }
+      - { text: "`connect` is asynchronous, so React schedules the effect again until it finishes", correct: false }
+      - { text: "React compares the content of objects, so something inside `options` must be changing", correct: false }
+  - type: single
+    prompt: "The counter below shows 1 and then stops increasing. Why?"
     code: |
-      function C() {
-        const [n, setN] = useState(0)
+      const [count, setCount] = useState(0)
 
-        useEffect(() => {
-          const onResize = () => console.log('resize')
-          window.addEventListener('resize', onResize)
-        })
-
-        return <button onClick={() => setN(n + 1)}>{n}</button>
-      }
+      useEffect(() => {
+        const id = setInterval(() => setCount(count + 1), 1000)
+        return () => clearInterval(id)
+      }, [])
     codeLanguage: tsx
-    explanation: "With no dependency array the effect runs after every render, and with no cleanup nothing removes the previous listener. Three renders leave three listeners, so one resize logs three times. Return `() => window.removeEventListener('resize', onResize)` to fix the leak."
-    theoryUrl: https://react.dev/learn/synchronizing-with-effects#step-3-add-cleanup-if-needed
+    explanation: "The effect runs only once, so the callback keeps the `count` of that first render, which is 0, and sets 1 every second. Use the updater form `setCount(c => c + 1)`, or list `count` in the dependencies."
+    theoryUrl: https://react.dev/learn/removing-effect-dependencies#i-want-to-read-the-latest-value-without-reacting-to-it
     options:
-      - { text: "1, because `addEventListener` ignores duplicates", correct: false }
-      - { text: "2, because the first render does not run effects", correct: false }
-      - { text: "0, because listeners are removed when the component re-renders", correct: false }
-      - { text: "3, because each render adds a listener and none is removed", correct: true }
-  - type: single
-    prompt: "A chat room effect depends on `roomId` and shows a notification using the current `theme` when connected. Adding `theme` to the dependencies reconnects the chat whenever the theme changes. What does the React docs recommend?"
-    explanation: "`useEffectEvent` declares a function that always reads the latest props and state but is not reactive, so it is not a dependency. The effect re-synchronises only when `roomId` changes. Silencing the lint rule with a comment would give stale values."
-    theoryUrl: https://react.dev/reference/react/useEffectEvent
-    options:
-      - {
-          text: "Disable the lint rule and leave `theme` out of the dependencies, since it rarely changes",
-          correct: false,
-        }
-      - { text: "Move the notification into a `useMemo` that depends on `theme`", correct: false }
-      - { text: "Store `theme` in `useRef` and mutate it during render", correct: false }
-      - {
-          text: "Wrap the notification in `useEffectEvent`, and call it from the effect",
-          correct: true,
-        }
+      - { text: "The interval is cleared on every render, so it never gets to tick twice", correct: false }
+      - { text: "The effect runs once, and the callback always sees the first render's `count`", correct: true }
+      - { text: "React batches state updates made in timers and drops all but the first", correct: false }
+      - { text: "`setInterval` cannot be used with state, and `setTimeout` must be used instead", correct: false }
   - type: multi
-    prompt: Which values never need to be listed in an effect's dependency array? Select all that apply.
-    explanation: "The `setState` function from `useState` and the `dispatch` from `useReducer` have a stable identity, and the lint rule knows it. Module-level constants are not reactive. A prop is reactive and must be listed if the effect reads it, and so is a variable computed from state in render."
-    theoryUrl: https://react.dev/learn/lifecycle-of-reactive-effects#what-an-effect-with-empty-dependencies-means
+    prompt: Which values do not need to be listed in an effect's dependency array? Select all that apply.
+    explanation: "State setter functions and refs have a stable identity, so they never change. Props and state that the effect reads are reactive values and must be listed. A constant defined outside the component never changes either."
+    theoryUrl: https://react.dev/learn/lifecycle-of-reactive-effects#all-variables-declared-in-the-component-body-are-reactive
     options:
       - { text: "The `setCount` function returned by `useState`", correct: true }
-      - { text: "A constant `API_URL` defined at module level", correct: true }
+      - { text: "An object created by `useRef`", correct: true }
       - { text: "A `userId` prop that the effect reads", correct: false }
-      - {
-          text: "`const doubled = count * 2` computed in the component body and read by the effect",
-          correct: false,
-        }
+      - { text: "A `query` state variable that the effect reads", correct: false }
   - type: single
-    prompt: "An effect depends on a helper function declared inside the component. It reconnects on every render, even though nothing meaningful changed. What is the preferred fix?"
-    code: |
-      function Room({ roomId }: { roomId: string }) {
-        function createConnection() { return connect(roomId) }
-
-        useEffect(() => {
-          const c = createConnection()
-          return () => c.close()
-        }, [createConnection])
-      }
-    codeLanguage: tsx
-    explanation: "A function declared in the body is a new object every render, so the effect re-runs. If only the effect uses it, move it inside the effect and depend on `roomId`. Wrapping with `useCallback` also works but adds noise; omitting it from the array hides the dependency."
-    theoryUrl: https://react.dev/learn/removing-effect-dependencies#move-dynamic-objects-and-functions-inside-your-effect
+    prompt: The `react-hooks/exhaustive-deps` lint rule warns that your effect is missing a dependency. What is the right way to respond?
+    explanation: "The rule is pointing at a real mismatch: your effect uses a value that it does not re-run for. Fix it by adding the dependency, or by restructuring the code so the value is no longer needed. Suppressing the warning hides stale-value bugs."
+    theoryUrl: https://react.dev/learn/removing-effect-dependencies
     options:
-      - {
-          text: "Add `// eslint-disable-next-line` and use an empty dependency array, since the helper is stable",
-          correct: false,
-        }
-      - { text: "Replace `useEffect` with `useLayoutEffect`", correct: false }
-      - {
-          text: "Move the function inside the effect, so the dependency becomes `roomId`",
-          correct: true,
-        }
-      - { text: "Memoise the returned connection with `useMemo`", correct: false }
+      - { text: "Add the dependency, or restructure the code so the effect no longer needs the value", correct: true }
+      - { text: "Disable the rule for that line, since the empty array is what you intended", correct: false }
+      - { text: "Ignore it, because the warning is only a style suggestion with no runtime effect", correct: false }
+      - { text: "Move the effect into a `useCallback`, which tells the linter to skip it", correct: false }
   - type: single
-    prompt: "Your app must initialise an analytics SDK exactly once per page load, not once per component mount. Putting `useEffect(() => init(), [])` in the root component runs it twice in development. What is the cleanest fix?"
-    explanation: "One-time app initialisation is not tied to a component being on screen, so it can run at module level (or in a guarded function) outside of React's lifecycle. StrictMode's remount will then not duplicate it. A ref guard works but is a workaround for something that is not an effect."
-    theoryUrl: https://react.dev/learn/you-might-not-need-an-effect#initializing-the-application
+    prompt: A tooltip must measure its content and be positioned before the user sees it, but with `useEffect` the user briefly sees it in the wrong place. What fixes it?
+    explanation: "`useLayoutEffect` runs after the DOM is updated but before the browser paints, so you can measure and adjust without a visible flicker. Use it only for this, since it blocks painting."
+    theoryUrl: https://react.dev/reference/react/useLayoutEffect
     options:
-      - {
-          text: "Call it at module level, outside any component, so it runs once on import",
-          correct: true,
-        }
-      - { text: "Disable StrictMode in development to avoid the second run", correct: false }
-      - { text: "Add the SDK object to the dependency array", correct: false }
-      - { text: "Use `useLayoutEffect`, which is never double-invoked", correct: false }
+      - { text: "Switch to `useLayoutEffect`, which runs before the browser paints", correct: true }
+      - { text: "Wrap the measuring code in `setTimeout` so the browser has time to lay out", correct: false }
+      - { text: "Add the tooltip size to the dependencies of the `useEffect`", correct: false }
+      - { text: "Hide the tooltip until its position state is set, by rendering it with `display: none`", correct: false }
   - type: single
-    prompt: "A component renders markup that depends on `window.innerWidth`, read in `useState(window.innerWidth)`. It works in the browser but fails with a server rendering error. Why?"
-    explanation: "`useState`'s initial value is computed during render, which also happens on the server where `window` does not exist. Effects, however, never run on the server. Read browser-only values in an effect (or with `useSyncExternalStore` and a server snapshot) and render a safe default first."
-    theoryUrl: https://react.dev/reference/react/useEffect
+    prompt: A component displays the browser's online/offline status, and subscribes to the `online` and `offline` events. Which hook is designed for subscribing to an external store like this?
+    explanation: "`useSyncExternalStore`, built for subscribing to external sources is built for reading and subscribing to an external source, with correct behaviour during concurrent rendering and server rendering. A hand-written effect with state also works, but is easier to get wrong."
+    theoryUrl: https://react.dev/reference/react/useSyncExternalStore
     options:
-      - { text: "`innerWidth` is read-only so it cannot seed state", correct: false }
-      - { text: "StrictMode forbids reading browser globals in `useState`", correct: false }
-      - {
-          text: "Render runs on the server, where `window` is not defined, while effects do not",
-          correct: true,
-        }
-      - { text: "`useState` runs asynchronously and returns a promise", correct: false }
+      - { text: "`useSyncExternalStore`, built for subscribing to external sources", correct: true }
+      - { text: "`useMemo`, which caches the result of a calculation between renders", correct: false }
+      - { text: "`useReducer`, which manages complex state with a reducer function", correct: false }
+      - { text: "`useDeferredValue`, which delays updating a part of the UI", correct: false }
+  - type: multi
+    prompt: Which of these are good fits for `useEffect`? Select all that apply.
+    explanation: "Opening a connection, subscribing to the browser's window, and reporting that a page was displayed are all about syncing with something outside React. A total computed from props or state is plain render logic."
+    theoryUrl: https://react.dev/learn/you-might-not-need-an-effect
+    options:
+      - { text: "Opening a WebSocket connection while a chat room is displayed", correct: true }
+      - { text: "Subscribing to `window` scroll events while a component is mounted", correct: true }
+      - { text: "Calculating the cart total from the list of items in props", correct: false }
+      - { text: "Transforming a list of users before rendering it in a table", correct: false }
   - type: boolean
-    prompt: "A `useEffect` callback runs during server-side rendering, so it can be used to fetch data that must be in the initial HTML."
+    prompt: A `useEffect` callback runs during server-side rendering, so it can be used to fetch data that must be in the initial HTML.
     answer: false
-    explanation: "Effects run only in the browser, after hydration or mount. Data needed in the first HTML has to be loaded before or during render on the server, for example in a Server Component or a framework data API."
+    explanation: "Effects run only in the browser, after the component is committed. They never run on the server, so data fetched in an effect cannot be part of the initial HTML. Fetch it on the server, with a framework feature, instead."
     theoryUrl: https://react.dev/reference/react/useEffect#caveats
+  - type: single
+    prompt: A component renders `window.innerWidth` directly while rendering. It works in the browser, but fails with an error when the page is rendered on the server. Why?
+    explanation: "There is no `window` on the server, so reading it during render throws. Browser-only values should be read inside an effect or an event handler, which run only in the browser."
+    theoryUrl: https://react.dev/reference/react-dom/server/renderToString
+    options:
+      - { text: "`window` does not exist on the server, and render code runs there too", correct: true }
+      - { text: "`innerWidth` is a getter that React blocks during rendering to protect purity", correct: false }
+      - { text: "React forbids reading browser APIs outside of `useEffect` in every environment", correct: false }
+      - { text: "Server rendering supports only function components that do not use props", correct: false }
+  - type: single
+    prompt: Coming from class components, you look for the `useEffect` equivalent of `componentDidMount`. What is the better mental model for effects?
+    explanation: "An effect describes how to start synchronizing with something and how to stop. React decides when to run it again based on its dependencies. Thinking in mount and unmount events leads to missed updates and forgotten cleanups."
+    theoryUrl: https://react.dev/learn/lifecycle-of-reactive-effects
+    options:
+      - { text: "Each effect is a start/stop synchronization process, which re-runs as its dependencies change", correct: true }
+      - { text: "An effect is a lifecycle hook, and the empty array is how you pick `componentDidMount`", correct: false }
+      - { text: "Effects replace the constructor, and must contain all the setup logic of the component", correct: false }
+      - { text: "An effect is run once per component type, and shared by all of its instances", correct: false }
+  - type: single
+    prompt: Your app needs to load a list of orders for a page. Which is generally the best option in a modern React app?
+    explanation: "Frameworks and data libraries handle caching, deduplication, race conditions and server rendering for you. A hand-written effect works for simple cases, but you end up re-implementing all of that."
+    theoryUrl: https://react.dev/learn/you-might-not-need-an-effect#fetching-data
+    options:
+      - { text: "Use your framework's data loading, or a data-fetching library with caching", correct: true }
+      - { text: "Write a `useEffect` with `fetch` in every component that needs data", correct: false }
+      - { text: "Fetch inside the render function and store the promise in a global variable", correct: false }
+      - { text: "Use a `useEffect` with an empty array, and a second one to refetch when something changes", correct: false }
   - type: boolean
-    prompt: "An effect's cleanup function runs only when the component unmounts, never between two runs of the same effect."
-    answer: false
-    explanation: "The cleanup also runs before the effect re-runs because a dependency changed (using the old values). Unmounting is only one of the two moments, and StrictMode adds a dev-only extra cycle."
+    prompt: An effect declared without a dependency array runs after every render of the component.
+    answer: true
+    explanation: "Without the second argument React has nothing to compare, so it re-runs the effect after each committed render. This is rarely what you want, so you normally pass an array."
     theoryUrl: https://react.dev/reference/react/useEffect#parameters
