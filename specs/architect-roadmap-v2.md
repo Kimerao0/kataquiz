@@ -65,13 +65,13 @@ Follow-up: Kill the old path, and the old quiz, i want a new quiz and new path. 
 
 1. [built] Running `check.mts` on a quiz file with 6 code questions out of 25 and no `advanced` tag prints FAIL with the code-question share.
 2. [built] Running `check.mts` on the same quiz file with an `advanced` tag added prints ok.
-3. [open] Running `check.mts` on `seeds/architect-0[1-6]-*.yaml` prints ok for all six files, each with at most 5 code questions, and none of them carries an `advanced` tag.
-4. [open] On a database holding the old seed quizzes 01–06 and the old path, `pnpm release` leaves exactly one seed quiz per title for 01–06, each with the rewritten question set.
+3. [built] Running `check.mts` on `seeds/architect-0[1-6]-*.yaml` prints ok for all six files, each with at most 5 code questions, and none of them carries an `advanced` tag.
+4. [built] On a database holding the old seed quizzes 01–06 and the old path, `pnpm release` leaves exactly one seed quiz per title for 01–06, each with the rewritten question set.
 5. [built] On a database holding the old seed quizzes, a quiz uploaded by a non-seed user titled "Architect Roadmap 01: React fundamentals" still exists after the R1 migration.
 6. [built] On a database holding the old seed quizzes, seed quiz 07 and its attempts still exist after the R1 migration.
-7. [open] On a fresh database, `pnpm release` runs the R1 migration without error and imports every seed, the path included.
-8. [open] After `pnpm release` on a database holding the old content, the "Road to Software Architect" page lists 41 steps and step 1 opens the rewritten React fundamentals quiz.
-9. [open] Reading quizzes 01, 02, 03 and 06, no question turns on an edge case or a trick output; quizzes 04 and 05 may.
+7. [built] On a fresh database, `pnpm release` runs the R1 migration without error and imports every seed, the path included.
+8. [built] After `pnpm release` on a database holding the old content, the "Road to Software Architect" page lists 41 steps and step 1 opens the rewritten React fundamentals quiz.
+9. [built] Reading quizzes 01, 02, 03 and 06, no question turns on an edge case or a trick output; quizzes 04 and 05 may.
 
 ### R2 — Next.js and React patterns 07–15
 
