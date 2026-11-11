@@ -1,7 +1,7 @@
 ---
 feature: architect-roadmap-v2
 title: Architect Roadmap v2
-phase: approved
+phase: building
 ---
 # Architect Roadmap v2
 
