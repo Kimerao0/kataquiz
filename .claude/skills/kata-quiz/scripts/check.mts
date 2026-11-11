@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs'
 import { parseQuizText } from '../../../../src/lib/quiz-schema/index.ts'
 
 const MAX_TELL = 30 // % of single questions where the correct option is the uniquely longest/shortest
+const MAX_CODE = 20 // % of questions with a code block, unless the quiz is tagged advanced
 let failed = 0
 
 for (const file of process.argv.slice(2)) {
@@ -36,6 +37,11 @@ for (const file of process.argv.slice(2)) {
   if (pct(shortest) > MAX_TELL) problems.push(`correct is shortest in ${pct(shortest)}% of singles`)
 
   const code = questions.filter((q) => q.code).length
+  const advanced = parsed.data.tags.includes('advanced')
+  const codePct = Math.round((100 * code) / questions.length)
+  if (!advanced && 100 * code > MAX_CODE * questions.length) {
+    problems.push(`code in ${codePct}% of questions (max ${MAX_CODE}%)`)
+  }
   const summary = `${questions.length} q, ${code} code, longest ${pct(longest)}%, shortest ${pct(shortest)}%`
   if (problems.length) failed++
   console.log(
