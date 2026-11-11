@@ -6,329 +6,232 @@ tags: [architect-roadmap, react, jsx, components, lists, rendering]
 run:
   questionsPerRun: 10
   maxErrors: 3
-  timePerQuestionSec: 60
+  timePerQuestionSec: 45
 questions:
   - type: single
     prompt: What does a JSX expression like `<Card title="Hi" />` evaluate to at runtime?
-    explanation: "JSX is syntax sugar for a call to the `jsx` function from the runtime, which returns a plain JavaScript object (a React element) describing what to render. It is not a DOM node and not an HTML string. React later reads these objects to decide what to put in the DOM."
+    explanation: "JSX is syntax sugar for a function call that returns a plain JavaScript object (a React element) describing what to render. It is not a DOM node and not an HTML string. React reads these objects later to decide what to put in the DOM."
     theoryUrl: https://react.dev/learn/writing-markup-with-jsx
     options:
       - { text: "A real DOM node created immediately by the browser", correct: false }
-      - {
-          text: "A plain object describing the element, which React uses later to render",
-          correct: true,
-        }
-      - { text: "An HTML string that React injects with `innerHTML`", correct: false }
-      - { text: "An instance of the `Card` class, created at that point", correct: false }
+      - { text: "A plain object describing the element, which React uses later to render", correct: true }
+      - { text: "An HTML string that React injects into the page", correct: false }
+      - { text: "An instance of a `Card` class created at that point", correct: false }
   - type: single
-    prompt: A component needs to return a heading and a paragraph side by side, without adding an extra wrapper node to the DOM. What do you use?
-    explanation: "A component can only return one value, so the siblings must be grouped. A Fragment (`<>...</>`) groups them without producing a DOM node. Returning an array would need keys, and a wrapping `<div>` adds an element that can break CSS layouts such as grid or flex children."
-    theoryUrl: https://react.dev/reference/react/Fragment
+    prompt: Browsers cannot run JSX directly. How does it end up as working JavaScript?
+    explanation: "A build step (Babel, SWC, TypeScript, esbuild) compiles each JSX tag into a function call that creates a React element. The browser only ever sees plain JavaScript. JSX is not interpreted at runtime and is not a template language that React parses in the browser."
+    theoryUrl: https://react.dev/learn/writing-markup-with-jsx
     options:
-      - {
-          text: "Wrap them in a `<div>`, because a Fragment still emits a wrapper element",
-          correct: false,
-        }
-      - { text: "Return both elements separated by a comma", correct: false }
-      - { text: "Wrap them in a Fragment, `<>...</>`", correct: true }
-      - { text: "Call `ReactDOM.render` twice, once per element", correct: false }
+      - { text: "A build-step compiler turns each tag into a function call", correct: true }
+      - { text: "React parses the JSX text in the browser at runtime and converts it to HTML", correct: false }
+      - { text: "Modern browsers ship a native JSX parser that React hooks into when the page loads", correct: false }
+      - { text: "The server converts JSX into an HTML string and the browser never sees any JavaScript for it", correct: false }
+  - type: single
+    prompt: Why must a component return a single root element (or a Fragment) rather than two sibling elements?
+    explanation: "A JSX expression compiles to a single function call that returns one value, so two siblings have nothing to be returned as. Grouping them in a Fragment (`<>...</>`) solves it without adding an extra DOM node."
+    theoryUrl: https://react.dev/learn/writing-markup-with-jsx#1-return-a-single-root-element
+    options:
+      - { text: "Browsers refuse to insert more than one top-level node at a time", correct: false }
+      - { text: "Because a function can only return one value, and JSX compiles to one call", correct: true }
+      - { text: "React uses the root element to attach event listeners for its children", correct: false }
+      - { text: "It is only a style rule that linters enforce, and React would render siblings fine otherwise", correct: false }
+  - type: single
+    prompt: Why does JSX use `className` and `htmlFor` instead of `class` and `for`?
+    explanation: "JSX attributes become JavaScript object properties, and `class` and `for` are reserved words in JavaScript. React therefore follows the DOM property names (`className`, `htmlFor`) and camelCase for multi-word attributes such as `tabIndex`."
+    theoryUrl: https://react.dev/learn/writing-markup-with-jsx#3-camelcase-salmost-all-of-the-things
+    options:
+      - { text: "They are reserved words in JavaScript, and JSX attributes map to JS properties", correct: true }
+      - { text: "React replaces them at runtime with its own scoped class names to avoid CSS collisions", correct: false }
+      - { text: "Older browsers do not support the `class` and `for` attributes on elements", correct: false }
+      - { text: "It is a convention, and `class` still works but triggers a deprecation warning in strict mode", correct: false }
+  - type: multi
+    prompt: Which of the following can be placed directly inside JSX curly braces `{ }`? Select all that apply.
+    explanation: "Curly braces accept any JavaScript expression: a variable, a ternary, a function call. Statements such as `if` and `for` are not expressions, so they must live outside the JSX, before the `return`."
+    theoryUrl: https://react.dev/learn/javascript-in-jsx-with-curly-braces
+    options:
+      - { text: "`{user.name}`", correct: true }
+      - { text: "`{if (user.isAdmin) 'Admin'}`", correct: false }
+      - { text: "`{user.isAdmin ? 'Admin' : 'User'}`", correct: true }
+      - { text: "`{for (const n of names) <li>{n}</li>}`", correct: false }
+  - type: single
+    prompt: A teammate writes `<card title="x" />` for a component defined as `function Card()`. What does React do?
+    explanation: "JSX tags starting with a lowercase letter are treated as built-in DOM elements, so React creates an unknown `<card>` element and never calls your function. Component names must start with an uppercase letter."
+    theoryUrl: https://react.dev/learn/your-first-component#nesting-and-organizing-components
+    options:
+      - { text: "It calls `Card`, because JSX tag names are case-insensitive", correct: false }
+      - { text: "It creates a plain `<card>` element and never calls `Card`", correct: true }
+      - { text: "It throws because `card` is not defined", correct: false }
+      - { text: "It calls `Card`, but only when `title` is passed as a string", correct: false }
+  - type: single
+    prompt: What is the difference between a component and an element?
+    explanation: "A component is the function you write (`Card`). An element is the plain object you get when you use it in JSX (`<Card />`), describing what should appear. The component is the recipe, the element is one description produced from it."
+    theoryUrl: https://react.dev/learn/your-first-component
+    options:
+      - { text: "They are the same thing, and `element` is just the older name from before function components", correct: false }
+      - { text: "A component is a function you define, an element is the object `<Card />` produces", correct: true }
+      - { text: "A component is a DOM node on the page, an element is the JavaScript object that wraps it", correct: false }
+      - { text: "An element is a function that can hold state, a component is a stateless piece of markup", correct: false }
+  - type: single
+    prompt: What does "composition" mean in React, and why is it preferred over inheritance?
+    explanation: "Composition means building bigger components by nesting smaller ones and passing data and children via props. It is flexible and explicit. React does not need component inheritance hierarchies for reuse."
+    theoryUrl: https://react.dev/learn/passing-props-to-a-component#passing-jsx-as-children
+    options:
+      - { text: "Building complex UIs by nesting and combining small components, passing data and children as props", correct: true }
+      - { text: "Making each component extend a shared base class so that styles and behaviour are inherited", correct: false }
+      - { text: "Merging several components into one file at build time to reduce the bundle size", correct: false }
+      - { text: "Copying a component and editing the copy so that each variant stays independent from the others", correct: false }
+  - type: boolean
+    prompt: A component may safely modify its `props` object (for example `props.title = props.title.trim()`), as long as it does so before returning JSX.
+    explanation: "Props are read-only snapshots owned by the parent. Mutating them breaks the one-way data flow and can cause bugs, because the parent and other renders share the same object. Compute a new value in a local variable instead."
+    theoryUrl: https://react.dev/learn/passing-props-to-a-component#how-props-change-over-time
+    answer: false
+  - type: single
+    prompt: What does "one-way data flow" mean in React?
+    explanation: "Data moves down the tree: a parent passes props to its children, and children cannot reassign them. To send information up, a child calls a function the parent passed as a prop (typically to update the parent's state)."
+    theoryUrl: https://react.dev/learn/sharing-state-between-components
+    options:
+      - { text: "Children and parents automatically stay in sync through two-way bindings", correct: false }
+      - { text: "Data flows only from the top of the app to the DOM, and never back to JavaScript", correct: false }
+      - { text: "Data flows down through props, and children report back via callbacks", correct: true }
+      - { text: "A component can render only once, so its data cannot change after the first paint", correct: false }
+  - type: single
+    prompt: What is the idiomatic way to give a prop a default value in a modern function component?
+    explanation: "Default values in the destructured parameters (`{ size = 'md' }`) are plain JavaScript and apply when the prop is `undefined`. `defaultProps` on function components has been removed in recent React versions."
+    theoryUrl: https://react.dev/learn/passing-props-to-a-component#specifying-a-default-value-for-a-prop
+    options:
+      - { text: "Set `Component.defaultProps`, which React reads for every function component", correct: false }
+      - { text: "Call `useDefault('size', 'md')` inside the component body", correct: false }
+      - { text: "Use a default in the destructured parameter, like `{ size = 'md' }`", correct: true }
+      - { text: "Declare the default in the parent's JSX, since a child cannot define its own fallbacks", correct: false }
+  - type: single
+    prompt: Given `<Panel>Hello <b>world</b></Panel>`, what is the `children` prop inside `Panel`?
+    explanation: "Whatever you nest between the opening and closing tags is passed to the component as `props.children`, and the component decides where to render it. This is what makes wrapper and layout components possible."
+    theoryUrl: https://react.dev/learn/passing-props-to-a-component#passing-jsx-as-children
+    options:
+      - { text: "The nested content, which `Panel` renders wherever it wants", correct: true }
+      - { text: "Always a string with the raw markup, which must be parsed before rendering", correct: false }
+      - { text: "`undefined`, because content between tags is only allowed on built-in HTML elements", correct: false }
+      - { text: "A list of the DOM nodes that React has already created for the nested content", correct: false }
+  - type: single
+    prompt: What is the main job of the `key` attribute on items in a rendered list?
+    explanation: "Keys give each sibling a stable identity, so across renders React can tell which item is which and can move, keep or destroy the right DOM nodes and state. A key is not a prop for the component and not an HTML attribute."
+    theoryUrl: https://react.dev/learn/rendering-lists#keeping-list-items-in-order-with-key
+    options:
+      - { text: "It identifies each item across renders, so React can match old items with new ones", correct: true }
+      - { text: "It is passed to the component as a prop so that the item knows its own position", correct: false }
+      - { text: "It marks the item as memoised so that React skips re-rendering it when nothing changed", correct: false }
+      - { text: "It becomes an HTML `id` attribute used by the browser to look up the node", correct: false }
+  - type: single
+    prompt: Which value is generally the best `key` for items in a list loaded from a database?
+    explanation: "A stable, unique identifier that belongs to the data, such as the database id, stays attached to the same item when the list is reordered, filtered or inserted into. Position or generated values do not."
+    theoryUrl: https://react.dev/learn/rendering-lists#where-to-get-your-key
+    options:
+      - { text: "The item's index in the array, because it is always unique", correct: false }
+      - { text: "A timestamp taken when the item is rendered", correct: false }
+      - { text: "A stable id from the data, such as the database primary key", correct: true }
+      - { text: "A hash of the item's visible text, so that identical rows are grouped together", correct: false }
+  - type: single
+    prompt: Why is using the array index as a key a bad idea for a list that can be reordered or have items removed?
+    explanation: "With index keys, the key belongs to a position, not to an item. After a removal or reorder, React matches old state and DOM nodes to different items, so things like input values or component state can end up on the wrong row."
+    theoryUrl: https://react.dev/learn/rendering-lists#why-does-react-need-keys
+    options:
+      - { text: "Indexes are not unique, so React throws an error as soon as two items share one", correct: false }
+      - { text: "After the list changes, the same key points to a different item, so state can attach to the wrong row", correct: true }
+      - { text: "React ignores numeric keys and falls back to comparing the items by deep equality", correct: false }
+      - { text: "Index keys disable the `map` optimisation, which makes the list slower to create", correct: false }
+  - type: single
+    prompt: A list is rendered with `key={Math.random()}` "to avoid duplicate key warnings". What is the practical consequence?
+    explanation: "A new random key on every render means React never matches an item with its previous one. Every row is destroyed and recreated, losing state and focus and wasting work. Keys must be stable between renders."
+    theoryUrl: https://react.dev/learn/rendering-lists#rules-of-keys
+    options:
+      - { text: "Nothing changes, because random values are unique and uniqueness is all that keys require", correct: false }
+      - { text: "React caches the first random value and reuses it, so the result is the same as a stable key", correct: false }
+      - { text: "Every item is unmounted and remounted on each render, losing state and hurting performance", correct: true }
+      - { text: "React throws an error, because keys must be strings or integers and not floats", correct: false }
+  - type: boolean
+    prompt: Keys only need to be unique among siblings in the same list, not globally across the whole app.
+    explanation: "Keys are scoped to the array they appear in. Two different lists can reuse the same keys without any conflict, because React compares siblings only within their own parent."
+    theoryUrl: https://react.dev/learn/rendering-lists#rules-of-keys
+    answer: true
+  - type: single
+    prompt: "What does React warn about when rendering this component?"
+    code: |
+      function Tags({ tags }: { tags: string[] }) {
+        return <ul>{tags.map((t) => <li>{t}</li>)}</ul>
+      }
+    codeLanguage: tsx
+    explanation: "Each element in an array rendered from `map` needs a `key`, otherwise React logs a warning that list children should have unique keys. The fix is `<li key={t}>` (or a stable id), not an `id` or index."
+    theoryUrl: https://react.dev/learn/rendering-lists#keeping-list-items-in-order-with-key
+    options:
+      - { text: "The `<li>` elements are missing a `key` prop", correct: true }
+      - { text: "`map` cannot be used inside JSX and must be replaced with a `for` loop", correct: false }
+      - { text: "The `<ul>` needs a `key` as well, because it contains a list", correct: false }
+      - { text: "Nothing, because `t` is a string and strings do not need keys", correct: false }
+  - type: multi
+    prompt: Which of these are valid ways to render something conditionally in a component? Select all that apply.
+    explanation: "Plain JavaScript works: an `if` with an early return, a ternary and `&&` inside the JSX are all common. React has no special `v-if` style directive, and `<If>` is not a built-in component."
+    theoryUrl: https://react.dev/learn/conditional-rendering
+    options:
+      - { text: "An `if` statement with an early `return` before the main JSX", correct: true }
+      - { text: "A ternary inside the JSX: `{isOn ? <Panel /> : null}`", correct: true }
+      - { text: "A built-in `<If condition={isOn}>` wrapper component from React", correct: false }
+      - { text: "Logical AND inside the JSX: `{isOn && <Panel />}`", correct: true }
   - type: single
     prompt: "What does this component render when `items` is an empty array?"
     code: |
       function Results({ items }: { items: string[] }) {
-        return (
-          <div>
-            {items.length && <ul>{items.map((i) => <li key={i}>{i}</li>)}</ul>}
-          </div>
-        )
+        return <div>{items.length && <List items={items} />}</div>
       }
     codeLanguage: tsx
-    explanation: "`0 && x` evaluates to `0`, and React renders the number `0` as text (only `null`, `undefined`, `true` and `false` render nothing). The div therefore contains the text `0`. Use `items.length > 0 && ...` or a ternary to avoid it."
+    explanation: "`0 && x` evaluates to `0`, and React renders the number `0` as text (only `null`, `undefined`, `true` and `false` render nothing). Use `items.length > 0 && ...` or a ternary to avoid it."
     theoryUrl: https://react.dev/learn/conditional-rendering#logical-and-operator-
     options:
       - { text: "An empty `<div>`", correct: false }
       - { text: "A `<div>` containing the text `0`", correct: true }
-      - { text: "A `<div>` containing an empty `<ul>`", correct: false }
+      - { text: "A `<div>` containing an empty `<List>`", correct: false }
       - { text: "It throws, because `0` is not a valid React child", correct: false }
   - type: single
-    prompt: "What is the `innerHTML` of the paragraph rendered by this JSX?"
-    code: |
-      <p>{[null, undefined, true, false, 0, '', NaN]}</p>
-    codeLanguage: tsx
-    explanation: "`null`, `undefined`, booleans and the empty string render nothing. Numbers are rendered as text, including `0` and `NaN`, so the output is `0NaN`."
-    theoryUrl: https://react.dev/learn/conditional-rendering
-    options:
-      - { text: "`<p></p>`", correct: false }
-      - { text: "`<p>0</p>`", correct: false }
-      - { text: "`<p>0NaN</p>`", correct: true }
-      - { text: "`<p>truefalse0NaN</p>`", correct: false }
-  - type: single
-    prompt: "What happens when React renders `<div>{{ a: 1 }}</div>`?"
-    explanation: 'Plain objects are not valid React children. React throws "Objects are not valid as a React child". Strings, numbers, elements and arrays of those are accepted, so you must pick a field or serialise the object yourself.'
-    theoryUrl: https://react.dev/learn/javascript-in-jsx-with-curly-braces
-    options:
-      - { text: "It renders `[object Object]`", correct: false }
-      - { text: 'It renders the JSON string `{"a":1}`', correct: false }
-      - { text: "It renders nothing, like `null`", correct: false }
-      - { text: "It throws an error during rendering", correct: true }
-  - type: single
-    prompt: A teammate writes `<card title="x" />` for a component defined as `function Card()`. What does React do?
-    explanation: "JSX tags starting with a lowercase letter are treated as built-in DOM elements, so React creates an unknown `<card>` element instead of calling your function. Component names must start with an uppercase letter."
-    theoryUrl: https://react.dev/learn/your-first-component#nesting-and-organizing-components
-    options:
-      - { text: "It calls `Card`, because JSX tag names are case-insensitive", correct: false }
-      - { text: "It creates a DOM element `<card>`, and `Card` is never called", correct: true }
-      - { text: "It throws because `card` is not defined", correct: false }
-      - { text: "It calls `Card` but only when `title` is a string", correct: false }
-  - type: multi
-    prompt: Which of these are valid in JSX attribute position for a regular DOM element? Select all that apply.
-    explanation: "JSX uses DOM property names, so `className`, `htmlFor` and `tabIndex` are right and `style` takes an object. `class` and `for` are reserved words in JavaScript, and the HTML names are not used. A string `style` is rejected by React."
-    theoryUrl: https://react.dev/learn/writing-markup-with-jsx
-    options:
-      - { text: '`className="box"`', correct: true }
-      - { text: '`style="color: red"`', correct: false }
-      - { text: '`htmlFor="email"` on a `<label>`', correct: true }
-      - { text: "`tabIndex={0}`", correct: true }
-  - type: multi
-    prompt: Which of the following can be placed directly inside JSX curly braces `{ }`? Select all that apply.
-    explanation: "Curly braces accept any JavaScript expression: a ternary, a function call, an array `.map` call. Statements such as `if` and `for` are not expressions, so they must live outside the JSX, before the `return`."
-    theoryUrl: https://react.dev/learn/javascript-in-jsx-with-curly-braces
-    options:
-      - { text: "`{user.isAdmin ? 'Admin' : 'User'}`", correct: true }
-      - { text: "`{if (user.isAdmin) 'Admin'}`", correct: false }
-      - { text: "`{names.map((n) => <li key={n}>{n}</li>)}`", correct: true }
-      - { text: "`{for (const n of names) <li>{n}</li>}`", correct: false }
-  - type: single
-    prompt: "What does this component log?"
-    code: |
-      function Item(props: { key?: string; label: string }) {
-        console.log('key prop:', props.key)
-        return null
-      }
-      // rendered as: <Item key="k1" label="a" />
-    codeLanguage: tsx
-    explanation: "`key` is consumed by React for reconciliation and is not passed down as a regular prop. Reading `props.key` gives `undefined`, and React 19 warns about it. If a child needs the identifier, pass it under another name such as `id`."
-    theoryUrl: https://react.dev/learn/rendering-lists#keeping-list-items-in-order-with-key
-    options:
-      - { text: "`key prop: k1`", correct: false }
-      - { text: "`key prop: undefined`", correct: true }
-      - { text: "`key prop: null`", correct: false }
-      - { text: "Nothing, because React skips the render for keyed elements", correct: false }
-  - type: single
-    prompt: What is the main job of the `key` attribute on elements in a rendered list?
-    explanation: "Keys give each sibling a stable identity, so across renders React can tell which item is which: it can move, keep or destroy the right DOM nodes and component state. It is not a prop, not a performance flag for memoisation, and not an HTML attribute."
-    theoryUrl: https://react.dev/learn/rendering-lists#keeping-list-items-in-order-with-key
-    options:
-      - { text: "It lets child components read their position through `props.key`", correct: false }
-      - {
-          text: "It gives each sibling a stable identity so React can match items between renders",
-          correct: true,
-        }
-      - {
-          text: "It prevents the item from re-rendering when the parent re-renders",
-          correct: false,
-        }
-      - {
-          text: "It is rendered as a `data-key` attribute used for event delegation",
-          correct: false,
-        }
-  - type: single
-    prompt: "A list of rows, each holding its own text-input state, uses `key={index}`. The user types `typed` in the first row (A), then the first item is removed from the array. What does the UI show?"
-    explanation: "With index keys, the row at position 0 keeps its identity, so React reuses the first component instance (with its input state) and just gives it the new props. The text `typed` therefore stays in the first row, which now shows B. Keying by a stable id, such as the item value, deletes the right instance."
-    theoryUrl: https://react.dev/learn/rendering-lists#why-does-react-need-keys
-    options:
-      - { text: "Row B shows `typed`, because the state stayed at position 0", correct: true }
-      - { text: "Row B is empty, because its state was empty from the start", correct: false }
-      - { text: "Row C shows `typed`, because the whole list shifts up", correct: false }
-      - {
-          text: "No row shows `typed`, because the removed row took the state with it",
-          correct: false,
-        }
-  - type: single
-    prompt: 'A list is rendered with `key={Math.random()}` to "avoid duplicate key warnings". What is the practical consequence?'
-    explanation: "A new key on every render means React sees every item as a brand new element: it unmounts the old instance and mounts a new one. State is lost, inputs lose focus, effects re-run and DOM nodes are recreated. Keys must be stable across renders, which is why ids from the data are used."
-    theoryUrl: https://react.dev/learn/rendering-lists#rules-of-keys
-    options:
-      - { text: "Nothing visible; random keys are just a cheaper way to be unique", correct: false }
-      - { text: "Items render faster, because React skips the diffing step", correct: false }
-      - { text: "Every item is remounted on every render, losing state and focus", correct: true }
-      - { text: "React throws, since keys must be strings derived from the data", correct: false }
-  - type: boolean
-    prompt: "Keys only need to be unique among siblings in the same list, not globally across the whole app."
-    answer: true
-    explanation: "Keys are scoped to the array they are in. Two different lists, or two components, can reuse the same key values without any conflict."
-    theoryUrl: https://react.dev/learn/rendering-lists#rules-of-keys
-  - type: single
-    prompt: "Each item in a list needs to render a `<dt>` and a `<dd>` as siblings, with no wrapper element. Which is correct?"
-    code: |
-      items.map((item) => (
-        /* ??? */
-      ))
-    codeLanguage: tsx
-    explanation: "The short fragment syntax `<>` cannot take a key. To group siblings and key them, import `Fragment` and use `<Fragment key={item.id}>`. Putting the key on the `<dt>` alone would leave the fragment itself unkeyed."
-    theoryUrl: https://react.dev/learn/rendering-lists#displaying-several-dom-nodes-for-each-list-item
-    options:
-      - { text: "`<div key={item.id}><dt>...</dt><dd>...</dd></div>`", correct: false }
-      - { text: "`<Fragment key={item.id}><dt>...</dt><dd>...</dd></Fragment>`", correct: true }
-      - { text: "`<><dt key={item.id}>...</dt><dd>...</dd></>`", correct: false }
-      - {
-          text: "`[<dt>...</dt>, <dd>...</dd>]`, since arrays are keyed automatically",
-          correct: false,
-        }
-  - type: single
-    prompt: "How many times is `Inner` mounted (its effect runs) after the button is clicked twice?"
-    code: |
-      function Outer() {
-        const [n, setN] = useState(0)
-
-        function Inner() {
-          useEffect(() => { console.log('Inner mount') }, [])
-          return <span>x</span>
-        }
-
-        return (
-          <>
-            <button onClick={() => setN(n + 1)}>+</button>
-            <Inner />
-          </>
-        )
-      }
-    codeLanguage: tsx
-    explanation: "`Inner` is a new function on every render of `Outer`, so React sees a different component type at the same position and remounts it. The effect logs on the initial mount and after each click: three times. Define components at module level, never inside another component."
-    theoryUrl: https://react.dev/learn/your-first-component#nesting-and-organizing-components
-    options:
-      - { text: "Once, because the dependency array is empty", correct: false }
-      - { text: "Twice, once for each click", correct: false }
-      - { text: "Three times: the mount plus one remount per click", correct: true }
-      - { text: "Zero times, because nested components never run effects", correct: false }
-  - type: single
-    prompt: "What do the three `Btn` elements log?"
-    code: |
-      function Btn({ size = 'md' }: { size?: string | null }) {
-        console.log(String(size))
-        return null
-      }
-
-      <>
-        <Btn size={undefined} />
-        <Btn size={null} />
-        <Btn />
-      </>
-    codeLanguage: tsx
-    explanation: 'A destructuring default only applies when the value is `undefined`, so an omitted prop or an explicit `undefined` gives `md`. An explicit `null` is kept as `null`. This matters when passing optional values down: `null` is not "missing".'
-    theoryUrl: https://react.dev/learn/passing-props-to-a-component#specifying-a-default-value-for-a-prop
-    options:
-      - { text: "`md`, `md`, `md`", correct: false }
-      - { text: "`md`, `null`, `md`", correct: true }
-      - { text: "`undefined`, `null`, `undefined`", correct: false }
-      - { text: "`md`, `null`, `undefined`", correct: false }
-  - type: single
-    prompt: 'A wrapper component forwards its props to a button. Both variants are rendered with `type="submit"` passed by the caller. What are the resulting button types?'
-    code: |
-      function B1(props: ButtonProps) {
-        return <button type="button" {...props} />
-      }
-      function B2(props: ButtonProps) {
-        return <button {...props} type="button" />
-      }
-      // <B1 type="submit" />  <B2 type="submit" />
-    codeLanguage: tsx
-    explanation: 'Later attributes win. In `B1` the spread comes last, so the caller''s `submit` overrides the default `button`. In `B2` the fixed `type="button"` comes after the spread and cannot be overridden. Put defaults before the spread, and enforced values after it.'
-    theoryUrl: https://react.dev/learn/passing-props-to-a-component#forwarding-props-with-the-jsx-spread-syntax
-    options:
-      - { text: "B1 is `button`, B2 is `submit`", correct: false }
-      - { text: "Both are `submit`", correct: false }
-      - { text: "B1 is `submit`, B2 is `button`", correct: true }
-      - { text: "Both are `button`", correct: false }
-  - type: boolean
-    prompt: A component may safely mutate its `props` object (for example `props.items.push(x)`) as long as it does so before returning JSX.
-    answer: false
-    explanation: "Props are read-only snapshots owned by the parent. Mutating them during render breaks purity, can corrupt the parent's data and produces bugs that depend on how many times React renders. Copy the data and change the copy, or lift the change into state."
-    theoryUrl: https://react.dev/learn/passing-props-to-a-component#how-props-change-over-time
-  - type: multi
-    prompt: Which of these are side effects that should NOT happen during a component's render phase? Select all that apply.
-    explanation: "Render must be pure: same inputs, same JSX. Mutating a module-level variable and firing a network request change the outside world, so they belong in event handlers or effects. Creating a local array and sorting a copy is fine, because nothing outside the component is touched."
-    theoryUrl: https://react.dev/learn/keeping-components-pure
-    options:
-      - { text: "Incrementing a module-level counter variable", correct: true }
-      - { text: "Calling `fetch('/api/log')` directly in the function body", correct: true }
-      - { text: "Building a new local array and calling `.sort()` on it", correct: false }
-      - { text: "Calling `.map()` on props to produce JSX", correct: false }
-  - type: single
-    prompt: 'A `Field` component holds its own `useState` counter. The parent renders `{primary ? <Field cls="a" /> : <Field cls="b" />}` and the user toggles `primary` after incrementing the counter twice. What does the counter show?'
-    explanation: "Both branches render the same component type at the same position in the tree, so React treats them as one element and keeps its state, only updating the props. The counter still shows 2. To force a reset, give the two branches different keys."
-    theoryUrl: https://react.dev/learn/preserving-and-resetting-state#same-component-at-the-same-position-preserves-state
-    options:
-      - { text: "0, because each branch is a separate element", correct: false }
-      - { text: "It depends on whether the `cls` prop is used inside", correct: false }
-      - { text: "2, because the same type at the same position keeps its state", correct: true }
-      - { text: "It throws, because two branches cannot share state", correct: false }
-  - type: single
-    prompt: "The same `Field` is now rendered as `{primary ? <div><Field /></div> : <section><Field /></section>}`. After incrementing to 2 and toggling `primary`, what does the counter show?"
-    explanation: "The wrapper element type at that position changed from `div` to `section`, so React destroys the old subtree, including `Field` and its state, and mounts a new one. The counter resets to 0. Same-position, same-type is the rule that preserves state."
-    theoryUrl: https://react.dev/learn/preserving-and-resetting-state#different-components-at-the-same-position-reset-state
-    options:
-      - { text: "2, because `Field` is the same component in both branches", correct: false }
-      - { text: "1, because React keeps half of the state on a type change", correct: false }
-      - { text: "0, because the subtree is unmounted and mounted again", correct: true }
-      - { text: "Undefined, because the state is detached but not reset", correct: false }
-  - type: single
-    prompt: "A page renders `<p>{userComment}</p>` where `userComment` is user-supplied text such as `<img src=x onerror=alert(1)>`. What happens?"
-    explanation: "JSX escapes string children, so the text is inserted as a text node and shown literally. It is not parsed as HTML. The risk appears only when you opt out with `dangerouslySetInnerHTML`, which injects markup without escaping."
-    theoryUrl: https://react.dev/reference/react-dom/components/common#dangerously-setting-the-inner-html
-    options:
-      - {
-          text: "The image tag is created and the handler runs, so you must sanitise first",
-          correct: false,
-        }
-      - {
-          text: "React strips the tag and renders only the text between the brackets",
-          correct: false,
-        }
-      - { text: "React throws because the string contains markup characters", correct: false }
-      - { text: "The text is shown literally; JSX escapes string children", correct: true }
-  - type: single
-    prompt: "A component receives `children`. Given `<Panel>Hello <b>world</b></Panel>`, what is `props.children` inside `Panel`?"
-    explanation: "Text and elements between the tags become the `children` prop. With more than one child it is an array containing the string `Hello ` and a React element for `<b>`. It is not a string of HTML, and it is not a function unless you pass one explicitly."
-    theoryUrl: https://react.dev/learn/passing-props-to-a-component#passing-jsx-as-children
-    options:
-      - { text: "The string `Hello <b>world</b>`", correct: false }
-      - { text: "An array: the string `Hello ` and a React element for `<b>`", correct: true }
-      - {
-          text: "`undefined`, because `children` must be passed as an explicit prop",
-          correct: false,
-        }
-      - { text: "A DOM `NodeList` holding the already-created nodes", correct: false }
-  - type: single
-    prompt: A product list shows a spinner while loading, an error banner on failure, an empty state with no items, and otherwise the items. Which structure keeps the rendering logic clearest and avoids the `0` pitfall?
-    explanation: "Early returns (or a chain of explicit conditions) with boolean checks handle each state in one place, and `items.length === 0` is a real boolean. Chaining `&&` with `items.length` risks printing `0`, and nesting four ternaries in one expression is hard to read."
+    prompt: What happens when a component returns `null`?
+    explanation: "Returning `null` is the standard way to render nothing: the component stays valid and produces no DOM output. It does not throw and it does not unmount the parent. Returning `undefined` is also allowed in recent React versions."
     theoryUrl: https://react.dev/learn/conditional-rendering#conditionally-returning-nothing-with-null
     options:
-      - {
-          text: "`{loading && <Spinner/>}{error && <Banner/>}{items.length && <List/>}`",
-          correct: false,
-        }
-      - { text: "One nested ternary with all four states inside the returned JSX", correct: false }
-      - {
-          text: "Early returns for `loading`, `error` and `items.length === 0`, then the list",
-          correct: true,
-        }
-      - {
-          text: "Render everything, and hide the wrong parts with CSS `display: none`",
-          correct: false,
-        }
+      - { text: "React throws an error, because every component must return an element", correct: false }
+      - { text: "React renders an empty `<div>` as a placeholder in its place", correct: false }
+      - { text: "It renders nothing, and nothing else breaks", correct: true }
+      - { text: "React unmounts the parent component and everything that is rendered inside of it", correct: false }
   - type: single
-    prompt: Why do React components need to return the same output for the same props, state and context?
-    explanation: "Purity is what lets React render in any order, skip work, re-run a render (StrictMode does it twice on purpose), and pause or discard in-progress renders in concurrent features. Impure components give different results depending on how often React calls them."
+    prompt: Why should a component's render be "pure", returning the same output for the same props, state and context?
+    explanation: "React may call render more than once, pause it, discard it or run it in StrictMode (which deliberately renders twice in development). That is only safe when rendering has no side effects. Side effects belong in event handlers or effects."
     theoryUrl: https://react.dev/learn/keeping-components-pure
     options:
-      - {
-          text: "Because the browser caches function results based on their arguments",
-          correct: false,
-        }
-      - {
-          text: "Because React can call, repeat, skip or discard renders, and the result must not depend on that",
-          correct: true,
-        }
-      - { text: "Because JSX forbids variables declared inside the function body", correct: false }
-      - { text: "Because pure functions are required to avoid hooks", correct: false }
+      - { text: "Pure functions are required so that React can compile the component to native code", correct: false }
+      - { text: "React can render a component several times (like StrictMode does), so render must be safe to repeat", correct: true }
+      - { text: "React caches the output forever after the first render and never calls the function again", correct: false }
+      - { text: "Impure components are not allowed to use props or state, so they would not work at all", correct: false }
+  - type: single
+    prompt: What does "declarative" mean for React UI code, compared with imperative DOM code?
+    explanation: "In declarative code you describe what the UI should look like for the current state, and React works out how to update the DOM. Imperative code (`document.createElement`, `appendChild`) spells out each step yourself."
+    theoryUrl: https://react.dev/learn/reacting-to-input-with-state
+    options:
+      - { text: "You write each DOM mutation by hand, but React checks the order of the steps", correct: false }
+      - { text: "You describe the UI for a given state, and React figures out the DOM changes needed", correct: true }
+      - { text: "Components must be declared in a fixed order at the top of the file before use", correct: false }
+      - { text: "The UI is described in HTML files, and JavaScript is only used to load them", correct: false }
+  - type: single
+    prompt: When state changes and a component re-renders, what does React do to the DOM?
+    explanation: "React calls your components to get a new tree of elements, compares it with the previous one (reconciliation) and applies only the differences to the real DOM. It does not throw away and rebuild the whole page."
+    theoryUrl: https://react.dev/learn/render-and-commit
+    options:
+      - { text: "It replaces the whole page's DOM with the freshly rendered tree", correct: false }
+      - { text: "It compares the new element tree with the previous one and updates only what changed", correct: true }
+      - { text: "It leaves the DOM alone until you call a method that updates the DOM nodes yourself", correct: false }
+      - { text: "It re-renders only the components whose JSX text is different, without comparing any elements", correct: false }
+  - type: single
+    prompt: "A page renders `<p>{userComment}</p>` where `userComment` is user-supplied text such as `<img src=x onerror=alert(1)>`. What happens?"
+    explanation: "React escapes string values placed in JSX, so the text is shown literally as text and the script never runs. This protects against most injection attacks, unless you opt out with `dangerouslySetInnerHTML`."
+    theoryUrl: https://react.dev/reference/react-dom/components/common#dangerously-setting-the-inner-html
+    options:
+      - { text: "The image tag is created and its `onerror` handler runs", correct: false }
+      - { text: "React removes the tag and shows only the safe parts of the text", correct: false }
+      - { text: "React throws an error, because strings with angle brackets are not valid children", correct: false }
+      - { text: "The string is escaped and displayed as literal text, so nothing is executed", correct: true }
