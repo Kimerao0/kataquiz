@@ -306,19 +306,26 @@ questions:
       - { text: "A built-in `<If condition={isOn}>` wrapper component from React", correct: false }
       - { text: "Logical AND inside the JSX: `{isOn && <Panel />}`", correct: true }
   - type: single
-    prompt: "What does this component render when `items` is an empty array?"
-    code: |
-      function Results({ items }: { items: string[] }) {
-        return <div>{items.length && <List items={items} />}</div>
-      }
-    codeLanguage: tsx
-    explanation: "`0 && x` evaluates to `0`, and React renders the number `0` as text (only `null`, `undefined`, `true` and `false` render nothing). Use `items.length > 0 && ...` or a ternary to avoid it."
+    prompt: "Why is `{count && <Badge />}` risky when `count` is a number, and what is the usual fix?"
+    explanation: "When `count` is `0`, `&&` short-circuits and returns `0`, and React renders the number `0` as text (only `null`, `undefined`, `true` and `false` render nothing). Make the condition a real boolean, such as `count > 0 && ...`, or use a ternary."
     theoryUrl: https://react.dev/learn/conditional-rendering#logical-and-operator-
     options:
-      - { text: "An empty `<div>`", correct: false }
-      - { text: "A `<div>` containing the text `0`", correct: true }
-      - { text: "A `<div>` containing an empty `<List>`", correct: false }
-      - { text: "It throws, because `0` is not a valid React child", correct: false }
+      - {
+          text: "With a `0` count it renders the text `0`; use `count > 0 &&` or a ternary",
+          correct: true,
+        }
+      - {
+          text: "React throws on any number child, so wrap `count` in `String()` first",
+          correct: false,
+        }
+      - {
+          text: "React treats `0` as false and renders nothing, so it is already safe",
+          correct: false,
+        }
+      - {
+          text: "The `&&` forces a re-render on every pass; memoize `<Badge />` to stop it",
+          correct: false,
+        }
   - type: single
     prompt: What happens when a component returns `null`?
     explanation: "Returning `null` is the standard way to render nothing: the component stays valid and produces no DOM output. It does not throw and it does not unmount the parent. Returning `undefined` is also allowed in recent React versions."

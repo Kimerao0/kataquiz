@@ -175,16 +175,16 @@ questions:
           correct: false,
         }
   - type: single
-    prompt: "A like button uses `useOptimistic`. The action below calls `setLikes` and then the server request fails. What does the user end up seeing?"
+    prompt: "A like button uses `useOptimistic`. The action below catches the failed request and sets an error message. What does the user end up seeing?"
     code: |
       const [likes, setLikes] = useOptimistic(serverLikes, (cur, d: number) => cur + d)
 
       async function like() {
         setLikes(1)
-        await postLike() // throws
+        try { await postLike() } catch { setError('Could not like') }
       }
     codeLanguage: tsx
-    explanation: "The optimistic value only lives while the action is pending. When the action ends, React renders the real state again, so a failed request makes the optimistic count disappear. Showing an error message is still up to you."
+    explanation: "The optimistic value only lives while the action is pending. Since the action catches the error, it ends normally and React renders the real state again, so the +1 disappears and the error message shows. Nothing reaches an error boundary."
     theoryUrl: https://react.dev/reference/react/useOptimistic
     options:
       - {
@@ -200,7 +200,7 @@ questions:
           correct: false,
         }
       - {
-          text: "The component unmounts and the nearest error boundary renders its fallback in place of the button",
+          text: "The count stays incremented until `serverLikes` changes, and the error message shows next to it",
           correct: false,
         }
   - type: multi

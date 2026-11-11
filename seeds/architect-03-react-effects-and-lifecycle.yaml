@@ -350,7 +350,7 @@ questions:
         }
   - type: single
     prompt: A component displays the browser's online/offline status, and subscribes to the `online` and `offline` events. Which hook is designed for subscribing to an external store like this?
-    explanation: "`useSyncExternalStore`, built for subscribing to external sources is built for reading and subscribing to an external source, with correct behaviour during concurrent rendering and server rendering. A hand-written effect with state also works, but is easier to get wrong."
+    explanation: "`useSyncExternalStore` is built for reading and subscribing to an external source like the browser's online status, with correct behaviour during concurrent rendering and server rendering. A hand-written effect with state also works, but is easier to get wrong. The other hooks cache a calculation, manage internal state, or delay a value, so none of them subscribe to anything outside React."
     theoryUrl: https://react.dev/reference/react/useSyncExternalStore
     options:
       - { text: "`useSyncExternalStore`, built for subscribing to external sources", correct: true }
@@ -365,7 +365,7 @@ questions:
       - { text: "`useDeferredValue`, which delays updating a part of the UI", correct: false }
   - type: multi
     prompt: Which of these are good fits for `useEffect`? Select all that apply.
-    explanation: "Opening a connection, subscribing to the browser's window, and reporting that a page was displayed are all about syncing with something outside React. A total computed from props or state is plain render logic."
+    explanation: "Opening a WebSocket connection and subscribing to `window` scroll events are both about syncing with something outside React, which is what an effect is for. Calculating a cart total and transforming a list of users can be done directly from props or state while rendering, so they are plain render logic."
     theoryUrl: https://react.dev/learn/you-might-not-need-an-effect
     options:
       - { text: "Opening a WebSocket connection while a chat room is displayed", correct: true }
