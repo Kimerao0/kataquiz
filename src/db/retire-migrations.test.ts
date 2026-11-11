@@ -70,12 +70,12 @@ async function insertAttempt(
   return attempt.id
 }
 
-async function insertPath(tx: TestTx, quizIds: string[]) {
+async function insertPath(tx: TestTx, quizIds: string[], authorId = SEED_AUTHOR_ID) {
   const [path] = await tx
     .insert(paths)
     .values({
       slug: `path-${crypto.randomUUID()}`,
-      authorId: SEED_AUTHOR_ID,
+      authorId,
       title: PATH_TITLE,
       language: 'en',
     })
@@ -97,7 +97,7 @@ async function arrange(tx: TestTx) {
   const pathId = await insertPath(tx, [retired[0].quizId, kept.quizId])
   const otherUser = await insertUser(tx)
   const foreign = await insertQuiz(tx, otherUser, RETIRED_TITLES[0])
-  return { retired, kept, keptAttemptId, pathId, foreign }
+  return { retired, kept, keptAttemptId, pathId, foreign, otherUser }
 }
 
 describe('0008 retire architect R1', () => {
@@ -140,6 +140,17 @@ describe('0008 retire architect R1', () => {
 
       const [quiz] = await tx.select().from(quizzes).where(eq(quizzes.id, foreign.quizId))
       expect(quiz?.title).toBe(RETIRED_TITLES[0])
+    })
+  })
+
+  it("keeps another user's path with the retired title", async () => {
+    await withTestDb(async (tx) => {
+      const { kept, otherUser } = await arrange(tx)
+      const foreignPathId = await insertPath(tx, [kept.quizId], otherUser)
+      await runMigration(tx)
+
+      const [path] = await tx.select().from(paths).where(eq(paths.id, foreignPathId))
+      expect(path?.title).toBe(PATH_TITLE)
     })
   })
 
