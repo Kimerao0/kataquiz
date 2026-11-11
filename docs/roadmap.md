@@ -131,7 +131,7 @@ Spec: `specs/paths.md` (phase 1, KQ42, live in production since 2026-11-11; arch
 ## Architect Roadmap v2
 
 - [ ] KQ47: Architect Roadmap v2 R1 — Delete mechanism, snippet guard, React quizzes 01–06
-  Spec: `specs/architect-roadmap-v2.md` R1 · status: open
+  Spec: `specs/architect-roadmap-v2.md` R1 · status: building on feat/architect-roadmap-v2-r1
   Specs: R1.1 … R1.9 (the spec file holds the text; never copy it here)
   Verdicts: <filled by feature-prove>
 - [ ] KQ48: Architect Roadmap v2 R2 — Next.js and React patterns 07–15
