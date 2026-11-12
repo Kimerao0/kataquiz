@@ -232,6 +232,17 @@ describe('0009 retire architect R2', () => {
     })
   })
 
+  it("keeps another user's path with the retired title", async () => {
+    await withTestDb(async (tx) => {
+      const { kept, otherUser } = await arrange(tx, R2_RETIRED_TITLES, R2_KEPT_TITLE)
+      const foreignPathId = await insertPath(tx, [kept.quizId], otherUser)
+      await runMigration(tx, R2_MIGRATION)
+
+      const [path] = await tx.select().from(paths).where(eq(paths.id, foreignPathId))
+      expect(path?.title).toBe(PATH_TITLE)
+    })
+  })
+
   it('runs cleanly when there is nothing to retire', async () => {
     await withTestDb(async (tx) => {
       await expect(runMigration(tx, R2_MIGRATION)).resolves.toBeUndefined()
