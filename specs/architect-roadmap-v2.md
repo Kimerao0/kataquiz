@@ -55,6 +55,7 @@ Follow-up: Kill the old path, and the old quiz, i want a new quiz and new path. 
 | 10  | Can a challenge attempt block the delete?                                                                 | No: a challenge attempt always belongs to its source's quiz, so both go in the same cascade.                                                                                         | 2026-11-11 |
 | 11  | A user-authored path that includes a retired quiz loses that step (cascade; the new quiz has a new slug). | Accepted, not handled.                                                                                                                                                               | 2026-11-11 |
 | 12  | "A new quiz and new path": new titles or the same ones?                                                   | Same titles; only content and the path slug change.                                                                                                                                  | 2026-11-11 |
+| 13  | A quiz with no flagged question that fails `check.mts` (e.g. 15, answer-length bias)?                     | Fixed and re-imported like a flagged one; its attempts go with it.                                                                                                                   | 2026-11-12 |
 
 ## Releases
 
@@ -87,10 +88,10 @@ Follow-up: Kill the old path, and the old quiz, i want a new quiz and new path. 
 1. [built] Running `check.mts` on `seeds/architect-0[7-9]-*.yaml seeds/architect-1[0-5]-*.yaml` prints ok for all nine files, each with at most 5 code questions, and none of them carries an `advanced` tag.
 2. [built] The title list in the R2 migration equals the set of quiz files changed in R2, as listed by `git diff --name-only` on `seeds/`.
 3. [built] On a database holding the R1 content, a quiz from 07–15 that R2 left unchanged keeps its attempts after `pnpm release`.
-4. [built] On a database holding the R1 content, `pnpm release` leaves exactly one seed quiz per title for 07–15.
+4. [built] On a database holding the R1 content, `pnpm release` leaves exactly one seed quiz per title for 07–15, each changed one with the R2 question set.
 5. [built] On a fresh database, `pnpm release` runs the R1 and R2 migrations without error and imports every seed, the path included.
-6. [built] After `pnpm release` on a database holding the R1 content, the "Road to Software Architect" page lists 41 steps.
-7. [built] Reading quizzes 07–13 and 15, no question turns on an edge case or a trick output; quiz 14 may.
+6. [built] After `pnpm release` on a database holding the R1 content, the "Road to Software Architect" page lists 41 steps and step 7 opens the R2 version of quiz 07.
+7. [open] Reading quizzes 07–13 and 15, no question turns on an edge case or a trick output; quiz 14 may.
 
 ### R3 — Node.js 16–23
 
@@ -146,3 +147,5 @@ Follow-up: Kill the old path, and the old quiz, i want a new quiz and new path. 
 - 2026-11-11 — R4.1 reworded
 - 2026-11-11 — decisions 11 and 12 added, user-authored paths out of scope (feature-check R1 triage)
 - 2026-11-11 — R1 merged bc3cef9
+- 2026-11-12 — R2.4 and R2.6 reworded (new content, not just one row per title), decision 13 added (feature-check R2 triage)
+- 2026-11-12 — R2.7 reopened: edge-case questions left in 07, 09, 11, 13, 15 (feature-check R2)
