@@ -65,7 +65,10 @@ questions:
     explanation: "`staleTime` is how long cached data counts as fresh. While fresh, mounting a component or refocusing the window serves the cache without a background refetch. It does not decide how long unused data stays in memory (that is `gcTime`), and it does not delay the first fetch."
     theoryUrl: https://tanstack.com/query/latest/docs/framework/react/guides/caching
     options:
-      - { text: "For 5 minutes, cached data is served without background refetches", correct: true }
+      - {
+          text: "For 5 minutes after a fetch, mounts and window refocus reuse the cached data without refetching",
+          correct: true,
+        }
       - {
           text: "The first request is delayed by 5 minutes to batch it with others",
           correct: false,
@@ -75,7 +78,7 @@ questions:
           correct: false,
         }
       - {
-          text: "Requests that take longer than 5 minutes are cancelled and retried",
+          text: "Requests that take longer than 5 minutes are cancelled and then retried with the default exponential backoff",
           correct: false,
         }
   - type: single

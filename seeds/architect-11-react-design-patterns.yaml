@@ -197,42 +197,29 @@ questions:
           correct: false,
         }
   - type: single
-    prompt: "A page applies a HOC inside its render function. What is the consequence for the form's input state?"
-    code: |
-      function Settings() {
-        const [theme, setTheme] = useState('light')
-        const SettingsForm = withAuth(Form)
-
-        return (
-          <>
-            <button onClick={() => setTheme('dark')}>{theme}</button>
-            <SettingsForm />
-          </>
-        )
-      }
-    codeLanguage: tsx
-    explanation: "`withAuth(Form)` creates a new component type on every render. React compares types by identity, so it unmounts the old `SettingsForm` and mounts a new one, and the state and focus of its inputs are lost. HOCs must be applied once, at module scope."
-    theoryUrl: https://react.dev/learn/preserving-and-resetting-state#different-components-at-the-same-position-reset-state
+    prompt: "A team must add the same mount-time analytics event and wrapper frame to 30 components from a vendor package it cannot edit. Why is a HOC such as `withTracking(VendorChart)` a reasonable fit here, even in a codebase that prefers hooks?"
+    explanation: "A hook only runs where it is called, inside a component body, so it cannot add behaviour to components whose source you do not own. A HOC (like a plain wrapper component) works from the outside: it renders the original with its props and adds the cross-cutting part around it. HOCs are not faster, they do not share state between the components they wrap, and hooks work fine inside third-party code."
+    theoryUrl: https://www.patterns.dev/react/hoc-pattern
     options:
       - {
-          text: "The form is remounted on every `Settings` render, so its input state is reset",
+          text: "It wraps each component from the outside, while a hook must be called inside a body you control",
           correct: true,
         }
       - {
-          text: "The form keeps its state, because React reuses the DOM nodes of the old form",
+          text: "HOCs render faster than hooks, because React memoises the wrapper component automatically",
           correct: false,
         }
       - {
-          text: "React throws an error, because a HOC cannot be called while rendering",
+          text: "Hooks cannot run in components shipped from `node_modules`, since those are compiled separately from the app",
           correct: false,
         }
       - {
-          text: "Nothing changes, because React memoises `withAuth` after the first call",
+          text: "The HOC shares one tracking state across all 30 components, which a custom hook cannot do",
           correct: false,
         }
   - type: multi
     prompt: "A legacy screen exports `withRouter(withTheme(withUser(withTracking(Profile))))`. Which problems are typical of stacking HOCs like this? Select all that apply."
-    explanation: "Stacked HOCs create wrapper layers in the tree, make it hard to see which wrapper injected which prop, and can silently overwrite each other's props when two use the same name. They do not stop a component from using hooks, and they do not break server rendering."
+    explanation: "Stacked HOCs create wrapper layers in the tree, make it hard to see which wrapper injected which prop, and can silently overwrite each other's props when two use the same name. They do not stop a component from using hooks."
     theoryUrl: https://www.patterns.dev/react/hoc-pattern
     options:
       - { text: "Extra wrapper layers in the component tree and in the DevTools", correct: true }
@@ -353,25 +340,25 @@ questions:
           correct: false,
         }
   - type: single
-    prompt: "What is the difference between a controlled and an uncontrolled input in React?"
-    explanation: "A controlled input gets its `value` from React state and reports changes through `onChange`, so React is the single source of truth. An uncontrolled input keeps its value in the DOM, which you read with a ref or `FormData` and can seed with `defaultValue`. Neither is about disabling the field or where it renders."
-    theoryUrl: https://react.dev/reference/react-dom/components/input#controlling-an-input-with-a-state-variable
+    prompt: "A compound `Tabs` shares its state through `createContext<TabsState | null>(null)`. A developer renders `<Tabs.Tab>` outside any `<Tabs>`. Which pattern gives the best developer experience?"
+    explanation: "Without a provider, consumers get the context's default value. A `null` default plus a `useTabsContext()` hook that throws turns the misuse into an actionable message naming the missing parent. A fake default value or rendering nothing hides the bug, and letting the first property access fail produces a cryptic error far from the cause."
+    theoryUrl: https://react.dev/reference/react/useContext#specifying-a-fallback-default-value
     options:
       - {
-          text: "Controlled inputs are disabled, while uncontrolled inputs accept user typing",
-          correct: false,
-        }
-      - {
-          text: "Controlled inputs are rendered on the server and hydrated, while uncontrolled inputs only exist in the browser",
-          correct: false,
-        }
-      - {
-          text: "Controlled inputs read their value through a `ref`, uncontrolled ones through `useState`",
-          correct: false,
-        }
-      - {
-          text: "A controlled input takes its value from React state, an uncontrolled one keeps it in the DOM",
+          text: "A `useTabsContext()` hook that throws a clear error when the context value is `null`",
           correct: true,
+        }
+      - {
+          text: "A default context value with a fake selected tab, so `Tabs.Tab` also works without a parent",
+          correct: false,
+        }
+      - {
+          text: "Let `Tabs.Tab` read `null` and fail with whatever error the first property access throws",
+          correct: false,
+        }
+      - {
+          text: "Have `Tabs.Tab` render nothing when the context is missing, so that the page never shows an error",
+          correct: false,
         }
   - type: multi
     prompt: "Which form requirements are good reasons to make the inputs controlled? Select all that apply."
@@ -383,21 +370,24 @@ questions:
       - { text: "Reading all the values once, when the form is submitted", correct: false }
       - { text: "Avoiding a re-render of the form on every keystroke", correct: false }
   - type: single
-    prompt: "A back-office form has 60 fields and validates only on submit. Typing feels sluggish because every keystroke re-renders the whole form held in one `useState` object. Which fix fits best?"
-    explanation: "When validation is needed only at submit, uncontrolled inputs read through `FormData` (or a form library that registers refs) avoid re-rendering on every keystroke. Moving the object to Context still re-renders every consumer, and `useMemo` around the JSX does not stop the state update from re-rendering the form."
-    theoryUrl: https://react.dev/reference/react-dom/components/input#reading-the-input-values-when-submitting-a-form
+    prompt: 'A settings form uses uncontrolled inputs with `defaultValue={saved.name}`. A new "Undo changes" button must put the saved values back into the fields. Why is this awkward, and what does it show about the trade-off?'
+    explanation: "`defaultValue` only sets the initial value: after that the DOM owns what the user typed, and React has no prop to push a new value in. You need a remount (a new `key`), a DOM reset such as `form.reset()`, or controlled inputs. That is the cost of uncontrolled inputs: simple to read, hard to set from code. Refs and `FormData` can read the fields at any time, and React does not overwrite typed text on re-render."
+    theoryUrl: https://react.dev/reference/react-dom/components/input#providing-an-initial-value-for-an-input
     options:
       - {
-          text: "Move the form object into a Context provider, so the inputs subscribe to it",
+          text: "`defaultValue` only sets the initial value, so React cannot replace typed text without a remount or DOM reset",
+          correct: true,
+        }
+      - {
+          text: "Uncontrolled inputs cannot be read until submit, so the button cannot know which fields changed",
           correct: false,
         }
       - {
-          text: "Use uncontrolled inputs and read the values with `FormData` on submit",
-          correct: true,
+          text: "React re-applies `defaultValue` on every render, so the restored values would overwrite the user's typing",
+          correct: false,
         }
-      - { text: "Wrap the whole form JSX in `useMemo`, so React skips diffing it", correct: false }
       - {
-          text: "Debounce `setState` by two seconds, so the form only re-renders when typing pauses",
+          text: "Uncontrolled inputs ignore the `name` attribute, so the fields cannot be matched back to `saved`",
           correct: false,
         }
   - type: single
@@ -422,36 +412,24 @@ questions:
           correct: false,
         }
   - type: single
-    prompt: "This provider re-renders every second because of the timer. What happens to the components that read `UserContext`?"
-    code: |
-      function UserProvider({ children }: { children: React.ReactNode }) {
-        const [user, setUser] = useState<User | null>(null)
-        const [tick, setTick] = useState(0) // updated by a timer, unrelated to the user
-
-        return (
-          <UserContext value={{ user, setUser }}>
-            {children}
-          </UserContext>
-        )
-      }
-    codeLanguage: tsx
-    explanation: "`{ user, setUser }` is a new object on every render, so the context value changes identity each second and every consumer re-renders even though `user` is the same. Memoising the value with `useMemo`, or moving the timer state out of the provider, fixes it. Context compares the value by identity, not property by property."
-    theoryUrl: https://react.dev/reference/react/useContext#optimizing-re-renders-when-passing-objects-and-functions
+    prompt: "A page gets a light theme from a `ThemeContext` provider at the root, but one sidebar, with every themed component inside it, must render in the dark theme. Which approach fits the provider pattern?"
+    explanation: "`useContext` reads the closest provider above the component, so a second `ThemeContext` provider around the sidebar overrides the value for that subtree only. Passing a prop to every component is the drilling the provider avoids, a second context forces every consumer to know about both, and flipping the root value would turn the whole page dark."
+    theoryUrl: https://react.dev/reference/react/useContext#overriding-context-for-a-part-of-the-tree
     options:
       - {
-          text: "Nothing, because Context compares the value's properties with a shallow check",
-          correct: false,
-        }
-      - {
-          text: "All the consumers re-render, because the value is a new object on every render",
+          text: "Wrap the sidebar in another `ThemeContext` provider with the dark value",
           correct: true,
         }
       - {
-          text: "Only the consumers that read `setUser` re-render, since `user` did not change",
+          text: 'Pass `theme="dark"` as a prop to every themed component inside the sidebar',
           correct: false,
         }
       - {
-          text: "No consumer re-renders, since `tick` is not part of the context value",
+          text: "Create a separate `DarkThemeContext`, and have each themed component read both contexts and pick one",
+          correct: false,
+        }
+      - {
+          text: "Switch the root provider's value to dark while the sidebar renders, then back to light",
           correct: false,
         }
   - type: single
