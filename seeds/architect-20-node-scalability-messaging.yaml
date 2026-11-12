@@ -51,47 +51,45 @@ questions:
           correct: true,
         }
   - type: single
-    prompt: "What does this program print?"
-    code: |
-      const { Worker, isMainThread, parentPort, workerData } = require('node:worker_threads')
-      let counter = 0
-      if (isMainThread) {
-        counter = 10
-        const w = new Worker(__filename, { workerData: 5 })
-        w.on('message', (m) => {
-          console.log('main got', m, 'main counter', counter)
-        })
-      } else {
-        counter += workerData
-        parentPort.postMessage(counter)
-      }
-    codeLanguage: javascript
-    explanation: "The worker re-evaluates the file in its own isolate, so it has its own `counter` that starts at 0, giving 5. The main thread's `counter` is untouched and stays 10. Worker threads do not share ordinary variables, only what you pass via messages, transfer or `SharedArrayBuffer`."
-    theoryUrl: https://nodejs.org/api/worker_threads.html#workerdata
-    options:
-      - { text: "main got 15 main counter 10", correct: false }
-      - { text: "main got 5 main counter 15", correct: false }
-      - { text: "main got 5 main counter 10", correct: true }
-      - { text: "main got 15 main counter 15", correct: false }
-  - type: single
-    prompt: "Your API keeps user sessions in a JavaScript object in process memory. You scale from 1 to 4 instances behind a round-robin load balancer, and users now get logged out randomly. What is the right architectural fix?"
-    explanation: "Each instance has its own memory, so a session created on instance A does not exist on B. Making the service stateless (sessions in Redis or a signed token) lets any instance serve any request and keeps horizontal scaling and rolling deploys simple. Sticky sessions hide the problem but break on restarts, deploys and instance failure, and a bigger machine does not remove the single point of failure."
-    theoryUrl: https://12factor.net/processes
+    prompt: "The main thread builds a 200 MB lookup table and sends it to each of 8 worker threads with `postMessage`. Memory grows by roughly 1.6 GB. What explains this, and what fits better?"
+    explanation: "`postMessage` uses the structured clone algorithm, so every worker receives a full, independent copy in its own isolate. A `SharedArrayBuffer` is shared rather than copied, so one binary copy of the table can serve all the workers. Transferring an `ArrayBuffer` moves it to a single receiver and detaches it in the sender, so it cannot feed 8 workers, and workers never clone the parent's heap."
+    theoryUrl: https://nodejs.org/api/worker_threads.html#portpostmessagevalue-transferlist
     options:
       - {
-          text: "Move the sessions to a shared store such as Redis, or use signed stateless tokens",
+          text: "Each worker gets its own cloned copy, so keep the table in a `SharedArrayBuffer` they all read",
           correct: true,
         }
       - {
-          text: "Enable sticky sessions on the balancer and keep the sessions in memory per instance",
+          text: "Transfer the table instead of posting it, so that all 8 workers receive the same object with no copying",
           correct: false,
         }
       - {
-          text: "Go back to one large instance, since sessions cannot be scaled horizontally",
+          text: "The main thread leaks the posted objects, so call `worker.unref()` after each `postMessage`",
           correct: false,
         }
       - {
-          text: "Replicate the in-memory object between instances by sending it in every HTTP response",
+          text: "Workers clone the main thread's heap at startup, so create them before building the table",
+          correct: false,
+        }
+  - type: single
+    prompt: "A Node API sends a daily digest email from an in-process timer that fires at 08:00. After you scale it from 1 to 4 instances, every user receives four digests. What is the right fix?"
+    explanation: "Every instance runs the same code, so an in-process timer fires once per instance. Scheduled work has to be triggered once for the whole fleet: a platform scheduler (such as a Kubernetes CronJob) that enqueues a job, or a lock in a shared store that only one instance can take. The cluster primary exists once per instance, a random delay only spreads the duplicates out, and an in-memory flag is not shared."
+    theoryUrl: https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/
+    options:
+      - {
+          text: "Trigger the job once for the fleet, from one scheduler or under a distributed lock",
+          correct: true,
+        }
+      - {
+          text: "Run the timer only in the `cluster` primary process, so that exactly one copy of it exists",
+          correct: false,
+        }
+      - {
+          text: "Add a random startup delay to each instance so that the timers fire at different moments",
+          correct: false,
+        }
+      - {
+          text: "Keep an in-memory 'already sent today' flag and check it before sending",
           correct: false,
         }
   - type: multi
@@ -233,68 +231,66 @@ questions:
           correct: false,
         }
   - type: single
-    prompt: "In what order do the results appear? The workers run concurrently, and each `await` takes `j * 10` ms."
-    code: |
-      const results = []
-      const jobs = [1, 2, 3, 4, 5]
-      async function worker(name) {
-        while (jobs.length) {
-          const j = jobs.shift()
-          await new Promise((r) => setTimeout(r, j * 10))
-          results.push(`${name}:${j}`)
-        }
-      }
-      Promise.all([worker('A'), worker('B')]).then(() => {
-        console.log(results.join(' '))
-      })
-    codeLanguage: javascript
-    explanation: "A takes job 1 (done at 10 ms), B takes job 2 (20 ms). A then takes 3 (done at 40 ms), B takes 4 (done at 60 ms), and A takes 5 (done at 90 ms). Whoever is free first pulls the next job, which is the competing consumers pattern in miniature."
-    theoryUrl: https://www.enterpriseintegrationpatterns.com/patterns/messaging/CompetingConsumers.html
-    options:
-      - { text: "A:1 A:2 A:3 B:4 B:5", correct: false }
-      - { text: "A:1 B:2 A:3 B:4 A:5", correct: true }
-      - { text: "A:1 B:2 B:3 A:4 B:5", correct: false }
-      - { text: "A:1 A:3 A:5 B:2 B:4", correct: false }
-  - type: single
-    prompt: "A team of five runs a monolith that peaks at 800 requests per second. Management wants to split it into microservices 'to be able to scale'. The load is well within what the code can serve with more instances. What do you recommend?"
-    explanation: "Microservices buy independent deployment and team autonomy at the price of network calls, distributed data and operational complexity. For a small team whose only need is more throughput, running several instances of the monolith behind a load balancer (and keeping modules well separated) solves the problem at a fraction of the cost. Splitting for scale alone is a common anti-pattern."
-    theoryUrl: https://martinfowler.com/bliki/MonolithFirst.html
+    prompt: "Workers generate PDFs from jobs that carry the full source documents, up to 30 MB per message. The broker rejects some messages as too large and slows down for every queue. What is the usual design?"
+    explanation: "This is the claim check pattern: the large payload goes to a store built for it (S3, blob storage), and the message carries a small key that the worker uses to fetch it. Brokers are tuned for many small messages. Compression only moves the limit, chunks of one document scatter across competing consumers, and raising the limits makes every queue on the broker pay for the big payloads."
+    theoryUrl: https://learn.microsoft.com/en-us/azure/architecture/patterns/claim-check
     options:
       - {
-          text: "Split into one service per database table, so each can scale on its own",
+          text: "Compress each message with gzip, so that even the largest documents fit under the broker's limit",
           correct: false,
         }
       - {
-          text: "Scale the monolith horizontally and keep it modular, and split only where a boundary pays off",
+          text: "Split each document into small messages and reassemble them in the worker that receives them",
+          correct: false,
+        }
+      - {
+          text: "Store the documents in object storage and put only a reference to them in the message",
           correct: true,
         }
       - {
-          text: "Rewrite it as serverless functions per endpoint, since they scale automatically and remove the need to think about scale",
-          correct: false,
-        }
-      - {
-          text: "Split it now, because it is cheaper to do it before the codebase grows",
+          text: "Raise the broker's maximum message size and give it more memory for the large messages",
           correct: false,
         }
   - type: single
-    prompt: "A worker consumes `ChargeCustomer` jobs from a queue with at-least-once delivery. It charges the card, then crashes before acknowledging the message. The broker redelivers the job. What protects the customer from a double charge?"
-    explanation: "At-least-once delivery means duplicates are normal, so the handler must be idempotent: for example it records the job id (or sends an idempotency key to the payment provider) and skips work already done. Acknowledging before processing turns it into at-most-once and loses jobs on a crash. Increasing the visibility timeout merely delays the redelivery."
-    theoryUrl: https://www.enterpriseintegrationpatterns.com/patterns/messaging/IdempotentReceiver.html
+    prompt: "Your Node services call each other using lists of instance IP addresses kept in config files. Since autoscaling was enabled, calls fail when instances are removed, and new instances get no traffic. What fixes this?"
+    explanation: "Instances come and go, so callers should not track them. With service discovery, the caller uses a stable name (a DNS name, a Kubernetes Service, a load balancer or a registry) and the platform keeps the set of healthy instances behind it up to date. Scripted config pushes race with scaling events, and retrying down a stale list never reaches the new instances."
+    theoryUrl: https://microservices.io/patterns/server-side-discovery.html
     options:
       - {
-          text: "Acknowledge the message before charging, so it can never be delivered twice",
+          text: "Push updated config files to every instance from a script each time the autoscaler adds or removes one",
           correct: false,
         }
       - {
-          text: "Make the handler idempotent, using the job id as an idempotency key",
+          text: "Disable autoscaling, since microservices need a fixed set of instances to call each other",
+          correct: false,
+        }
+      - {
+          text: "Call a stable service name that resolves to the healthy instances (service discovery)",
           correct: true,
         }
       - {
-          text: "Raise the visibility timeout so that the broker waits longer before redelivery",
+          text: "Retry each failed call against the next IP in the list until one of them answers",
+          correct: false,
+        }
+  - type: single
+    prompt: "Queue workers run jobs that take up to 2 minutes. On every deploy the orchestrator sends SIGTERM and the process exits at once, so in-flight jobs are abandoned and only rerun after the visibility timeout. What should the worker do on SIGTERM?"
+    explanation: "Graceful shutdown means draining: stop pulling, let current jobs complete within the termination grace period (or hand them back to the queue), then exit. Acknowledging unfinished jobs loses them, ignoring SIGTERM only ends in a SIGKILL after the grace period, and a very short visibility timeout makes long jobs reappear while they are still running, so they get processed twice."
+    theoryUrl: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#pod-termination
+    options:
+      - {
+          text: "Acknowledge every in-flight job at once, so that the broker never redelivers any of them",
           correct: false,
         }
       - {
-          text: "Run only one worker, since a single consumer receives each message exactly once",
+          text: "Stop taking new jobs, let in-flight ones finish or hand them back, then exit",
+          correct: true,
+        }
+      - {
+          text: "Ignore SIGTERM, so the orchestrator cannot stop the worker while jobs are running",
+          correct: false,
+        }
+      - {
+          text: "Lower the visibility timeout to a few seconds so that abandoned jobs come back sooner after a deploy",
           correct: false,
         }
   - type: multi
@@ -448,20 +444,26 @@ questions:
           correct: false,
         }
   - type: single
-    prompt: "A payment screen must tell the user within 200 ms whether their card balance is sufficient before enabling the 'Pay' button. A colleague proposes routing the balance check through a message queue 'for decoupling'. What is the best judgement?"
-    explanation: "The user is waiting for an answer, so this interaction is inherently synchronous request/response. A queue adds latency and complexity and forces you to build request/reply on top, with no benefit because the caller cannot proceed without the result. Queues are the right tool when the caller does not need the outcome immediately."
-    theoryUrl: https://microservices.io/patterns/communication-style/rpi.html
+    prompt: "Three instances of an API implement request/reply over a broker. They all consume responses from one shared `replies` queue, and about two thirds of the calls time out even though every responder answers quickly. What is wrong?"
+    explanation: "A shared queue makes the callers competing consumers of the replies, so each reply goes to one arbitrary instance, which usually has no pending request with that correlation id. Each instance should own its reply queue (often a temporary, exclusive one) and send it as the reply-to address. Longer timeouts or sorting do not bring a reply to the process that is waiting for it."
+    theoryUrl: https://www.enterpriseintegrationpatterns.com/patterns/messaging/ReturnAddress.html
     options:
       - {
-          text: "Keep the queue and add polling in the browser until the answer arrives",
+          text: "Correlation ids collide across instances, so they must include a timestamp to stay unique",
           correct: false,
         }
       - {
-          text: "Keep a direct synchronous call, with a timeout and a fallback, since the user waits for the result",
+          text: "The callers' timeouts are too tight, so raise them to several seconds to wait for replies",
+          correct: false,
+        }
+      - {
+          text: "Replies go to whichever instance takes them, so each caller needs its own reply queue",
           correct: true,
         }
-      - { text: "Use pub/sub so every service can learn about the balance check", correct: false }
-      - { text: "Cache the previous balance forever so that no call is needed", correct: false }
+      - {
+          text: "The broker delivers replies in random order, so callers must sort them by request time",
+          correct: false,
+        }
   - type: single
     prompt: "Your Node service runs in Kubernetes on nodes with 4 vCPUs. A developer wants to embed the `cluster` module in the container to start 4 workers per pod, while the platform already scales pods with an autoscaler. What do you advise?"
     explanation: "In an orchestrated platform, the usual approach is one Node process per container and scaling by adding pods, so that health checks, resource limits, restarts and metrics map to a single process. Embedding `cluster` hides worker crashes from Kubernetes and makes CPU limits and graceful shutdown harder. It is not forbidden, just usually redundant."

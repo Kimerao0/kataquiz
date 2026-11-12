@@ -99,27 +99,26 @@ questions:
       - { text: "`PATCH`", correct: false }
       - { text: "`GET`", correct: true }
   - type: single
-    prompt: "What does this script print?"
-    code: |
-      const seen = new Map()
-      function handle(key, amount) {
-        if (seen.has(key)) return seen.get(key)
-        const result = { charged: amount }
-        seen.set(key, result)
-        console.log('charging', amount)
-        return result
-      }
-      const a = handle('k1', 10)
-      const b = handle('k1', 99)
-      console.log(a === b, b.charged)
-    codeLanguage: javascript
-    explanation: "The second call finds the key already stored and returns the first result without charging, so only `charging 10` is logged, and `a === b` is `true` with `charged` still 10. This is the core of an idempotency key. In a real service the store must be durable and shared, and you should also check that the payload matches."
-    theoryUrl: https://developer.mozilla.org/en-US/docs/Glossary/Idempotent
+    prompt: "An API stores an idempotency key for each `POST /payments`. Why should it keep the original response with the key, and not only a flag saying the key was already seen?"
+    explanation: "The client usually retries because it never saw the first response (a timeout or a dropped connection). Replaying the stored result gives it the outcome, such as the payment id, exactly as if the first call had arrived. A bare 409 only says that something happened, rerunning the payment would charge twice, and HTTP has no rule that servers must cache `POST` responses."
+    theoryUrl: https://datatracker.ietf.org/doc/draft-ietf-httpapi-idempotency-key-header/
     options:
-      - { text: "charging 10, then charging 99, then false 99", correct: false }
-      - { text: "charging 10, then true 99", correct: false }
-      - { text: "charging 10, then false 10", correct: false }
-      - { text: "charging 10, then true 10", correct: true }
+      - {
+          text: "It need not: a 409 Conflict on the retry is enough, since the payment was already made",
+          correct: false,
+        }
+      - {
+          text: "So a retry gets the same result, as the client may never have received the first one",
+          correct: true,
+        }
+      - {
+          text: "So the server can rerun the payment when the stored response is older than the key's expiry",
+          correct: false,
+        }
+      - {
+          text: "Because HTTP requires servers to cache every `POST` response for later replays",
+          correct: false,
+        }
   - type: single
     prompt: "A mobile client calls `POST /payments`, the network drops before it receives the response, and the client retries. You must guarantee the customer is charged once, even if the two requests arrive at the same time on different instances. What do you implement?"
     explanation: "Require an `Idempotency-Key` header and store the key with the outcome in a shared database, protected by a unique constraint so that concurrent duplicates cannot both proceed: the second one waits or receives the stored result. A per-instance in-memory check fails across instances, and disabling retries leaves the client unable to recover from timeouts."
@@ -151,20 +150,26 @@ questions:
         }
       - { text: "Delete the stored key and handle the request as a brand new one", correct: false }
   - type: single
-    prompt: "An `/orders` endpoint uses `LIMIT 20 OFFSET n` on a table with 50 million rows. Deep pages (offset in the hundreds of thousands) are slow, and users scrolling a live feed see some orders twice when new ones are inserted. What do you change?"
-    explanation: "Offset pagination makes the database scan and discard all the skipped rows, so cost grows with the page number, and inserts shift the offsets, causing duplicates or gaps. Keyset (cursor) pagination filters with `WHERE (created_at, id) < (last values)` on an index, which stays fast and stable. Caching the pages or raising `LIMIT` does not remove the shifting."
-    theoryUrl: https://use-the-index-luke.com/no-offset
+    prompt: "A cursor-paginated `/orders` endpoint also returns `total`, computed with `SELECT COUNT(*)` using the same filters over 50 million rows in PostgreSQL. Profiling shows the count takes most of each page's time. What is the usual fix?"
+    explanation: "An exact `COUNT(*)` in PostgreSQL has to visit every matching row (or index entry) and check its visibility under MVCC, so its cost grows with the table and is paid on every page. Most lists only need to know whether a next page exists, and an approximate count (from planner statistics or a periodically refreshed counter) is enough when a number is shown. OFFSET does not provide a count, and a worker thread does not reduce the database's work."
+    theoryUrl: https://wiki.postgresql.org/wiki/Slow_Counting
     options:
       - {
-          text: "Keyset pagination on an indexed, unique sort key, returned as an opaque cursor",
-          correct: true,
-        }
-      - {
-          text: "Cache each page in Redis for an hour so that deep pages are served from memory",
+          text: "Add an index on the primary key, so that PostgreSQL can read the row count without scanning",
           correct: false,
         }
-      - { text: "Raise `LIMIT` to 1000 so that clients need fewer pages", correct: false }
-      - { text: "Add an index on every column so the offset scan is faster", correct: false }
+      - {
+          text: "Switch to OFFSET pagination, since it gives the database the total number of rows for free",
+          correct: false,
+        }
+      - {
+          text: "Run the count in a worker thread so that it no longer slows down the page query",
+          correct: false,
+        }
+      - {
+          text: "Drop the exact total: return a next cursor or `hasMore`, plus an estimate if needed",
+          correct: true,
+        }
   - type: single
     prompt: "Orders are listed newest first, `ORDER BY created_at DESC, id DESC`. The last row of the previous page had `created_at = $1` and `id = $2`. Which query fetches the next page correctly with keyset pagination?"
     code: |
@@ -210,72 +215,89 @@ questions:
           correct: false,
         }
   - type: single
-    prompt: "A product page is served with a Redis cache-aside layer (read cache, else read DB and fill cache). When an admin edits a product, customers keep seeing the old price for up to an hour, the TTL. Which change gives fresh data with the least added complexity?"
-    explanation: "On write, update the database and then delete (invalidate) the cache key, so the next read refills it with fresh data, and keep the TTL as a safety net. Writing the cache first risks inconsistency if the database write fails, and lowering the TTL to a few seconds gives up the benefit of the cache."
-    theoryUrl: https://learn.microsoft.com/en-us/azure/architecture/patterns/cache-aside
-    options:
-      - { text: "Lower the TTL to 2 seconds so that stale data barely matters", correct: false }
-      - {
-          text: "Update the DB, then delete the product's cache key, keeping the TTL as a fallback",
-          correct: true,
-        }
-      - { text: "Update the cache first, and write to the DB in the background", correct: false }
-      - { text: "Remove the cache for products and rely on the DB indexes alone", correct: false }
-  - type: single
-    prompt: "What does this script print?"
-    code: |
-      const cache = new Map()
-      let loads = 0
-      async function load(id) {
-        loads++
-        await new Promise((r) => setTimeout(r, 10))
-        return 'v' + id
-      }
-      async function get(id) {
-        if (cache.has(id)) return cache.get(id)
-        const v = await load(id)
-        cache.set(id, v)
-        return v
-      }
-      Promise.all([get(1), get(1), get(1)]).then(() => console.log('loads', loads))
-    codeLanguage: javascript
-    explanation: "All three calls run before the first `load` finishes, so each finds the cache empty and triggers its own load: `loads 3`. This is a cache stampede in miniature. Caching the promise itself (`cache.set(id, load(id))`) makes concurrent callers share one load, which would print `loads 1`."
-    theoryUrl: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise
-    options:
-      - { text: "loads 3", correct: true }
-      - { text: "loads 1", correct: false }
-      - { text: "loads 0", correct: false }
-      - { text: "loads 2", correct: false }
-  - type: single
-    prompt: "A very popular cache key (the homepage feed) expires, and within a second thousands of concurrent requests miss the cache and hammer the database, which slows down and starts to time out. Which mitigation targets this problem directly?"
-    explanation: "This is a cache stampede (thundering herd). Single-flight or a short lock so only one request recomputes, serving slightly stale data while refreshing, and adding jitter to TTLs so hot keys do not expire together all prevent the herd. A bigger pool or more database replicas just lets more of the herd through."
-    theoryUrl: https://learn.microsoft.com/en-us/azure/architecture/patterns/cache-aside
+    prompt: "Listing pages are cached under keys like `list:cat:42:page:3:sort:price`. When a product in category 42 changes, the code runs `KEYS list:cat:42:*` and deletes the matches. As the keyspace grows, every Redis client sees latency spikes during invalidations. What is the problem and a better design?"
+    explanation: "Redis executes commands one at a time, and `KEYS` walks the entire keyspace, so every other client waits while it runs. A version in the key prefix (`list:cat:42:v7:...`, bumped to v8 on change while the old keys expire) or a set that tracks the keys to delete makes invalidation cheap. The blocking happens inside Redis, so worker threads or extra connections in Node do not help, and Redis has no secondary index to rebuild."
+    theoryUrl: https://redis.io/docs/latest/commands/keys/
     options:
       - {
-          text: "Let one request recompute the value while the others wait or get the stale copy",
-          correct: true,
-        }
-      - {
-          text: "Increase the database connection pool so that all requests can reach it",
+          text: "`KEYS` blocks the Node event loop while it runs, so do the invalidation in a worker thread",
           correct: false,
         }
       - {
-          text: "Set the TTL of every key to exactly the same value to keep it predictable",
-          correct: false,
-        }
-      - { text: "Disable the cache for the homepage so that load is evenly spread", correct: false }
-  - type: single
-    prompt: "A lookup endpoint `/users/:id` is cached with Redis. An attacker requests millions of random non-existent ids. Every request misses the cache and queries the database, which returns nothing. What mitigates this best?"
-    explanation: "This is cache penetration: results that do not exist are never cached, so the cache gives no protection. Cache the 'not found' result with a short TTL, and/or filter impossible ids with a Bloom filter or input validation, and rate-limit the abuser. Increasing the TTL of existing entries does nothing for keys that are never stored."
-    theoryUrl: https://learn.microsoft.com/en-us/azure/architecture/patterns/cache-aside
-    options:
-      - { text: "Raise the TTL of all positive entries to 24 hours", correct: false }
-      - {
-          text: "Cache negative results briefly, validate ids and add rate limiting or a Bloom filter",
+          text: "`KEYS` scans the whole keyspace and blocks Redis, so version the key prefix and bump it",
           correct: true,
         }
-      - { text: "Make the cache larger so it can store every possible id", correct: false }
-      - { text: "Return a 500 error for unknown ids so the clients retry later", correct: false }
+      - {
+          text: "Redis runs one command at a time per connection, so open a separate connection only for `KEYS`",
+          correct: false,
+        }
+      - {
+          text: "Deleting many keys makes Redis rebuild its index, so delete them inside one `MULTI` block",
+          correct: false,
+        }
+  - type: single
+    prompt: "An Express handler creates a new Redis client, connects it, runs one `GET` and closes it on every request. Under load, latency rises and Redis reports thousands of connections opened and closed each second. What should change?"
+    explanation: "Each new connection costs a TCP (and often TLS) handshake per request, and the churn loads both Node and Redis. One client created at startup keeps a connection open and sends concurrent commands over it, which is the normal pattern for Node Redis clients. Leaving per-request clients open leaks connections, and raising server limits or adding nodes absorbs the waste instead of removing it."
+    theoryUrl: https://redis.io/docs/latest/develop/clients/nodejs/
+    options:
+      - {
+          text: "Keep a client per request but stop closing it, so that its connection can be reused later",
+          correct: false,
+        }
+      - {
+          text: "Create one long-lived client at startup and share it across all requests",
+          correct: true,
+        }
+      - {
+          text: "Raise Redis `maxclients` and the server's file descriptor limit to absorb the churn",
+          correct: false,
+        }
+      - {
+          text: "Move to a Redis cluster with more nodes so that it can accept the extra connections",
+          correct: false,
+        }
+  - type: single
+    prompt: "A Node API caches the whole 4 MB product catalogue as one JSON string under a single Redis key and runs `JSON.parse` on it for every request. The cache hit rate is 99%, yet CPU is saturated and p99 latency is high. What is the best fix?"
+    explanation: "Every request transfers 4 MB and parses it synchronously on the event loop, CPU work that no cache hit can avoid. Caching values at the granularity requests use (one key per product or per page) removes most of that cost. `await` does not make `JSON.parse` asynchronous, and a longer TTL or a different cache server changes nothing about the per-request parsing."
+    theoryUrl: https://nodejs.org/en/learn/asynchronous-work/dont-block-the-event-loop
+    options:
+      - {
+          text: "Raise the TTL so that the catalogue is loaded from the database less often",
+          correct: false,
+        }
+      - {
+          text: "Use `await JSON.parse(...)` so that parsing no longer blocks the event loop",
+          correct: false,
+        }
+      - {
+          text: "Cache smaller values shaped like each response, so a request parses only what it needs",
+          correct: true,
+        }
+      - {
+          text: "Switch the cache from Redis to Memcached, which returns large values faster",
+          correct: false,
+        }
+  - type: single
+    prompt: "A middleware caches `GET` responses in Redis using `req.path` as the key. After it is enabled, some users see another user's cart on `/api/me/cart`. What is the fix?"
+    explanation: "The key is the cache's definition of 'the same response'. `/api/me/cart` returns different data per user, so a key without the user serves one user's cart to everyone. `Cache-Control: private` instructs browsers and CDNs, not your own Redis code, and a short TTL or encryption only shrinks or hides the leak."
+    theoryUrl: https://learn.microsoft.com/en-us/azure/architecture/best-practices/caching
+    options:
+      - {
+          text: "Add a short TTL so that a wrong cart is only visible for a few seconds before it expires",
+          correct: false,
+        }
+      - {
+          text: "Set `Cache-Control: private` on the response, so Redis stores a separate copy per user",
+          correct: false,
+        }
+      - {
+          text: "Put every input that changes the response, such as the user, in the key, or skip caching it",
+          correct: true,
+        }
+      - {
+          text: "Encrypt the cached values so that a user cannot read the cart of another user",
+          correct: false,
+        }
   - type: single
     prompt: "Postgres allows 100 connections. You run 20 Node.js instances, each with a pool configured with `max: 10`. Under load you see `too many clients already` errors. What is the best fix?"
     explanation: "Twenty instances times 10 connections can open 200 connections, twice what Postgres allows. Size the pools so that the total (instances times max, plus admin headroom) stays within the limit, or put a pooler such as PgBouncer in front so many app connections share few server connections. Raising `max` makes it worse."
@@ -354,45 +376,45 @@ questions:
       - { text: "C", correct: false }
       - { text: "D", correct: false }
   - type: single
-    prompt: "Placing an order must reserve stock in the Inventory service, charge the customer in the Payments service and create the order in the Orders service. Each has its own database. If the payment fails, the stock reservation must be undone. What approach is the standard fit?"
-    explanation: "With a database per service you cannot use one ACID transaction. A saga runs a sequence of local transactions and, if a step fails, runs compensating actions (release the stock) for the steps already done, accepting eventual consistency. Two-phase commit across services is fragile and blocks, and wrapping the calls in one local transaction does not span other services' databases."
-    theoryUrl: https://microservices.io/patterns/data/saga.html
+    prompt: "An order handler opens a database transaction, inserts the order, calls the payment provider over HTTP (which can take up to 10 seconds), and then commits. Under load the pool runs out of connections and other requests wait on row locks. What should change?"
+    explanation: "A transaction holds its connection and its locks until it ends, so a slow network call inside it multiplies pool and lock contention. Saving the order as pending, calling the provider, then updating the status (with an idempotency key for retries) keeps each transaction to milliseconds. A database rollback cannot undo an external charge, and a bigger pool or stricter isolation only adds more blocked work."
+    theoryUrl: https://node-postgres.com/features/transactions
     options:
       - {
-          text: "A saga of local transactions with compensating actions for failed steps",
+          text: "Increase the pool size so that the waiting requests can always get a connection",
+          correct: false,
+        }
+      - {
+          text: "Use SERIALIZABLE isolation so that the transaction is protected during the HTTP call",
+          correct: false,
+        }
+      - {
+          text: "Keep the transaction short: call the provider outside it and record the outcome after",
           correct: true,
         }
       - {
-          text: "One database transaction opened by the Orders service around the three HTTP calls",
-          correct: false,
-        }
-      - {
-          text: "Let each service retry forever until all three steps happen to be successful",
-          correct: false,
-        }
-      - {
-          text: "Merge the three databases into one so that a single transaction can cover them",
+          text: "Keep the call inside the transaction, since a rollback also undoes the charge if the commit fails",
           correct: false,
         }
   - type: single
-    prompt: "A service saves an order in its database and then publishes `OrderCreated` to a message broker. Sometimes the process crashes between the two steps, so the order exists but no event is ever sent. What pattern solves this dual-write problem?"
-    explanation: "The transactional outbox writes the event into an outbox table in the same local transaction as the order, and a separate relay (poller or CDC) publishes it to the broker, with at-least-once delivery. Publishing first and saving second just flips the failure mode, and a retry loop inside the handler is lost when the process crashes."
-    theoryUrl: https://microservices.io/patterns/data/transactional-outbox.html
+    prompt: "A developer writes a transaction with a `pg` pool as `await pool.query('BEGIN')`, two awaited `pool.query` inserts, then `await pool.query('COMMIT')`. When the second insert fails, the first one is sometimes still saved. Why?"
+    explanation: "`BEGIN`, the inserts and `COMMIT` may each run on a different pooled connection, so the inserts can run outside the transaction in autocommit mode while `BEGIN` leaves some other connection idle in a transaction. Check out one client with `pool.connect()`, run every statement on it, and release it in `finally`. Isolation levels do not change this, and `pg` neither buffers nor retries statements."
+    theoryUrl: https://node-postgres.com/features/transactions
     options:
       - {
-          text: "Publish the event first, and only then save the order in the database",
+          text: "`BEGIN` only takes effect at SERIALIZABLE isolation, which the pool does not use by default",
           correct: false,
         }
       - {
-          text: "Wrap both operations in `try/catch` and retry the publish in a loop",
+          text: "The pool retries failed statements automatically, and the retry commits the first insert",
           correct: false,
         }
       - {
-          text: "Write the event to an outbox table in the same transaction and relay it afterwards",
+          text: "A transaction belongs to one connection, and each `pool.query` may use a different one",
           correct: true,
         }
       - {
-          text: "Use a longer broker timeout and a bigger connection pool, so the publish call is much less likely to fail",
+          text: "`pg` buffers the inserts until `COMMIT`, and a failed flush keeps whatever was sent first",
           correct: false,
         }
   - type: single
@@ -416,21 +438,24 @@ questions:
     explanation: "Two-phase commit couples the availability of all participants, holds locks while waiting for the coordinator, and is unsupported by many modern datastores and brokers. Most microservice systems prefer sagas, outbox and idempotent consumers, accepting eventual consistency."
     theoryUrl: https://microservices.io/patterns/data/saga.html
   - type: single
-    prompt: "Your read-heavy API sends reads to a replica with some replication lag. A user updates their profile, the page redirects to the profile view, and the old data appears for a second or two. What is a pragmatic fix?"
-    explanation: "The user needs read-your-writes consistency. Route that user's reads to the primary for a short window after a write (or until the replica has reached their write's position). Disabling replicas or waiting with `setTimeout` before redirecting is wasteful and brittle, and caching the stale profile longer makes it worse."
-    theoryUrl: https://www.postgresql.org/docs/current/warm-standby.html
+    prompt: "To stop a write-skew bug, you run a booking transaction at SERIALIZABLE isolation in PostgreSQL. Under contention, some requests now fail with a serialization failure error. How should the Node code handle it?"
+    explanation: "Under SERIALIZABLE, PostgreSQL aborts one of the conflicting transactions instead of letting an anomaly through, and applications are expected to retry the complete transaction, re-reading the data. The failed transaction is aborted, so a single statement cannot be retried inside it and nothing from it was applied, and falling back to a weaker level brings the write skew back."
+    theoryUrl: https://www.postgresql.org/docs/current/transaction-iso.html#XACT-SERIALIZABLE
     options:
       - {
-          text: "Read from the primary for that user for a short time after they write",
+          text: "Retry only the statement that failed, inside the same transaction that is still open",
+          correct: false,
+        }
+      - {
+          text: "Treat it as success, since PostgreSQL has already applied the change before the error",
+          correct: false,
+        }
+      - {
+          text: "Retry the whole transaction from the start, a bounded number of times",
           correct: true,
         }
       - {
-          text: "Add a 3 second `setTimeout` before the redirect so the replica has caught up",
-          correct: false,
-        }
-      - { text: "Remove the replicas and send every read to the primary", correct: false }
-      - {
-          text: "Increase the cache TTL of the profile so that the page loads faster",
+          text: "Run the failed requests again at READ COMMITTED, where this error cannot happen",
           correct: false,
         }
   - type: single
