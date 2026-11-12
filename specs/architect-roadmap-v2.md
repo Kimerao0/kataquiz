@@ -84,13 +84,13 @@ Follow-up: Kill the old path, and the old quiz, i want a new quiz and new path. 
 
 #### Specs
 
-1. [open] Running `check.mts` on `seeds/architect-0[7-9]-*.yaml seeds/architect-1[0-5]-*.yaml` prints ok for all nine files, each with at most 5 code questions, and none of them carries an `advanced` tag.
-2. [open] The title list in the R2 migration equals the set of quiz files changed in R2, as listed by `git diff --name-only` on `seeds/`.
-3. [open] On a database holding the R1 content, a quiz from 07–15 that R2 left unchanged keeps its attempts after `pnpm release`.
-4. [open] On a database holding the R1 content, `pnpm release` leaves exactly one seed quiz per title for 07–15.
-5. [open] On a fresh database, `pnpm release` runs the R1 and R2 migrations without error and imports every seed, the path included.
-6. [open] After `pnpm release` on a database holding the R1 content, the "Road to Software Architect" page lists 41 steps.
-7. [open] Reading quizzes 07–13 and 15, no question turns on an edge case or a trick output; quiz 14 may.
+1. [built] Running `check.mts` on `seeds/architect-0[7-9]-*.yaml seeds/architect-1[0-5]-*.yaml` prints ok for all nine files, each with at most 5 code questions, and none of them carries an `advanced` tag.
+2. [built] The title list in the R2 migration equals the set of quiz files changed in R2, as listed by `git diff --name-only` on `seeds/`.
+3. [built] On a database holding the R1 content, a quiz from 07–15 that R2 left unchanged keeps its attempts after `pnpm release`.
+4. [built] On a database holding the R1 content, `pnpm release` leaves exactly one seed quiz per title for 07–15.
+5. [built] On a fresh database, `pnpm release` runs the R1 and R2 migrations without error and imports every seed, the path included.
+6. [built] After `pnpm release` on a database holding the R1 content, the "Road to Software Architect" page lists 41 steps.
+7. [built] Reading quizzes 07–13 and 15, no question turns on an edge case or a trick output; quiz 14 may.
 
 ### R3 — Node.js 16–23
 
