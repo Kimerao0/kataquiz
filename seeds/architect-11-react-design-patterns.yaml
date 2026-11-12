@@ -1,6 +1,6 @@
 version: 1
 title: "Architect Roadmap 11: Design patterns in React"
-description: Composition vs inheritance, compound components, render props vs hooks, container/presentational, controlled vs uncontrolled components, the provider pattern and its limits.
+description: Composition vs inheritance and slots, compound and headless components, render props, HOCs and hooks, container/presentational, controlled vs uncontrolled components, the provider pattern and its limits.
 language: en
 tags: [architect-roadmap, frontend-architecture, react, design-patterns, composition]
 run:
@@ -10,32 +10,15 @@ run:
 questions:
   - type: single
     prompt: "A team wants several button variants (primary, danger, with icon) that share behaviour. A developer proposes `class DangerButton extends Button`. What is the idiomatic React approach?"
-    explanation: "React recommends composition: a `Button` that takes props (`variant`, `icon`, `children`) or small components that render a `Button` with specific props. Inheritance couples the subclass to the parent's internals and has no good way to customise rendering. The React team states that they found no use case for component inheritance hierarchies."
+    explanation: "React favours composition: one `Button` configured through props (`variant`, `icon`, `children`), optionally wrapped by thin components that render it with fixed props. Inheritance couples the subclass to the parent's internals, and function components cannot inherit at all. Copying the source per variant duplicates every future fix."
     theoryUrl: https://react.dev/learn/passing-props-to-a-component
     options:
-      - {
-          text: "Keep the inheritance, and override `render` in the subclass for each variant",
-          correct: false,
-        }
-      - {
-          text: "Compose: one `Button` configured through props, wrapped by thin components such as `DangerButton`",
-          correct: true,
-        }
-      - {
-          text: "Copy the `Button` source for every variant, so the variants cannot break one another and each can evolve on its own",
-          correct: false,
-        }
-      - {
-          text: "Use a HOC that mutates the `Button` prototype to add the variant styles",
-          correct: false,
-        }
-  - type: boolean
-    prompt: "In React, sharing behaviour between components by making them extend a common base component class is the recommended approach, and hooks and composition are only for simple cases."
-    answer: false
-    explanation: "Composition is the recommended way to reuse both UI and logic: props, `children`, and custom hooks for stateful logic. Class inheritance is discouraged, and function components cannot inherit at all."
-    theoryUrl: https://react.dev/reference/react/Component
+      - { text: "Keep the inheritance and override `render` in the subclass for each variant", correct: false }
+      - { text: "One `Button` configured through props, wrapped by thin components such as `DangerButton`", correct: true }
+      - { text: "Copy the `Button` source for every variant, so that each variant can evolve independently without breaking the others", correct: false }
+      - { text: "A HOC that patches the `Button` prototype to add the styles of each variant", correct: false }
   - type: single
-    prompt: "A `Layout` component needs a header, a sidebar and a content area, and each page fills them with different components. Which API is the most flexible and idiomatic?"
+    prompt: "A `Layout` component needs a header, a sidebar and a content area, and each page fills them with different components. Which API design is the most flexible?"
     code: |
       <Layout
         header={<PageHeader title="Orders" />}
@@ -44,189 +27,78 @@ questions:
         <OrdersTable />
       </Layout>
     codeLanguage: tsx
-    explanation: "Components can receive JSX as props, so `children` and named props act as slots. `Layout` owns the structure and the pages own the content, with no knowledge of each other. A `type` prop with a switch inside `Layout` makes it grow with every new page, and passing component names as strings is not valid JSX."
+    explanation: "Components can receive JSX as props, so `children` and named props act as slots. `Layout` owns the structure and the pages own the content, with no knowledge of each other. A `page` prop with a switch inside `Layout` makes it grow with every new page, and subclasses are not how React components are customised."
     theoryUrl: https://react.dev/learn/passing-props-to-a-component#passing-jsx-as-children
     options:
-      - {
-          text: "Slots: JSX passed as `children` and named props, rendered by `Layout` where it wants",
-          correct: true,
-        }
-      - {
-          text: "A `page` string prop with a `switch` inside `Layout` that renders the matching sections",
-          correct: false,
-        }
-      - {
-          text: "A `Layout` subclass for every page that overrides `renderHeader` and `renderSidebar`",
-          correct: false,
-        }
-      - {
-          text: "A global store where pages register their header and sidebar, read by `Layout`",
-          correct: false,
-        }
+      - { text: "Slots: JSX passed as `children` and named props, which `Layout` places in its structure", correct: true }
+      - { text: "A `page` string prop with a `switch` inside `Layout` that renders the matching sections", correct: false }
+      - { text: "A `Layout` subclass for every page that overrides `renderHeader` and `renderSidebar`", correct: false }
+      - { text: "A global store where each page registers its header and sidebar, read by `Layout`", correct: false }
   - type: single
     prompt: "A `Page` passes `user` through 5 intermediate components that never use it, down to an `Avatar`. Before reaching for Context, what is the first refactor to consider?"
-    explanation: "Composition often removes the drilling: build `<Avatar user={user} />` in `Page` and pass the element down as `children` or a slot prop, so the intermediate components just render what they receive. Context is the next step when many distant components need the same value. A global store or `useEffect` copying props adds indirection without fixing the structure."
+    explanation: "Composition often removes the drilling: build `<Avatar user={user} />` in `Page` and pass the element down as `children` or a slot prop, so the intermediate layers just render what they receive. Context is the next step when many distant components need the same value. A global store or `memo` does not fix the structure."
     theoryUrl: https://react.dev/learn/passing-data-deeply-with-context#before-you-use-context
     options:
-      - {
-          text: "Pass the `Avatar` element itself down as `children` or a prop, so the layers do not need `user`",
-          correct: true,
-        }
-      - {
-          text: "Copy `user` into a `useEffect` of every intermediate component, so it stays in sync and only the affected layers re-render",
-          correct: false,
-        }
-      - {
-          text: "Move `user` to a global store, as props are meant for at most two levels",
-          correct: false,
-        }
-      - {
-          text: "Wrap each intermediate component in `React.memo`, which makes props implicit",
-          correct: false,
-        }
+      - { text: "Pass the `Avatar` element itself down as `children` or a prop, so the layers do not need `user`", correct: true }
+      - { text: "Move `user` to a global store, because props are only meant to travel two levels before they become unmaintainable", correct: false }
+      - { text: "Wrap each intermediate component in `React.memo`, so that `user` is forwarded implicitly", correct: false }
+      - { text: "Read `user` again from the API inside `Avatar`, so that no component has to pass it down", correct: false }
+  - type: single
+    prompt: "A `Card` component has grown to 20 props: `showFooter`, `footerText`, `footerAlign`, `headerIcon`, `headerAction`, and so on. Every new screen adds another one. What does this usually signal, and what is the fix?"
+    explanation: "A long list of configuration props that each control one bit of markup is a sign the component owns content it should not own. Accepting `children` or slot props (`header`, `footer`) lets callers pass whatever they need, and `Card` keeps only the frame and behaviour. Splitting into variants by subclassing or switching on a mode string just moves the same growth elsewhere."
+    theoryUrl: https://react.dev/learn/passing-props-to-a-component#passing-jsx-as-children
+    options:
+      - { text: "Too few props are typed: add a TypeScript union for each one so the list stays manageable", correct: false }
+      - { text: "`Card` owns content it should not: accept `children` and slots such as `header` and `footer`", correct: true }
+      - { text: "`Card` should become a class with a protected render method per section that screens can override", correct: false }
+      - { text: "Replace the props with one `mode` string, and let `Card` switch on it to pick the right layout", correct: false }
   - type: single
     prompt: "What is the main advantage of the compound components pattern (`<Tabs>`, `<Tabs.List>`, `<Tabs.Tab>`, `<Tabs.Panel>`) over one `<Tabs items={[...]} />` component?"
-    explanation: "Compound components share implicit state through Context, so the consumer controls the structure and markup (order, extra wrappers, conditional tabs) while the parent keeps the behaviour (selection, keyboard, ARIA). A config-array API needs a new prop for every layout variation. The pattern does not make the components faster."
-    theoryUrl: https://react.dev/learn/passing-data-deeply-with-context
+    explanation: "Compound components share implicit state, usually through Context, so the consumer controls the structure and markup (order, extra wrappers, conditional tabs) while the parent keeps the behaviour (selection, keyboard, ARIA). A config-array API needs a new prop for every layout variation. The pattern is about flexibility, not speed."
+    theoryUrl: https://www.patterns.dev/react/compound-pattern
     options:
-      - {
-          text: "Sub-components render faster, because React batches them as one unit",
-          correct: false,
-        }
-      - {
-          text: "The consumer controls layout and markup, while the parts share state implicitly",
-          correct: true,
-        }
-      - {
-          text: "It removes the need for any state, as the DOM tracks the selected tab",
-          correct: false,
-        }
-      - {
-          text: "It lets the sub-components be defined in any file without importing the parent",
-          correct: false,
-        }
+      - { text: "The sub-components render faster, because React batches them as a single unit", correct: false }
+      - { text: "The consumer controls layout and markup, while the parts share state implicitly", correct: true }
+      - { text: "It removes the need for any state, because the DOM tracks which tab is selected", correct: false }
+      - { text: "The sub-components can live in any file and work without being rendered inside the parent", correct: false }
   - type: single
-    prompt: 'A compound `Tabs` is built with a Context. What happens when a developer renders `<Tab id="a" />` outside any `<Tabs>`?'
-    code: |
-      const TabsContext = createContext<{ active: string; select: (id: string) => void } | null>(null)
-
-      function useTabs() {
-        const ctx = useContext(TabsContext)
-        if (!ctx) throw new Error('Tab must be rendered inside <Tabs>')
-        return ctx
-      }
-
-      function Tab({ id }: { id: string }) {
-        const { active, select } = useTabs()
-        return <button aria-selected={active === id} onClick={() => select(id)}>{id}</button>
-      }
-    codeLanguage: tsx
-    explanation: "With no provider above, `useContext` returns the default value (`null`), and the guard throws during render. The error is caught by the nearest error boundary (or crashes the tree if there is none). The guard is the usual way to give compound components a clear failure instead of a vague `Cannot read properties of null`."
-    theoryUrl: https://react.dev/reference/react/useContext
+    prompt: "Which of these components is the best candidate for a compound components API?"
+    explanation: "Compound components pay off when a widget has several cooperating parts that share state and the consumer needs to arrange them freely: an accordion with items, triggers and panels is the textbook case. A price label or a badge has one job and no internal parts to coordinate, so plain props are simpler. A data-fetching wrapper is about logic, which a hook covers better."
+    theoryUrl: https://www.patterns.dev/react/compound-pattern
     options:
-      - {
-          text: "It renders a button with `aria-selected` false, as `active` defaults to an empty string",
-          correct: false,
-        }
-      - {
-          text: "It renders nothing, since a component without a provider is skipped by React",
-          correct: false,
-        }
-      - {
-          text: "It throws while rendering, and the nearest error boundary handles it",
-          correct: true,
-        }
-      - { text: "It logs the error and renders the button, which is disabled", correct: false }
+      - { text: "A `Price` label that formats an amount and a currency code", correct: false }
+      - { text: "An `Accordion` whose items, triggers and panels consumers lay out themselves", correct: true }
+      - { text: "A `Badge` that shows an unread count, capped at `99+`", correct: false }
+      - { text: "A `UserLoader` that fetches the current user, retries on failure and exposes the loading state", correct: false }
   - type: single
-    prompt: "An older compound component implementation uses `React.Children.map(children, (child) => cloneElement(child, { active }))` to inject props into its children. What is the main weakness compared with Context?"
-    explanation: "`Children.map` and `cloneElement` only see the direct children. As soon as a consumer wraps a tab in another component or a fragment, the injected props are lost. Context reaches any descendant regardless of the nesting, which is why modern libraries use it. React also marks `Children` and `cloneElement` as legacy APIs."
-    theoryUrl: https://react.dev/reference/react/cloneElement#alternatives
+    prompt: "A design system replaces `<Select options={...} />` with a compound `<Select>`, `<Select.Trigger>`, `<Select.Item>` API. What trade-off does the team accept?"
+    explanation: "The compound API is more flexible but less constrained: consumers write more JSX for simple cases and can assemble structures the component did not anticipate, so docs and runtime guards (for example a clear error when a part is used outside its parent) matter more. It has nothing to do with server rendering or bundle splitting."
+    theoryUrl: https://www.patterns.dev/react/compound-pattern
     options:
-      - {
-          text: "`cloneElement` cannot copy `key` or `ref`, so the lists are rebuilt on every render",
-          correct: false,
-        }
-      - {
-          text: "It breaks when a child is wrapped in another component, because only direct children are reached",
-          correct: true,
-        }
-      - {
-          text: "`Children.map` runs the children as async functions, which delays the first paint",
-          correct: false,
-        }
-      - {
-          text: "It only works with class components, so function components cannot use it",
-          correct: false,
-        }
+      - { text: "More verbose usage for simple cases, and consumers can compose structures the team did not foresee", correct: true }
+      - { text: "The component can no longer be rendered on the server, because the Context that links the parts does not work during SSR", correct: false }
+      - { text: "Each part becomes its own bundle chunk, so the first render of the `Select` is slower", correct: false }
+      - { text: "Keyboard navigation and ARIA can no longer be handled centrally and move to every caller", correct: false }
   - type: single
-    prompt: "Why did custom hooks replace most uses of render props for sharing stateful logic?"
-    explanation: "A hook shares logic without adding a component to the tree: no nesting (callback hell of `<A>{a => <B>{b => ...}}`), simple composition of several hooks, and ordinary variables instead of function parameters in JSX. Render props still work, but they are noisier. Neither technique shares state between instances."
+    prompt: "Why did custom hooks replace most uses of render props and HOCs for sharing stateful logic?"
+    explanation: "A hook shares logic without adding a component to the tree: no nesting (`<A>{a => <B>{b => ...}}</B>}</A>`), no wrapper layers, and several hooks compose as plain function calls whose results are ordinary variables. Render props and HOCs still work, they are just noisier. None of the three techniques shares state between instances."
     theoryUrl: https://react.dev/learn/reusing-logic-with-custom-hooks
     options:
-      - {
-          text: "Hooks share one state instance among all components that call them",
-          correct: false,
-        }
-      - {
-          text: "Hooks run in the browser's idle time, while render props run during the commit phase",
-          correct: false,
-        }
-      - {
-          text: "Render props are deprecated, and React logs a warning when `children` is a function",
-          correct: false,
-        }
-      - {
-          text: "Hooks add no extra component layers and compose as plain function calls",
-          correct: true,
-        }
+      - { text: "Hooks share a single state instance among all the components that call them", correct: false }
+      - { text: "Hooks add no extra component layers and compose as plain function calls", correct: true }
+      - { text: "Render props and HOCs were removed from React 19, so hooks are the only remaining option", correct: false }
+      - { text: "Hooks run during the browser's idle time, while render props block the commit phase", correct: false }
   - type: single
     prompt: "In which case is a render prop (a function prop that returns JSX) still a good design in current React?"
-    explanation: "When the parent owns something the child needs to render *inside* the parent's own structure, for example a virtualised list that decides which rows exist and calls `renderRow(index)`, or a headless component that exposes layout-dependent state. Sharing plain stateful logic is better done with a hook."
+    explanation: "A render prop fits when the parent owns something the caller needs to render inside the parent's own structure, for example a virtualised list that decides which rows exist and calls `renderRow(index)`. Sharing stateful logic is better done with a hook, hooks can do async work through effects or data libraries, and function props do not skip diffing."
     theoryUrl: https://react.dev/reference/react/Children#calling-a-render-prop-or-function-as-children
     options:
-      - {
-          text: "To share a `useState` counter between two components that need the same count, which hooks cannot do without a render prop",
-          correct: false,
-        }
-      - { text: "To fetch data, because hooks cannot run async work", correct: false }
-      - {
-          text: "To let a virtualised list decide which rows exist and ask the caller how to render each one",
-          correct: true,
-        }
-      - {
-          text: "To avoid re-renders, since function props are ignored by React's diffing",
-          correct: false,
-        }
+      - { text: "To share a counter between two sibling components, which hooks cannot do", correct: false }
+      - { text: "To fetch data, because hooks cannot start asynchronous work", correct: false }
+      - { text: "A virtualised list that decides which rows exist and asks the caller how to render each", correct: true }
+      - { text: "To avoid re-renders of the caller, since React's diffing ignores any prop whose value is a function", correct: false }
   - type: single
-    prompt: "Two components both call `useToggle()`. What does `A` see when `B` toggles?"
-    code: |
-      function useToggle(initial = false) {
-        const [on, setOn] = useState(initial)
-        return [on, () => setOn((v) => !v)] as const
-      }
-
-      function A() {
-        const [on] = useToggle()
-        return <p>A: {String(on)}</p>
-      }
-
-      function B() {
-        const [, toggle] = useToggle()
-        return <button onClick={toggle}>toggle</button>
-      }
-    codeLanguage: tsx
-    explanation: "Each call of a custom hook creates its own state, tied to the component that called it. Hooks share logic, not state. A stays `false` when B toggles. To share the state you need to lift it up, or use Context or a store."
-    theoryUrl: https://react.dev/learn/reusing-logic-with-custom-hooks#custom-hooks-let-you-share-stateful-logic-not-state-itself
-    options:
-      - {
-          text: "A updates to `true`, since both calls read the same underlying state",
-          correct: false,
-        }
-      - { text: "A stays `false`, because each hook call has its own state", correct: true }
-      - { text: "React throws, because two components cannot use the same hook", correct: false }
-      - { text: "A updates only after a full page refresh", correct: false }
-  - type: single
-    prompt: "A page defines the enhanced component inside its render function. What is the consequence for the input state?"
+    prompt: "A page applies a HOC inside its render function. What is the consequence for the form's input state?"
     code: |
       function Settings() {
         const [theme, setTheme] = useState('light')
@@ -240,177 +112,114 @@ questions:
         )
       }
     codeLanguage: tsx
-    explanation: "`withAuth(Form)` creates a new component type on each render. React compares types by identity, so it unmounts the old `SettingsForm` and mounts a new one, and the state and focus of its inputs are lost. HOCs must be applied once, outside of components (module scope)."
+    explanation: "`withAuth(Form)` creates a new component type on every render. React compares types by identity, so it unmounts the old `SettingsForm` and mounts a new one, and the state and focus of its inputs are lost. HOCs must be applied once, at module scope."
     theoryUrl: https://react.dev/learn/preserving-and-resetting-state#different-components-at-the-same-position-reset-state
     options:
-      - {
-          text: "The form is remounted on every `Settings` render, so its input state is reset",
-          correct: true,
-        }
-      - { text: "The form keeps its state, because React reuses the DOM nodes", correct: false }
-      - {
-          text: "React throws an error, since a HOC cannot be called while rendering",
-          correct: false,
-        }
-      - {
-          text: "Only the first render creates the component, since `withAuth` is memoised by React",
-          correct: false,
-        }
-  - type: single
-    prompt: "The container/presentational split (smart components fetch data, dumb components render it) is less common today. What part of the idea is still worth keeping?"
-    explanation: "Hooks removed the need for a separate wrapper component to hold state, but separating pure UI (props in, JSX out) from data access remains valuable: it makes UI easy to test, stories easy to write and logic easy to reuse. The rigid two-file convention is what faded."
-    theoryUrl: https://react.dev/learn/thinking-in-react
+      - { text: "The form is remounted on every `Settings` render, so its input state is reset", correct: true }
+      - { text: "The form keeps its state, because React reuses the DOM nodes of the old form", correct: false }
+      - { text: "React throws an error, because a HOC cannot be called while rendering", correct: false }
+      - { text: "Nothing changes, because React memoises `withAuth` after the first call", correct: false }
+  - type: multi
+    prompt: "A legacy screen exports `withRouter(withTheme(withUser(withTracking(Profile))))`. Which problems are typical of stacking HOCs like this? Select all that apply."
+    explanation: "Stacked HOCs create wrapper layers in the tree, make it hard to see which wrapper injected which prop, and can silently overwrite each other's props when two use the same name. They do not stop a component from using hooks, and they do not break server rendering."
+    theoryUrl: https://www.patterns.dev/react/hoc-pattern
     options:
-      - {
-          text: "Presentational components must never use any state, including UI state like an open dropdown",
-          correct: false,
-        }
-      - {
-          text: "UI components that take props and return JSX, kept apart from data fetching and business logic",
-          correct: true,
-        }
-      - {
-          text: "Every component needs exactly one container, since React requires data flow to go through it",
-          correct: false,
-        }
-      - { text: "Containers must be class components, as hooks cannot fetch data", correct: false }
+      - { text: "Extra wrapper layers in the component tree and in the DevTools", correct: true }
+      - { text: "It is unclear which HOC injected which prop into `Profile`", correct: true }
+      - { text: "Two HOCs can inject a prop with the same name, and one silently overwrites the other", correct: true }
+      - { text: "A component wrapped in a HOC can no longer call hooks itself", correct: false }
+  - type: single
+    prompt: "The codebase reads the current user through a `withUser(Component)` HOC. You are writing 10 new components that need the user. What is the best choice for the new code?"
+    explanation: "A `useUser()` hook (typically reading the same Context the HOC uses) gives the new components the user with no wrapper layer and no hidden prop, and it can live alongside the HOC while old code migrates. A render prop adds nesting for no benefit, and prop drilling from the root is what the HOC was avoiding in the first place."
+    theoryUrl: https://react.dev/learn/reusing-logic-with-custom-hooks
+    options:
+      - { text: "Keep wrapping each new component in `withUser`, so the codebase stays consistent", correct: false }
+      - { text: "A `useUser()` hook that reads the same source, used directly inside each component", correct: true }
+      - { text: "A `<UserConsumer>` render prop around the JSX of each new component", correct: false }
+      - { text: "Pass `user` as a prop from the root component down to each new component", correct: false }
+  - type: boolean
+    prompt: "Render props and higher-order components are patterns, not React APIs: they still work in React 19, but custom hooks have replaced them for most logic reuse."
+    answer: true
+    explanation: "Both are plain JavaScript techniques (a function prop, a function that returns a component), so React has nothing to remove. Hooks cover most of what they were used for with less nesting, which is why new code rarely needs them, but they remain valid for specific cases such as render callbacks in lists."
+    theoryUrl: https://react.dev/learn/reusing-logic-with-custom-hooks
+  - type: single
+    prompt: "A team adopts \"headless\" components (for example a `useCombobox` hook or unstyled primitives) instead of a fully styled component library. What problem does that solve?"
+    explanation: "Headless components ship the behaviour (state, keyboard handling, focus, ARIA) and leave markup and styles to you, so a team with its own design system gets accessibility and logic without fighting a library's look. They do not make the bundle disappear or remove the need for state, and accessibility is one of the things they provide rather than skip."
+    theoryUrl: https://www.radix-ui.com/primitives/docs/overview/introduction
+    options:
+      - { text: "Reusing complex behaviour and accessibility while keeping full control of markup and styling", correct: true }
+      - { text: "Removing all client JavaScript from the components, so that they render as static HTML on the server and still stay interactive", correct: false }
+      - { text: "Skipping accessibility work, which headless components leave out to stay small", correct: false }
+      - { text: "Avoiding component state, because headless components store everything in the URL", correct: false }
+  - type: single
+    prompt: "The container/presentational split (smart components fetch data, dumb components render it) is less common since hooks. What part of the idea is still worth keeping?"
+    explanation: "Hooks removed the need for a wrapper component to hold state, but keeping pure UI (props in, JSX out) apart from data access is still valuable: the UI is easy to test, easy to show in Storybook and easy to reuse. What faded is the rigid two-file convention, not the separation."
+    theoryUrl: https://www.patterns.dev/react/presentational-container-pattern
+    options:
+      - { text: "Presentational components must never hold any state, not even whether a dropdown is open", correct: false }
+      - { text: "UI components that take props and return JSX, kept apart from data fetching", correct: true }
+      - { text: "Every component needs exactly one container, since React requires data to flow through it", correct: false }
+      - { text: "Containers must be class components, because hooks cannot fetch data", correct: false }
+  - type: single
+    prompt: "An `OrderList` fetches its data with `useEffect` inside the component. The team wants to show it in Storybook with fake orders and test the empty state. Which refactor fits best?"
+    explanation: "Split the rendering into a presentational `OrderListView` that takes `orders` (and loading/error) as props, and move fetching into a hook or parent. Stories and tests then pass any data they need. Mocking `fetch` globally or adding a `storybook` flag keeps the coupling and leaks test concerns into production code."
+    theoryUrl: https://www.patterns.dev/react/presentational-container-pattern
+    options:
+      - { text: "Add an `isStorybook` prop that makes `OrderList` skip the fetch and use hard-coded orders", correct: false }
+      - { text: "Extract an `OrderListView` that receives `orders` as props, and keep fetching in a hook or parent", correct: true }
+      - { text: "Mock the global `fetch` in every story and test, so the component can stay as it is", correct: false }
+      - { text: "Move the fetch into a Context provider, and wrap every story and test in it with real API credentials for a staging backend", correct: false }
   - type: single
     prompt: "In a Next.js App Router page, a Server Component fetches an order and renders `<OrderSummary order={order} />`, a Client Component that handles an expand/collapse toggle. How does this map to the container/presentational idea?"
-    explanation: "The Server Component plays the container role: it reads data on the server and passes serialisable props, without shipping its code or fetching logic to the client. The Client Component keeps only interactive UI state. The props crossing the boundary must be serialisable, so functions and class instances cannot be passed."
-    theoryUrl: https://react.dev/reference/rsc/server-components
+    explanation: "The Server Component plays the container role: it reads data on the server and passes serialisable props, without shipping its fetching code to the client. The Client Component keeps only interactive UI state. Server Components can pass props to Client Components, as long as they are serialisable."
+    theoryUrl: https://nextjs.org/docs/app/getting-started/server-and-client-components
     options:
-      - {
-          text: "It does not map, because Server Components cannot pass props to Client Components",
-          correct: false,
-        }
-      - {
-          text: "The Client Component is the container, as it receives data and decides what to show on screen",
-          correct: false,
-        }
-      - {
-          text: "The Server Component fetches data (container role); the Client Component handles UI state",
-          correct: true,
-        }
-      - {
-          text: "Both are containers, since each of them can access the order data directly",
-          correct: false,
-        }
+      - { text: "It does not map, because Server Components cannot pass props to Client Components", correct: false }
+      - { text: "The Client Component is the container, because it decides what is shown on screen", correct: false }
+      - { text: "The Server Component fetches data (container role), the Client Component holds UI state", correct: true }
+      - { text: "Both are containers, because each of them can access the order data directly", correct: false }
   - type: single
     prompt: "What is the difference between a controlled and an uncontrolled input in React?"
-    explanation: "A controlled input gets its `value` from React state and reports changes through `onChange`, so React is the single source of truth. An uncontrolled input keeps its value in the DOM, which you read with a ref or `FormData` (and can seed with `defaultValue`). Controlled gives instant validation and formatting, uncontrolled is simpler and cheaper for large forms."
+    explanation: "A controlled input gets its `value` from React state and reports changes through `onChange`, so React is the single source of truth. An uncontrolled input keeps its value in the DOM, which you read with a ref or `FormData` and can seed with `defaultValue`. Neither is about disabling the field or where it renders."
     theoryUrl: https://react.dev/reference/react-dom/components/input#controlling-an-input-with-a-state-variable
     options:
-      - {
-          text: "Controlled inputs are disabled, while uncontrolled inputs accept user typing",
-          correct: false,
-        }
-      - {
-          text: "Controlled inputs are rendered on the server, while uncontrolled inputs only run in the browser",
-          correct: false,
-        }
-      - {
-          text: "Controlled inputs use a `ref` to read the value, while uncontrolled inputs use `useState`",
-          correct: false,
-        }
-      - {
-          text: "A controlled input takes its value from React state, while an uncontrolled input keeps it in the DOM",
-          correct: true,
-        }
-  - type: single
-    prompt: "The user types in this input. What does the field show and what does React report?"
-    code: |
-      function NameField() {
-        const [name] = useState('Ann')
-        return <input value={name} />
-      }
-    codeLanguage: tsx
-    explanation: "Providing `value` without `onChange` makes a read-only controlled input: React resets the DOM value to the state after every keystroke, so the text never changes, and it warns that the field has a `value` prop without `onChange`. Use `defaultValue` for an editable uncontrolled field, or add `onChange` and a setter."
-    theoryUrl: https://react.dev/reference/react-dom/components/input#im-getting-an-error-a-component-is-changing-an-uncontrolled-input-to-be-controlled
-    options:
-      - {
-          text: "The text changes while typing, and the state is updated in the background",
-          correct: false,
-        }
-      - {
-          text: "It always shows `Ann` and React warns about a `value` without `onChange`",
-          correct: true,
-        }
-      - { text: "It is disabled by the browser, so the user cannot focus it", correct: false }
-      - {
-          text: "The field becomes uncontrolled after the first keystroke and keeps what the user typed",
-          correct: false,
-        }
-  - type: single
-    prompt: "A back-office screen has a form with 60 fields and validation only on submit. Typing feels sluggish because every keystroke re-renders the whole form held in one `useState` object. Which fix fits best?"
-    explanation: "When validation is needed only at submit, uncontrolled inputs read through `FormData` (or a form library that registers refs) avoid re-rendering on every keystroke. Moving the state to Context would still re-render all consumers, and `useMemo` on the JSX does not stop the state update from re-rendering the parent."
-    theoryUrl: https://react.dev/reference/react-dom/components/input#reading-the-input-values-when-submitting-a-form
-    options:
-      - {
-          text: "Move the form object into a Context provider so that the inputs subscribe to it",
-          correct: false,
-        }
-      - {
-          text: "Use uncontrolled inputs and read the values with `FormData` on submit",
-          correct: true,
-        }
-      - { text: "Wrap the whole form JSX in `useMemo`, so React skips the diffing", correct: false }
-      - {
-          text: "Replace `useState` with `useRef` for the object and call `forceUpdate` on each key",
-          correct: false,
-        }
-  - type: single
-    prompt: "You are building a reusable `Rating` component, and some consumers want to manage the value themselves while others just want an initial value. Which design is the most common and robust?"
-    explanation: "Support both: if the `value` prop is provided the component is controlled and reports changes through `onChange`, otherwise it keeps its own state seeded by `defaultValue`. This is how native inputs and most design systems work. Forcing one mode makes the component awkward for half the users, and switching mode mid-life is a warning in React."
+      - { text: "Controlled inputs are disabled, while uncontrolled inputs accept user typing", correct: false }
+      - { text: "Controlled inputs are rendered on the server and hydrated, while uncontrolled inputs only exist in the browser", correct: false }
+      - { text: "Controlled inputs read their value through a `ref`, uncontrolled ones through `useState`", correct: false }
+      - { text: "A controlled input takes its value from React state, an uncontrolled one keeps it in the DOM", correct: true }
+  - type: multi
+    prompt: "Which form requirements are good reasons to make the inputs controlled? Select all that apply."
+    explanation: "Controlled inputs pay off when the UI must react to the current value on every change: formatting while typing, or enabling the submit button only when the fields are valid. Reading values once on submit is exactly what uncontrolled inputs plus `FormData` do well, and avoiding a re-render per keystroke is an argument for uncontrolled, not against it."
     theoryUrl: https://react.dev/learn/sharing-state-between-components#controlled-and-uncontrolled-components
     options:
-      - {
-          text: "Expose only `defaultValue`, so that parents never need to know the rating",
-          correct: false,
-        }
-      - {
-          text: "Expose `value`/`onChange` for controlled use and `defaultValue` for uncontrolled use",
-          correct: true,
-        }
-      - {
-          text: "Always keep the value in a module-level variable, shared by all `Rating` instances on the page",
-          correct: false,
-        }
-      - {
-          text: "Require a Context provider and read the value from it for every instance",
-          correct: false,
-        }
+      - { text: "Formatting a card number with spaces as the user types", correct: true }
+      - { text: "Enabling the submit button only once all fields are valid", correct: true }
+      - { text: "Reading all the values once, when the form is submitted", correct: false }
+      - { text: "Avoiding a re-render of the form on every keystroke", correct: false }
   - type: single
-    prompt: "A `ChatDraft` component keeps the draft text in its own state. When the user opens another conversation the draft of the previous one is still visible. Which fix is the most idiomatic?"
-    code: |
-      function ChatPanel({ conversationId }: { conversationId: string }) {
-        return <ChatDraft conversationId={conversationId} />
-      }
-    codeLanguage: tsx
-    explanation: "State belongs to a position in the tree. Passing `key={conversationId}` makes React treat each conversation as a different component instance, so the state is reset by remounting. Syncing with `useEffect` causes a stale render first, and clearing it by hand is more code and easy to miss."
-    theoryUrl: https://react.dev/learn/preserving-and-resetting-state#resetting-state-with-a-key
+    prompt: "A back-office form has 60 fields and validates only on submit. Typing feels sluggish because every keystroke re-renders the whole form held in one `useState` object. Which fix fits best?"
+    explanation: "When validation is needed only at submit, uncontrolled inputs read through `FormData` (or a form library that registers refs) avoid re-rendering on every keystroke. Moving the object to Context still re-renders every consumer, and `useMemo` around the JSX does not stop the state update from re-rendering the form."
+    theoryUrl: https://react.dev/reference/react-dom/components/input#reading-the-input-values-when-submitting-a-form
     options:
-      - {
-          text: "Add `useEffect(() => setDraft(''), [conversationId])` inside `ChatDraft`",
-          correct: false,
-        }
-      - {
-          text: "Pass `key={conversationId}` to `ChatDraft`, so React remounts it for each conversation",
-          correct: true,
-        }
-      - {
-          text: "Memoise `ChatDraft` with `React.memo`, so it re-renders only when the id changes",
-          correct: false,
-        }
-      - {
-          text: "Store every draft in a `ref` keyed by id, and clear it when the user navigates away",
-          correct: false,
-        }
+      - { text: "Move the form object into a Context provider, so the inputs subscribe to it", correct: false }
+      - { text: "Use uncontrolled inputs and read the values with `FormData` on submit", correct: true }
+      - { text: "Wrap the whole form JSX in `useMemo`, so React skips diffing it", correct: false }
+      - { text: "Debounce `setState` by two seconds, so the form only re-renders when typing pauses", correct: false }
   - type: single
-    prompt: "A Provider re-renders for a reason unrelated to the context data. What happens to the consumers of `UserContext`?"
+    prompt: "You are building a reusable `Rating` component. Some consumers want to manage the value themselves, others just want an initial value. Which design is the most common and robust?"
+    explanation: "Support both: when `value` is provided the component is controlled and reports changes through `onChange`, otherwise it keeps its own state seeded by `defaultValue`. Native inputs and most design systems work this way. Forcing one mode makes the component awkward for half its users, and a module-level variable would share one value across every instance."
+    theoryUrl: https://react.dev/learn/sharing-state-between-components#controlled-and-uncontrolled-components
+    options:
+      - { text: "Expose only `defaultValue`, so that parents never need to know the rating", correct: false }
+      - { text: "Accept `value`/`onChange` for controlled use and `defaultValue` for uncontrolled use", correct: true }
+      - { text: "Keep the value in a module-level variable that all `Rating` instances on the page share", correct: false }
+      - { text: "Require a Context provider above every `Rating` and read the value from it", correct: false }
+  - type: single
+    prompt: "This provider re-renders every second because of the timer. What happens to the components that read `UserContext`?"
     code: |
       function UserProvider({ children }: { children: React.ReactNode }) {
         const [user, setUser] = useState<User | null>(null)
-        const [tick, setTick] = useState(0) // updated by a timer, unrelated to the context
+        const [tick, setTick] = useState(0) // updated by a timer, unrelated to the user
 
         return (
           <UserContext value={{ user, setUser }}>
@@ -419,134 +228,37 @@ questions:
         )
       }
     codeLanguage: tsx
-    explanation: "`{ user, setUser }` is a new object on every render, so the Provider's value changes identity each time and all consumers re-render, even if `user` is the same. Memoising the value with `useMemo` (or splitting the timer state out of the provider) avoids the useless renders."
+    explanation: "`{ user, setUser }` is a new object on every render, so the context value changes identity each second and every consumer re-renders even though `user` is the same. Memoising the value with `useMemo`, or moving the timer state out of the provider, fixes it. Context compares the value by identity, not property by property."
     theoryUrl: https://react.dev/reference/react/useContext#optimizing-re-renders-when-passing-objects-and-functions
     options:
-      - {
-          text: "Nothing, because Context compares the properties of the value with a shallow check",
-          correct: false,
-        }
-      - {
-          text: "All the consumers re-render, as the value is a new object on every render",
-          correct: true,
-        }
-      - {
-          text: "Only the consumers that read `setUser` re-render, since `user` did not change",
-          correct: false,
-        }
-      - {
-          text: "No consumer re-renders, since the provider's own state is not part of its value",
-          correct: false,
-        }
-  - type: boolean
-    prompt: "Wrapping a Context consumer in `React.memo` prevents it from re-rendering when the context value it reads changes."
-    answer: false
-    explanation: "`memo` only skips re-renders caused by a parent passing the same props. A component that calls `useContext` re-renders whenever that context's value changes, regardless of `memo`. To limit re-renders, split the context in smaller ones or use a store with selectors."
-    theoryUrl: https://react.dev/reference/react/memo#updating-a-memoized-component-using-a-context
+      - { text: "Nothing, because Context compares the value's properties with a shallow check", correct: false }
+      - { text: "All the consumers re-render, because the value is a new object on every render", correct: true }
+      - { text: "Only the consumers that read `setUser` re-render, since `user` did not change", correct: false }
+      - { text: "No consumer re-renders, since `tick` is not part of the context value", correct: false }
   - type: single
-    prompt: "A product holds `theme` (changes a few times per session) and `mousePosition` (changes dozens of times per second) and wants to share both across the whole app. Which design is right?"
-    explanation: "A Context re-renders every consumer on every change. Mouse position is high-frequency, so it should be kept out of Context: use a store with selectors (Zustand and similar), or local state and subscriptions near the components that need it. Theme is the classic fit for Context because it is rarely updated and read by many."
+    prompt: "A `TodoContext` holds `{ todos, dispatch }`. Many components only call `dispatch` (add buttons, toolbar actions) but re-render on every todo change. What is the standard fix with Context?"
+    explanation: "Split the value into two contexts, one for the state and one for `dispatch`. The `dispatch` from `useReducer` has a stable identity, so components that read only the dispatch context never re-render when the todos change. This is the pattern React documents for scaling up with reducer and context."
     theoryUrl: https://react.dev/learn/scaling-up-with-reducer-and-context
     options:
-      - {
-          text: "Put both in one Context, so that all the global state is in a single place",
-          correct: false,
-        }
-      - { text: "Put both in Redux, since Context only supports static values", correct: false }
-      - {
-          text: "Theme in Context, mouse position in a store with selectors or local state",
-          correct: true,
-        }
-      - {
-          text: "Both in separate Contexts, which makes React skip updates for unused consumers",
-          correct: false,
-        }
+      - { text: "Store `dispatch` in `localStorage`, which components can read without subscribing", correct: false }
+      - { text: "Wrap the provider's children in `useMemo`, so the consumers are skipped", correct: false }
+      - { text: "Use two contexts, one for the state and one for the stable `dispatch`", correct: true }
+      - { text: "Pass `dispatch` as a prop from the root, because Context cannot hold functions", correct: false }
   - type: single
-    prompt: "A `TodoContext` holds `{ todos, dispatch }`. Many components only call `dispatch` (add buttons) but re-render on every todo change. What is the standard fix with Context?"
-    explanation: "Split the value into two contexts: one for the state, one for `dispatch`. `dispatch` from `useReducer` has a stable identity, so components that only read the dispatch context never re-render when the state changes. This is the pattern React documents for scaling up with reducer and context."
-    theoryUrl: https://react.dev/learn/scaling-up-with-reducer-and-context
+    prompt: "Components send analytics events through an `AnalyticsContext` that provides a `track` function, instead of importing the analytics SDK directly. Besides avoiding prop drilling, what does this provider pattern give you?"
+    explanation: "Context works as dependency injection: components depend on an interface, and whoever renders the provider decides the implementation. Tests and stories wrap the tree in a provider with a fake `track`, and a different app could plug in another vendor without touching the components. It does not batch or speed up the calls, and the SDK still has to be loaded somewhere."
+    theoryUrl: https://react.dev/learn/passing-data-deeply-with-context#use-cases-for-context
     options:
-      - {
-          text: "Move `dispatch` into `localStorage`, which components can read without subscribing",
-          correct: false,
-        }
-      - {
-          text: "Wrap the provider's children in `useMemo`, so the consumers are skipped",
-          correct: false,
-        }
-      - {
-          text: "Use two contexts, one for the state and one for the stable `dispatch`",
-          correct: true,
-        }
-      - {
-          text: "Pass `dispatch` as a prop from the root, because Context cannot hold functions",
-          correct: false,
-        }
+      - { text: "Tests and stories can swap in a fake `track` by rendering a different provider", correct: true }
+      - { text: "React batches the `track` calls of all consumers and sends them once per render", correct: false }
+      - { text: "The analytics SDK is never downloaded, because Context loads it only on the server", correct: false }
+      - { text: "Consumers stop re-rendering, since a function in Context is never compared", correct: false }
   - type: single
-    prompt: "What does the following code render, given there is no provider above the second `Label`?"
-    code: |
-      const LocaleContext = createContext('en')
-
-      function Label() {
-        const locale = useContext(LocaleContext)
-        return <span>{locale}</span>
-      }
-
-      function App() {
-        return (
-          <>
-            <LocaleContext value="it"><Label /></LocaleContext>
-            <Label />
-          </>
-        )
-      }
-    codeLanguage: tsx
-    explanation: "A consumer reads the value of the closest provider above it. The first `Label` sits inside the provider and gets `it`. The second has none above it, so `useContext` returns the default passed to `createContext`, `en`. In React 19, `<Context value>` can be used directly as the provider."
-    theoryUrl: https://react.dev/reference/react/createContext
-    options:
-      - { text: "`it` and `en`", correct: true }
-      - { text: "`it` and `it`, since the provider applies to the whole fragment", correct: false }
-      - { text: "`en` and `en`, since the default always wins", correct: false }
-      - { text: "`it` and `undefined`, since a missing provider has no value", correct: false }
-  - type: multi
-    prompt: "Which statements about Context in React 19 are true? Select all that apply."
-    explanation: "React 19 lets you render `<Context value={...}>` without `.Provider`, and `use(Context)` can be called conditionally (unlike `useContext`, it is not a hook subject to the rules of hooks). The default value is used only when there is no provider above, and passing `undefined` as a value does not trigger the default."
-    theoryUrl: https://react.dev/reference/react/use
-    options:
-      - {
-          text: "`<MyContext value={x}>` can be used as a provider without `.Provider`",
-          correct: true,
-        }
-      - {
-          text: "`use(MyContext)` can be called after an early return or inside a condition",
-          correct: true,
-        }
-      - {
-          text: "The default value passed to `createContext` is used whenever the provider value is `undefined`",
-          correct: false,
-        }
-      - {
-          text: "`useContext` reads the closest provider above the component in the tree",
-          correct: true,
-        }
-  - type: single
-    prompt: "An app has 9 nested providers (auth, theme, i18n, feature flags, query client, and so on) at the root, and every change to one of them re-renders large parts of the tree. Which is a sound way to deal with it?"
-    explanation: "Keep each provider's value stable and focused, and place providers as low in the tree as the consumers allow, so an update affects a small subtree. Provider nesting itself is cheap, and combining everything in one mega-context makes the re-render problem worse. Moving frequently changing state out of Context into a store with selectors is the next step."
+    prompt: "An app has 9 nested providers at the root (auth, theme, i18n, feature flags, query client, and so on), and a change to any of them re-renders large parts of the tree. Which is a sound way to deal with it?"
+    explanation: "Keep each provider's value stable and focused, and place providers as low in the tree as their consumers allow, so an update touches a small subtree. Nesting itself is cheap, and merging everything into one big context makes the re-render problem worse, because every consumer then depends on every field. Frequently changing state belongs in a store with selectors."
     theoryUrl: https://react.dev/learn/passing-data-deeply-with-context
     options:
-      - {
-          text: "Merge all of them into one `AppContext`, so React tracks only a single subscription",
-          correct: false,
-        }
-      - {
-          text: "Keep values stable and focused, and put each provider as low as its consumers allow",
-          correct: true,
-        }
-      - {
-          text: "Remove the providers and read the data from `window`, which never triggers re-renders",
-          correct: false,
-        }
-      - {
-          text: "Wrap every provider in `StrictMode`, which de-duplicates provider updates",
-          correct: false,
-        }
+      - { text: "Merge them into one `AppContext`, so React tracks a single subscription", correct: false }
+      - { text: "Keep values stable and focused, and put each provider as low as its consumers allow", correct: true }
+      - { text: "Remove the providers and read the data from `window`, which never triggers re-renders", correct: false }
+      - { text: "Wrap every provider in `StrictMode`, which de-duplicates provider updates", correct: false }
