@@ -438,24 +438,24 @@ questions:
     explanation: "Two-phase commit couples the availability of all participants, holds locks while waiting for the coordinator, and is unsupported by many modern datastores and brokers. Most microservice systems prefer sagas, outbox and idempotent consumers, accepting eventual consistency."
     theoryUrl: https://microservices.io/patterns/data/saga.html
   - type: single
-    prompt: "Product wants the `price` field of `GET /products/:id`, a decimal in dollars, to become an integer in cents. Hundreds of third-party integrations read `price`. What is the least disruptive way to evolve the API?"
-    explanation: "Additive change first: a new `priceCents` field breaks nobody, the old field is marked deprecated and announced, and it is removed only when usage has dropped or in the next major version. Changing the meaning of `price` in place silently corrupts every integration, since the JSON still parses. A brand-new API version with a one-week cutoff forces all clients to migrate at once for a change that did not need it."
-    theoryUrl: https://google.aip.dev/180
+    prompt: "`POST /exports` builds a large report that takes 2 to 10 minutes. Today the handler keeps the HTTP request open until the file is ready, and clients often get gateway timeouts even though the export finishes later on the server. How should the API expose this operation?"
+    explanation: "Work that outlasts normal request timeouts is modelled as a resource: the API accepts the job at once (typically `202 Accepted`) with a status URL, the client polls it or gets a callback, and the status links to the file or carries the error. Longer timeouts still leave every proxy, deploy and flaky mobile network able to cut the connection and lose the result. Retrying a timed-out request can start a duplicate export, and a worker thread frees the event loop but does not make a 10-minute job fit in a request."
+    theoryUrl: https://learn.microsoft.com/en-us/azure/architecture/patterns/async-request-reply
     options:
       - {
-          text: "Change `price` to cents in place and announce it in the changelog, since the field name stays the same",
-          correct: false,
-        }
-      - {
-          text: "Add a `priceCents` field, deprecate `price`, and remove it once usage has dropped",
+          text: "Accept the job at once and return a status URL to poll, which links to the file when ready",
           correct: true,
         }
       - {
-          text: "Publish a `/v2` of the whole API with the new format and switch `/v1` off next week",
+          text: "Raise the timeouts on the server, the load balancer and the client to 15 minutes so the request can complete",
           correct: false,
         }
       - {
-          text: "Return cents by default, and dollars only to clients that send an `Accept-Version: 1` header",
+          text: "Keep the request open and have clients retry on timeout, since the retry will find the finished report",
+          correct: false,
+        }
+      - {
+          text: "Move the export into a worker thread so the request no longer waits on the event loop",
           correct: false,
         }
   - type: single

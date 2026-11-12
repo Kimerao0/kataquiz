@@ -502,7 +502,7 @@ questions:
           correct: false,
         }
   - type: boolean
-    prompt: "On a Node.js server, a single request that pollutes `Object.prototype` can change how later requests from other users are handled, until the process restarts."
-    explanation: "True. A polluted `Object.prototype` lives for the whole process, and one process serves many users, so one attacker's request can affect every later request (for example through an injected `isAdmin` default). Client-side pollution is dangerous too: attackers deliver it to victims through crafted URLs and chain it with script gadgets into DOM XSS, so browser code needs the same defences."
-    theoryUrl: https://cheatsheetseries.owasp.org/cheatsheets/Prototype_Pollution_Prevention_Cheat_Sheet.html
-    answer: true
+    prompt: "A service logs every incoming request, headers included, to a log platform that only engineers can access. Because access is restricted, keeping `Authorization` headers and session tokens in these logs is an acceptable trade-off for easier debugging."
+    explanation: "False. Logs are copied far more widely than the primary data: aggregators, backups, third-party vendors, support exports and laptops, often kept for months with looser controls. A bearer token in a log line is a live credential for anyone who reads it. Redact at the source with an allowlist of fields to log, and log identifiers (user id, request id) rather than secrets or personal data."
+    theoryUrl: https://cheatsheetseries.owasp.org/cheatsheets/Logging_Cheat_Sheet.html
+    answer: false
