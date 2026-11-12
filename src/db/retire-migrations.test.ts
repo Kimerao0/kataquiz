@@ -5,9 +5,9 @@ import { SEED_AUTHOR_ID } from '@/lib/quizzes/seed-author'
 import { type TestTx, withTestDb } from '@/test/db'
 import { attempts, options, pathSteps, paths, questions, quizzes, user } from './schema'
 
-const MIGRATION = 'drizzle/0008_retire-architect-r1.sql'
 const PATH_TITLE = 'Road to Software Architect'
-const RETIRED_TITLES = [
+const R1_MIGRATION = 'drizzle/0008_retire-architect-r1.sql'
+const R1_RETIRED_TITLES = [
   'Architect Roadmap 01: React fundamentals',
   'Architect Roadmap 02: React state and events',
   'Architect Roadmap 03: React effects and lifecycle',
@@ -15,10 +15,22 @@ const RETIRED_TITLES = [
   'Architect Roadmap 05: React performance and rendering',
   "Architect Roadmap 06: What's new in React 19",
 ]
-const KEPT_TITLE = 'Architect Roadmap 07: App Router and routing'
+const R1_KEPT_TITLE = 'Architect Roadmap 07: App Router and routing'
+const R2_MIGRATION = 'drizzle/0009_retire-architect-r2.sql'
+const R2_RETIRED_TITLES = [
+  'Architect Roadmap 07: App Router and routing',
+  'Architect Roadmap 08: Server and Client Components',
+  'Architect Roadmap 09: Data fetching, caching and Server Actions',
+  'Architect Roadmap 10: Next.js in production',
+  'Architect Roadmap 11: Design patterns in React',
+  'Architect Roadmap 12: State architecture',
+  'Architect Roadmap 13: Next.js as a backend [SCENARIO]',
+  'Architect Roadmap 15: System design of a production Next.js app [SCENARIO]',
+]
+const R2_KEPT_TITLE = 'Architect Roadmap 14: Rendering and caching strategies at scale [SCENARIO]'
 
-async function runMigration(tx: TestTx) {
-  const text = readFileSync(join(process.cwd(), MIGRATION), 'utf8')
+async function runMigration(tx: TestTx, file: string) {
+  const text = readFileSync(join(process.cwd(), file), 'utf8')
   const statements = text.split('--> statement-breakpoint').filter((stmt) => stmt.trim())
   for (const stmt of statements) await tx.execute(sql.raw(stmt))
 }
@@ -86,31 +98,31 @@ async function insertPath(tx: TestTx, quizIds: string[], authorId = SEED_AUTHOR_
   return path.id
 }
 
-async function arrange(tx: TestTx) {
+async function arrange(tx: TestTx, retiredTitles: string[], keptTitle: string) {
   await insertSeedAuthor(tx)
   const retired = []
-  for (const title of RETIRED_TITLES) retired.push(await insertQuiz(tx, SEED_AUTHOR_ID, title))
+  for (const title of retiredTitles) retired.push(await insertQuiz(tx, SEED_AUTHOR_ID, title))
   const first = await insertAttempt(tx, retired[0])
   await insertAttempt(tx, retired[0], first)
-  const kept = await insertQuiz(tx, SEED_AUTHOR_ID, KEPT_TITLE)
+  const kept = await insertQuiz(tx, SEED_AUTHOR_ID, keptTitle)
   const keptAttemptId = await insertAttempt(tx, kept)
   const pathId = await insertPath(tx, [retired[0].quizId, kept.quizId])
   const otherUser = await insertUser(tx)
-  const foreign = await insertQuiz(tx, otherUser, RETIRED_TITLES[0])
+  const foreign = await insertQuiz(tx, otherUser, retiredTitles[0])
   return { retired, kept, keptAttemptId, pathId, foreign, otherUser }
 }
 
 describe('0008 retire architect R1', () => {
   it('deletes the seed quizzes 01-06 with their questions and attempts', async () => {
     await withTestDb(async (tx) => {
-      const { retired } = await arrange(tx)
-      await runMigration(tx)
+      const { retired } = await arrange(tx, R1_RETIRED_TITLES, R1_KEPT_TITLE)
+      await runMigration(tx, R1_MIGRATION)
 
       const quizIds = retired.map((quiz) => quiz.quizId)
       const remaining = await tx
         .select({ id: quizzes.id })
         .from(quizzes)
-        .where(and(eq(quizzes.authorId, SEED_AUTHOR_ID), inArray(quizzes.title, RETIRED_TITLES)))
+        .where(and(eq(quizzes.authorId, SEED_AUTHOR_ID), inArray(quizzes.title, R1_RETIRED_TITLES)))
       expect(remaining).toEqual([])
       expect(await tx.select().from(questions).where(inArray(questions.quizId, quizIds))).toEqual(
         [],
@@ -121,8 +133,8 @@ describe('0008 retire architect R1', () => {
 
   it('deletes the seed path and its steps', async () => {
     await withTestDb(async (tx) => {
-      const { pathId } = await arrange(tx)
-      await runMigration(tx)
+      const { pathId } = await arrange(tx, R1_RETIRED_TITLES, R1_KEPT_TITLE)
+      await runMigration(tx, R1_MIGRATION)
 
       const remaining = await tx
         .select({ id: paths.id })
@@ -135,19 +147,19 @@ describe('0008 retire architect R1', () => {
 
   it("keeps another user's quiz with a retired title", async () => {
     await withTestDb(async (tx) => {
-      const { foreign } = await arrange(tx)
-      await runMigration(tx)
+      const { foreign } = await arrange(tx, R1_RETIRED_TITLES, R1_KEPT_TITLE)
+      await runMigration(tx, R1_MIGRATION)
 
       const [quiz] = await tx.select().from(quizzes).where(eq(quizzes.id, foreign.quizId))
-      expect(quiz?.title).toBe(RETIRED_TITLES[0])
+      expect(quiz?.title).toBe(R1_RETIRED_TITLES[0])
     })
   })
 
   it("keeps another user's path with the retired title", async () => {
     await withTestDb(async (tx) => {
-      const { kept, otherUser } = await arrange(tx)
+      const { kept, otherUser } = await arrange(tx, R1_RETIRED_TITLES, R1_KEPT_TITLE)
       const foreignPathId = await insertPath(tx, [kept.quizId], otherUser)
-      await runMigration(tx)
+      await runMigration(tx, R1_MIGRATION)
 
       const [path] = await tx.select().from(paths).where(eq(paths.id, foreignPathId))
       expect(path?.title).toBe(PATH_TITLE)
@@ -156,11 +168,11 @@ describe('0008 retire architect R1', () => {
 
   it('keeps seed quiz 07 and its attempt', async () => {
     await withTestDb(async (tx) => {
-      const { kept, keptAttemptId } = await arrange(tx)
-      await runMigration(tx)
+      const { kept, keptAttemptId } = await arrange(tx, R1_RETIRED_TITLES, R1_KEPT_TITLE)
+      await runMigration(tx, R1_MIGRATION)
 
       const [quiz] = await tx.select().from(quizzes).where(eq(quizzes.id, kept.quizId))
-      expect(quiz?.title).toBe(KEPT_TITLE)
+      expect(quiz?.title).toBe(R1_KEPT_TITLE)
       const [attempt] = await tx.select().from(attempts).where(eq(attempts.id, keptAttemptId))
       expect(attempt?.quizId).toBe(kept.quizId)
     })
@@ -168,7 +180,61 @@ describe('0008 retire architect R1', () => {
 
   it('runs cleanly when there is nothing to retire', async () => {
     await withTestDb(async (tx) => {
-      await expect(runMigration(tx)).resolves.toBeUndefined()
+      await expect(runMigration(tx, R1_MIGRATION)).resolves.toBeUndefined()
+    })
+  })
+})
+
+describe('0009 retire architect R2', () => {
+  it('deletes the seed quizzes 07-13 and 15 with their questions and attempts, and the seed path with its steps', async () => {
+    await withTestDb(async (tx) => {
+      const { retired, pathId } = await arrange(tx, R2_RETIRED_TITLES, R2_KEPT_TITLE)
+      await runMigration(tx, R2_MIGRATION)
+
+      const quizIds = retired.map((quiz) => quiz.quizId)
+      const remaining = await tx
+        .select({ id: quizzes.id })
+        .from(quizzes)
+        .where(and(eq(quizzes.authorId, SEED_AUTHOR_ID), inArray(quizzes.title, R2_RETIRED_TITLES)))
+      expect(remaining).toEqual([])
+      expect(await tx.select().from(questions).where(inArray(questions.quizId, quizIds))).toEqual(
+        [],
+      )
+      expect(await tx.select().from(attempts).where(inArray(attempts.quizId, quizIds))).toEqual([])
+      const remainingPaths = await tx
+        .select({ id: paths.id })
+        .from(paths)
+        .where(and(eq(paths.authorId, SEED_AUTHOR_ID), eq(paths.title, PATH_TITLE)))
+      expect(remainingPaths).toEqual([])
+      expect(await tx.select().from(pathSteps).where(eq(pathSteps.pathId, pathId))).toEqual([])
+    })
+  })
+
+  it('keeps seed quiz 14 and its attempt', async () => {
+    await withTestDb(async (tx) => {
+      const { kept, keptAttemptId } = await arrange(tx, R2_RETIRED_TITLES, R2_KEPT_TITLE)
+      await runMigration(tx, R2_MIGRATION)
+
+      const [quiz] = await tx.select().from(quizzes).where(eq(quizzes.id, kept.quizId))
+      expect(quiz?.title).toBe(R2_KEPT_TITLE)
+      const [attempt] = await tx.select().from(attempts).where(eq(attempts.id, keptAttemptId))
+      expect(attempt?.quizId).toBe(kept.quizId)
+    })
+  })
+
+  it("keeps another user's quiz with a retired title", async () => {
+    await withTestDb(async (tx) => {
+      const { foreign } = await arrange(tx, R2_RETIRED_TITLES, R2_KEPT_TITLE)
+      await runMigration(tx, R2_MIGRATION)
+
+      const [quiz] = await tx.select().from(quizzes).where(eq(quizzes.id, foreign.quizId))
+      expect(quiz?.title).toBe(R2_RETIRED_TITLES[0])
+    })
+  })
+
+  it('runs cleanly when there is nothing to retire', async () => {
+    await withTestDb(async (tx) => {
+      await expect(runMigration(tx, R2_MIGRATION)).resolves.toBeUndefined()
     })
   })
 })
