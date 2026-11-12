@@ -2,7 +2,7 @@
 
 feature: architect-roadmap-v2
 title: Architect Roadmap v2
-phase: building
+phase: checking
 ---
 
 # Architect Roadmap v2

@@ -146,9 +146,10 @@ Spec: `specs/paths.md` (phase 1, KQ42, live in production since 2026-11-11; arch
   2026-11-12 — check: 7/7 implemented (R2.7 bounced once: ~10 edge-case questions replaced); 9 findings (0 blockers): 7 fixed, R2.4/R2.6 tightened + decision 13 via sync
   2026-11-12 — merged ef0746d (ff, rebase clean onto origin/main); pnpm check green: biome ok, tsc ok, 855/855 tests, portability ok
 - [ ] KQ49: Architect Roadmap v2 R3 — Node.js 16–23
-  Spec: `specs/architect-roadmap-v2.md` R3 · status: building on feat/architect-roadmap-v2-r3
+  Spec: `specs/architect-roadmap-v2.md` R3 · status: checking
   Specs: R3.1 … R3.7 (the spec file holds the text; never copy it here)
   Verdicts: <filled by feature-prove>
+  2026-11-12 — check: 7/7 implemented (R3.7 bounced once: 10 trivia questions replaced, 22 back to general API/data theory); 21 findings (0 blockers): all fixed, R3.3/R3.4/R3.6 reworded via sync
 - [ ] KQ50: Architect Roadmap v2 R4 — Architecture 24–41
   Spec: `specs/architect-roadmap-v2.md` R4 · status: open
   Specs: R4.1 … R4.7 (the spec file holds the text; never copy it here)
