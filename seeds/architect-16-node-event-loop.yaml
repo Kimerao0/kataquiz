@@ -1,6 +1,6 @@
 version: 1
 title: "Architect Roadmap 16: Node.js core concepts and the event loop"
-description: Non-blocking architecture, libuv, event loop phases, nextTick vs setImmediate vs microtasks, CommonJS vs ESM and module resolution.
+description: The non-blocking I/O model, the role of V8 and libuv, the thread pool, event loop phases and microtasks, why blocking the loop hurts, offloading CPU work, and CommonJS vs ESM modules.
 language: en
 tags: [architect-roadmap, nodejs, event-loop, libuv, modules]
 run:
@@ -10,439 +10,515 @@ run:
 questions:
   - type: single
     prompt: Node.js runs your JavaScript on a single thread, yet one process can serve thousands of concurrent connections. What makes that possible?
-    explanation: "Network I/O is handed to the OS (epoll, kqueue, IOCP) through libuv, which notifies the event loop when a socket is ready. The JS thread never waits on the I/O itself, it only runs the callbacks. It is not one hidden thread per connection, and it is not that JS is fast enough to poll everything in a loop."
+    explanation: "Network I/O is handed to the operating system through libuv, which tells the event loop when a socket has data. The JS thread never sits waiting for I/O; it only runs the short callbacks that react to it. There is no hidden thread or process per connection, and raw execution speed is not what makes it scale."
     theoryUrl: https://nodejs.org/en/learn/asynchronous-work/overview-of-blocking-vs-non-blocking
     options:
       - {
-          text: Each connection is silently served by its own OS thread that runs your callback in parallel,
+          text: "Each connection is quietly given its own OS thread, which runs your handler in parallel with the others",
           correct: false,
         }
       - {
-          text: "I/O is delegated to the OS and libuv, and the JS thread only runs callbacks when results are ready",
+          text: "I/O is delegated to the OS via libuv, and the JS thread only runs callbacks once results are ready",
           correct: true,
         }
       - {
-          text: V8 compiles handlers to native code that is fast enough to poll every socket in a tight loop,
+          text: "V8 compiles the handlers to native code that is fast enough to check every socket in a tight loop",
           correct: false,
         }
       - {
-          text: Node forks a child process per request and shares the results through shared memory,
+          text: "Node forks a child process per request and merges the results back through shared memory",
           correct: false,
         }
-  - type: multi
-    prompt: "Which of these operations are executed on libuv's thread pool rather than through the OS's non-blocking socket notifications? Select all that apply."
-    explanation: "`fs.readFile`, `zlib` and `crypto.pbkdf2` are offloaded to the thread pool (4 threads by default, `UV_THREADPOOL_SIZE`), and so is `dns.lookup`. Reading from a TCP socket uses the OS readiness mechanism (epoll/kqueue/IOCP), so it does not consume a pool thread."
-    theoryUrl: https://nodejs.org/en/learn/asynchronous-work/dont-block-the-event-loop
-    options:
-      - { text: "`fs.readFile`", correct: true }
-      - { text: "Reading data from an incoming TCP socket", correct: false }
-      - { text: "`dns.lookup`", correct: true }
-      - { text: "`zlib.gzip` with a callback", correct: true }
+
   - type: single
-    prompt: Which is the correct order of the main phases of one Node.js event loop iteration?
-    explanation: "One iteration goes timers, pending callbacks, idle/prepare, poll, check (`setImmediate`), close callbacks. That is why `setImmediate` fires right after the poll phase, while timers wait for the next iteration. Microtasks and `nextTick` are not a phase: they drain between callbacks."
+    prompt: In one sentence, what is the job of the Node.js event loop?
+    explanation: "The event loop waits for things to happen (I/O completing, timers expiring, sockets closing) and runs the matching callbacks on the JS thread, one at a time. It does not run code in parallel, and it is not a scheduler that time-slices your functions: a callback always runs to completion before the next one starts."
     theoryUrl: https://nodejs.org/en/learn/asynchronous-work/event-loop-timers-and-nexttick
     options:
-      - { text: "poll, timers, check, close callbacks", correct: false }
-      - { text: "timers, check, poll, close callbacks", correct: false }
       - {
-          text: "timers, pending callbacks, idle/prepare, poll, check, close callbacks",
+          text: "To pre-empt long-running functions so that every request gets a fair slice of CPU time",
+          correct: false,
+        }
+      - {
+          text: "To wait for events such as finished I/O or expired timers and run their callbacks one at a time",
           correct: true,
         }
-      - { text: "check, timers, poll, pending callbacks, close callbacks", correct: false }
+      - {
+          text: "To spread JavaScript callbacks across all CPU cores so they execute in parallel",
+          correct: false,
+        }
+      - {
+          text: "To poll the database periodically and push fresh results into the application's memory",
+          correct: false,
+        }
+
   - type: single
-    prompt: "In what order are the lines printed when this CommonJS file is run with `node app.js`?"
-    code: |
-      console.log('A')
-      setTimeout(() => console.log('B'), 0)
-      Promise.resolve().then(() => console.log('C'))
-      process.nextTick(() => console.log('D'))
-      console.log('E')
-    codeLanguage: javascript
-    explanation: "Synchronous code runs first (A, E). When the main script ends, the `nextTick` queue is drained (D), then the promise microtask queue (C), and only then does the event loop reach the timers phase (B). A tempting mistake is to put C before D, but Node always empties the `nextTick` queue before promise microtasks."
-    theoryUrl: https://nodejs.org/en/learn/asynchronous-work/understanding-processnexttick
+    prompt: "Inside one Node.js process, which responsibilities belong to V8 and which to libuv?"
+    explanation: "V8 parses, compiles and runs JavaScript and manages the JS heap and garbage collector. libuv is the C library that provides the event loop, asynchronous I/O over the OS mechanisms, timers and the worker thread pool. Node's own bindings glue the two together and expose modules like `fs` and `net`."
+    theoryUrl: https://docs.libuv.org/en/v1.x/design.html
     options:
-      - { text: "A, E, C, D, B", correct: false }
-      - { text: "A, B, C, D, E", correct: false }
-      - { text: "A, E, B, D, C", correct: false }
-      - { text: "A, E, D, C, B", correct: true }
+      - {
+          text: "V8 provides the event loop and the thread pool; libuv compiles and runs JavaScript",
+          correct: false,
+        }
+      - {
+          text: "V8 runs JavaScript and manages its heap; libuv provides the event loop, async I/O and the thread pool",
+          correct: true,
+        }
+      - {
+          text: "V8 handles network sockets and file I/O; libuv takes care of garbage collection",
+          correct: false,
+        }
+      - {
+          text: "Both are interchangeable runtimes, and Node picks one at startup depending on the platform it runs on",
+          correct: false,
+        }
+
+  - type: multi
+    prompt: "Which kinds of work does libuv run on its thread pool, rather than through the OS's non-blocking socket notifications? Select all that apply."
+    explanation: "Most asynchronous file system calls, async compression and CPU-heavy async crypto such as key derivation run on the thread pool, because there is no portable non-blocking OS API for them or because they are CPU work. Socket reads and writes use the OS readiness mechanisms (epoll, kqueue, IOCP), and timers are tracked by the loop itself, so neither occupies a pool thread."
+    theoryUrl: https://nodejs.org/en/learn/asynchronous-work/dont-block-the-event-loop
+    options:
+      - { text: "Most asynchronous file system operations", correct: true }
+      - { text: "Asynchronous compression and decompression with zlib", correct: true }
+      - { text: "Async CPU-heavy crypto such as password key derivation", correct: true }
+      - { text: "Reading and writing data on TCP sockets", correct: false }
+      - { text: "Keeping track of pending timers", correct: false }
+
   - type: single
-    prompt: "What does this script print, and is the order guaranteed?"
+    prompt: Why does libuv use a thread pool for file system operations but not for network sockets?
+    explanation: "Operating systems offer efficient readiness notification for sockets, so one thread can watch thousands of them. Regular files have no equally portable non-blocking API, so libuv runs the blocking file calls on pool threads and reports back to the loop. It has nothing to do with files being more important or sockets being slower."
+    theoryUrl: https://docs.libuv.org/en/v1.x/design.html
+    options:
+      - {
+          text: "File operations are rarer than network calls, so it is cheaper to give them dedicated threads",
+          correct: false,
+        }
+      - {
+          text: "Sockets have portable non-blocking readiness APIs in the OS, while regular files generally do not",
+          correct: true,
+        }
+      - {
+          text: "The thread pool exists so that file reads can run JavaScript callbacks in parallel with the main thread",
+          correct: false,
+        }
+      - {
+          text: "Network I/O must stay on the main thread because TLS encryption is not thread-safe",
+          correct: false,
+        }
+
+  - type: boolean
+    prompt: "When a file read finishes on a libuv pool thread, the JavaScript callback you passed still runs on the main thread."
+    answer: true
+    explanation: "Pool threads only do the blocking native work. When it completes, libuv queues the completion, and the event loop runs your callback on the single JS thread. That is why your JavaScript never needs locks, and also why a slow callback still blocks everything else."
+    theoryUrl: https://nodejs.org/en/learn/asynchronous-work/dont-block-the-event-loop
+
+  - type: single
+    prompt: "A service makes heavy use of async file reads and async password hashing. Under load, simple file reads become slow even though the JS thread is mostly idle and event loop delay is low. What is the most likely explanation?"
+    explanation: "Async fs and crypto share libuv's small, fixed-size thread pool. When it is saturated, new tasks wait in its queue even though the JS thread is free. The fix is to reduce or bound the concurrent pool work, or carefully size the pool; a garbage-collection problem or a blocked loop would show up as high event loop delay."
+    theoryUrl: https://docs.libuv.org/en/v1.x/threadpool.html
+    options:
+      - {
+          text: "The event loop is blocked by the hashing callbacks, which run synchronously on the main thread",
+          correct: false,
+        }
+      - {
+          text: "The thread pool is saturated, so file reads queue behind the hashing work",
+          correct: true,
+        }
+      - {
+          text: "The garbage collector pauses file I/O whenever hashing allocates large buffers",
+          correct: false,
+        }
+      - {
+          text: "The operating system limits each process to a few open files at once and makes the rest wait in line",
+          correct: false,
+        }
+
+  - type: single
+    prompt: "An endpoint that generates a large PDF report takes 2 seconds of pure CPU. While it runs, every other request to the service, even trivial health checks, stalls. Why?"
+    explanation: "All JavaScript in the process runs on one thread. While the report code runs, the event loop cannot pick up any other callback, so every other request waits until it finishes. The network and the thread pool are fine; the bottleneck is that the only JS thread is busy."
+    theoryUrl: https://nodejs.org/en/learn/asynchronous-work/dont-block-the-event-loop
+    options:
+      - {
+          text: "The report fills the network buffers, so responses to other clients cannot be sent until it is delivered",
+          correct: false,
+        }
+      - {
+          text: "The report uses up every thread in the libuv pool, so other requests have nowhere to run",
+          correct: false,
+        }
+      - {
+          text: "Every request shares the one JS thread, and it cannot run other callbacks until the report code ends",
+          correct: true,
+        }
+      - {
+          text: "Node lowers the priority of all other requests while one of them is using a lot of CPU",
+          correct: false,
+        }
+
+  - type: single
+    prompt: "A teammate tries to stop the PDF endpoint from blocking other requests with the change below. What is the effect?"
+    code: |
+      app.get('/report', async (req, res) => {
+        const pdf = await new Promise((resolve) => {
+          resolve(buildPdf(req.query)) // ~2 s of synchronous CPU work
+        })
+        res.send(pdf)
+      })
+    codeLanguage: javascript
+    explanation: "The promise executor runs synchronously, so `buildPdf` still occupies the main thread for the full 2 seconds. Promises and `async` change how results are delivered, not where the code runs. To unblock the loop, the CPU work has to move to another thread or process, or be split into small chunks."
+    theoryUrl: https://nodejs.org/en/learn/asynchronous-work/dont-block-the-event-loop
+    options:
+      - {
+          text: "It fixes the problem, because code inside a promise runs on the libuv thread pool",
+          correct: false,
+        }
+      - {
+          text: "Nothing improves: the executor runs synchronously, so the loop is still blocked",
+          correct: true,
+        }
+      - {
+          text: "It fixes the problem, because `await` yields to other requests while `buildPdf` is running",
+          correct: false,
+        }
+      - {
+          text: "It makes things worse, because the work now runs twice: once in the executor and once on `await`",
+          correct: false,
+        }
+
+  - type: single
+    prompt: "That same CPU-heavy report runs a few hundred times an hour and must not hurt the latency of other endpoints. Which approach fits best?"
+    explanation: "A small pool of worker threads runs the CPU work in parallel with the main thread, which stays free to serve requests. Raising the libuv pool size does nothing for JavaScript code, and wrapping it in `setTimeout` only delays the block. Simply adding instances spreads the stalls around without removing them."
+    theoryUrl: https://nodejs.org/api/worker_threads.html
+    options:
+      - {
+          text: "Run the report generation in a small pool of worker threads and send the result back to the main thread",
+          correct: true,
+        }
+      - {
+          text: "Increase the libuv thread pool size so that the report code gets more threads to run on",
+          correct: false,
+        }
+      - {
+          text: "Wrap the call in `setTimeout(..., 0)` so the report starts on a later tick of the event loop",
+          correct: false,
+        }
+      - {
+          text: "Run more instances of the service so the chance of hitting a blocked one goes down",
+          correct: false,
+        }
+
+  - type: single
+    prompt: "A nightly cleanup inside your API server loops over 200,000 records with light per-item work. It doesn't justify a worker thread, but you don't want it to freeze requests. What does the code below do about it?"
+    code: |
+      function processAll(items, i = 0) {
+        const end = Math.min(i + 1000, items.length)
+        for (; i < end; i++) cleanup(items[i])
+        if (i < items.length) setImmediate(() => processAll(items, i))
+      }
+    codeLanguage: javascript
+    explanation: "This is partitioning: the work is cut into chunks, and `setImmediate` schedules the next chunk after the loop has had a chance to handle pending I/O. Total CPU time is the same; what improves is that no single callback holds the thread for long. It does not create any parallelism."
+    theoryUrl: https://nodejs.org/en/learn/asynchronous-work/dont-block-the-event-loop
+    options:
+      - {
+          text: "It runs each chunk of 1,000 items on a different thread so the total job finishes faster",
+          correct: false,
+        }
+      - {
+          text: "It splits the work into chunks and lets the loop handle other events between chunks",
+          correct: true,
+        }
+      - {
+          text: "It batches the records so that the database receives 1,000 writes per round trip",
+          correct: false,
+        }
+      - {
+          text: "It delays the whole job until the server is idle, then processes every record in one pass",
+          correct: false,
+        }
+
+  - type: single
+    prompt: "When breaking up a long task into chunks, why is `setImmediate` a better way to schedule the next chunk than `process.nextTick`?"
+    explanation: "The `nextTick` queue is drained completely before the event loop moves on, so chunks scheduled that way run back to back and I/O still never gets a turn. `setImmediate` runs in the check phase of a later loop iteration, after pending I/O has been polled. The point is letting other work through, not raw speed."
+    theoryUrl: https://nodejs.org/en/learn/asynchronous-work/understanding-setimmediate
+    options:
+      - {
+          text: "`nextTick` callbacks run before the loop continues, so pending I/O would still be starved",
+          correct: true,
+        }
+      - {
+          text: "`nextTick` callbacks are executed on the thread pool, which can corrupt shared state",
+          correct: false,
+        }
+      - {
+          text: "`setImmediate` runs the chunk on another core, while `nextTick` keeps it on the main one",
+          correct: false,
+        }
+      - {
+          text: "`setImmediate` callbacks get a higher priority, so the OS scheduler runs them first",
+          correct: false,
+        }
+
+  - type: single
+    prompt: Conceptually, how do microtasks (such as promise reactions) relate to the macrotask-style callbacks the event loop runs, like timers and I/O callbacks?
+    explanation: "After each callback finishes, Node drains the microtask queues before the event loop takes the next timer or I/O callback. So a resolved promise's `then` runs soon after the current code, ahead of any timer or I/O event. Microtasks are not a separate thread, and they are not deferred to the end of the whole loop iteration."
+    theoryUrl: https://developer.mozilla.org/en-US/docs/Web/API/HTML_DOM_API/Microtask_guide
+    options:
+      - {
+          text: "Microtasks run on a separate thread, alongside the main callbacks, so they never delay each other",
+          correct: false,
+        }
+      - {
+          text: "Microtasks wait until every timer and I/O callback of the current loop iteration has completed",
+          correct: false,
+        }
+      - {
+          text: "The microtask queue is drained after the current callback, before the loop moves to the next one",
+          correct: true,
+        }
+      - {
+          text: "Microtasks only run when the process is otherwise idle, like a low-priority background queue",
+          correct: false,
+        }
+
+  - type: single
+    prompt: A library schedules a new microtask from inside every microtask, forever. What happens to the server?
+    explanation: "The microtask queue is drained to empty before the event loop continues, so a queue that keeps refilling itself never lets the loop move on. Timers, I/O and incoming requests are starved even though no single callback is slow. The same applies to recursive `process.nextTick`."
+    theoryUrl: https://nodejs.org/en/learn/asynchronous-work/event-loop-timers-and-nexttick
+    options:
+      - {
+          text: "Nothing serious: Node interleaves microtasks with I/O callbacks, so requests are still served",
+          correct: false,
+        }
+      - {
+          text: "Node detects the cycle after a fixed number of iterations and throws a RangeError",
+          correct: false,
+        }
+      - {
+          text: "The event loop never gets past the microtask queue, so I/O and timers are starved",
+          correct: true,
+        }
+      - {
+          text: "The microtasks are moved to the thread pool once the queue grows beyond a threshold",
+          correct: false,
+        }
+
+  - type: single
+    prompt: "An `async` handler reaches `await db.query(...)`, and the query takes 50 ms. What happens on the JS thread during those 50 ms?"
+    explanation: "`await` suspends only that async function and returns control to the event loop, which keeps serving other callbacks. When the query's promise resolves, the rest of the function is queued as a microtask and resumes. Nothing spins or blocks, and no new thread is created for the function."
+    theoryUrl: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/await
+    options:
+      - {
+          text: "The thread waits on the query, but other requests are handled on additional threads Node spawns for them",
+          correct: false,
+        }
+      - {
+          text: "The function is suspended and the thread is free to run other callbacks until the result arrives",
+          correct: true,
+        }
+      - {
+          text: "The thread checks in a busy loop whether the query has finished, which costs CPU but not latency",
+          correct: false,
+        }
+      - {
+          text: "The whole process pauses, but the query is fast enough that nobody notices",
+          correct: false,
+        }
+
+  - type: single
+    prompt: "What is the role of the poll phase in the Node.js event loop?"
+    explanation: "In the poll phase the loop collects new I/O events and runs their callbacks. When there is nothing else to do it waits there for I/O, bounded by the next timer due, which is why an idle Node process uses almost no CPU. Timers and `setImmediate` callbacks have their own phases."
+    theoryUrl: https://nodejs.org/en/learn/asynchronous-work/event-loop-timers-and-nexttick
+    options:
+      - {
+          text: "It runs the callbacks of expired `setTimeout` and `setInterval` timers",
+          correct: false,
+        }
+      - {
+          text: "It retrieves new I/O events, runs their callbacks, and waits for I/O when idle",
+          correct: true,
+        }
+      - {
+          text: "It checks every few milliseconds whether the garbage collector should run",
+          correct: false,
+        }
+      - {
+          text: "It runs all callbacks scheduled with `setImmediate`, then closes finished sockets",
+          correct: false,
+        }
+
+  - type: single
+    prompt: "What does `setTimeout(fn, 100)` actually guarantee?"
+    explanation: "The delay is a minimum threshold: `fn` will not run before roughly 100 ms, but it can run later if the loop is busy with other callbacks or blocked by synchronous code. Timers cannot interrupt running code, and they give no upper bound."
+    theoryUrl: https://nodejs.org/en/learn/asynchronous-work/event-loop-timers-and-nexttick
+    options:
+      - {
+          text: "`fn` runs exactly 100 ms later, interrupting whatever code is running at that moment",
+          correct: false,
+        }
+      - {
+          text: "`fn` runs no earlier than about 100 ms later, and possibly later if the loop is busy",
+          correct: true,
+        }
+      - {
+          text: "`fn` runs within 100 ms, as soon as the loop is idle for the first time",
+          correct: false,
+        }
+      - {
+          text: "`fn` runs exactly 100 ms later on a timer thread, in parallel with the main code",
+          correct: false,
+        }
+
+  - type: boolean
+    prompt: "A Node.js script exits on its own once there are no pending timers, open sockets, servers or other active work left for the event loop."
+    answer: true
+    explanation: "The event loop keeps running only while something can still produce events. When nothing remains (no timers, no listening servers, no in-flight I/O), the loop ends and so does the process. That is why a script that only defines functions exits immediately, while a running HTTP server keeps the process alive."
+    theoryUrl: https://nodejs.org/en/learn/asynchronous-work/event-loop-timers-and-nexttick
+
+  - type: single
+    prompt: "Which kind of workload is Node.js's single-threaded event loop model best suited to?"
+    explanation: "Node shines when most of the time is spent waiting on I/O: APIs, gateways, real-time messaging. One thread can juggle many connections cheaply. Long CPU-bound jobs such as video encoding block the loop and need worker threads or another runtime, so they are the weak spot, not the sweet spot."
+    theoryUrl: https://nodejs.org/en/learn/asynchronous-work/overview-of-blocking-vs-non-blocking
+    options:
+      - {
+          text: "Many concurrent requests that each spend most of their time waiting on databases or networks",
+          correct: true,
+        }
+      - {
+          text: "Long CPU-bound jobs such as video encoding, since V8's JIT makes them run at native speed",
+          correct: false,
+        }
+      - {
+          text: "Heavy numerical computation, because the event loop spreads the work across all CPU cores",
+          correct: false,
+        }
+      - {
+          text: "Any workload, since an async API makes every kind of operation non-blocking automatically",
+          correct: false,
+        }
+
+  - type: single
+    prompt: "Your Node service must convert uploaded videos by running the existing `ffmpeg` command-line program. Which mechanism fits?"
+    explanation: "Running an external program is exactly what child processes are for: it runs in its own OS process, outside your event loop, and you talk to it through stdio or exit codes. Worker threads run JavaScript inside the same process, and `cluster` forks copies of your own server to share a port; neither runs another executable."
+    theoryUrl: https://nodejs.org/api/child_process.html
+    options:
+      - {
+          text: "A worker thread, because it runs the program in parallel inside the same process",
+          correct: false,
+        }
+      - {
+          text: "A child process, because it runs a separate executable in its own OS process",
+          correct: true,
+        }
+      - {
+          text: "The `cluster` module, because it forks processes that can run any command",
+          correct: false,
+        }
+      - {
+          text: "An async function, because `await` moves the program's execution onto the thread pool",
+          correct: false,
+        }
+
+  - type: single
+    prompt: "This handler serves a small config file. Traffic grows to hundreds of requests per second and latency climbs for every endpoint. What is the problem?"
     code: |
       const fs = require('node:fs')
 
-      fs.readFile(__filename, () => {
-        setTimeout(() => console.log('timeout'), 0)
-        setImmediate(() => console.log('immediate'))
+      app.get('/config', (req, res) => {
+        const data = fs.readFileSync('./config.json', 'utf8')
+        res.json(JSON.parse(data))
       })
     codeLanguage: javascript
-    explanation: "Inside an I/O callback we are in the poll phase, so the next phase is check, which runs `setImmediate` callbacks before the loop wraps around to timers. It always prints `immediate` then `timeout`. The order is only non-deterministic when both are scheduled from the main module."
-    theoryUrl: https://nodejs.org/en/learn/asynchronous-work/event-loop-timers-and-nexttick
-    options:
-      - { text: "timeout, then immediate, always", correct: false }
-      - { text: "immediate, then timeout, always", correct: true }
-      - { text: "Either order, it depends on process performance", correct: false }
-      - { text: "Only immediate, since a 0 ms timeout is ignored in I/O callbacks", correct: false }
-  - type: single
-    prompt: "What is the output order of this script?"
-    code: |
-      async function a() {
-        console.log(1)
-        await b()
-        console.log(2)
-      }
-
-      async function b() {
-        console.log(3)
-      }
-
-      a()
-      Promise.resolve().then(() => console.log(4))
-      console.log(5)
-    codeLanguage: javascript
-    explanation: "An async function runs synchronously until its first `await`, so it prints 1 then 3 (the body of `b`). `a` is then suspended and its continuation is queued as a microtask before the `.then` callback was queued. After the sync `5`, the microtasks run in queue order: 2, then 4."
-    theoryUrl: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/async_function
-    options:
-      - { text: "1, 3, 5, 4, 2", correct: false }
-      - { text: "1, 3, 5, 2, 4", correct: true }
-      - { text: "1, 5, 3, 2, 4", correct: false }
-      - { text: "1, 3, 2, 5, 4", correct: false }
-  - type: single
-    prompt: "What is the output order of these callbacks in a CommonJS script?"
-    code: |
-      Promise.resolve().then(() => {
-        console.log('p1')
-        process.nextTick(() => console.log('tick inside promise'))
-      })
-
-      process.nextTick(() => {
-        console.log('t1')
-        Promise.resolve().then(() => console.log('promise inside tick'))
-      })
-
-      Promise.resolve().then(() => console.log('p2'))
-    codeLanguage: javascript
-    explanation: "After the main script, `nextTick` runs first (t1), which queues a new microtask at the end of the promise queue. Then the microtask queue drains in order: p1, p2, 'promise inside tick'. The `nextTick` scheduled from p1 only runs once that microtask queue is empty, so it comes last. Microtasks do not yield to the tick queue mid-drain."
-    theoryUrl: https://nodejs.org/en/learn/asynchronous-work/understanding-processnexttick
-    options:
-      - { text: "t1, p1, p2, tick inside promise, promise inside tick", correct: false }
-      - { text: "p1, p2, t1, promise inside tick, tick inside promise", correct: false }
-      - { text: "t1, p1, tick inside promise, p2, promise inside tick", correct: false }
-      - { text: "t1, p1, p2, promise inside tick, tick inside promise", correct: true }
-  - type: single
-    prompt: "What does this script print?"
-    code: |
-      const p = new Promise((resolve) => {
-        console.log('executor')
-        resolve('done')
-        console.log('after resolve')
-      })
-
-      p.then((value) => console.log(value))
-      console.log('sync end')
-    codeLanguage: javascript
-    explanation: "The promise executor runs synchronously, and `resolve` does not stop it, so both executor logs print first. The `.then` callback is always asynchronous (a microtask), even for an already-resolved promise, so `done` comes after `sync end`."
-    theoryUrl: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Using_promises
-    options:
-      - { text: "executor, after resolve, done, sync end", correct: false }
-      - { text: "executor, done, after resolve, sync end", correct: false }
-      - { text: "executor, after resolve, sync end, done", correct: true }
-      - { text: "sync end, executor, after resolve, done", correct: false }
-  - type: single
-    prompt: "A module schedules `setTimeout(fn, 0)` and `setImmediate(fn)` at its top level, not inside any I/O callback. What can you say about which fires first?"
-    explanation: "From the main module the order depends on how fast the process reaches the loop: if 1 ms has already elapsed when the timers phase starts, the timeout fires first, otherwise `setImmediate` wins. So it is non-deterministic. It is deterministic only inside an I/O callback, where `setImmediate` always wins."
-    theoryUrl: https://nodejs.org/en/learn/asynchronous-work/event-loop-timers-and-nexttick
+    explanation: "`readFileSync` blocks the JS thread for the full duration of the disk read on every request, and nothing else can run meanwhile. Using `fs.promises.readFile`, or better reading the file once at startup and caching it, keeps the loop free. Sync APIs are fine at startup, not in a hot request path."
+    theoryUrl: https://nodejs.org/en/learn/asynchronous-work/overview-of-blocking-vs-non-blocking
     options:
       - {
-          text: "`setTimeout` always fires first, since the timers phase comes first in the loop",
+          text: "`JSON.parse` runs on the thread pool, which is too small for hundreds of parses per second",
           correct: false,
         }
       - {
-          text: "`setImmediate` always fires first, since it is the more specific API",
-          correct: false,
-        }
-      - {
-          text: "It is non-deterministic, as it depends on process performance when the loop starts",
+          text: "Each request blocks the JS thread on a synchronous disk read, so all requests queue behind it",
           correct: true,
         }
       - {
-          text: "They fire in the same tick, in registration order, as a single batch",
+          text: "`res.json` cannot stream the response, so large responses hold the socket open too long",
           correct: false,
         }
-  - type: single
-    prompt: "What is the output order of this CommonJS script?"
-    code: |
-      setTimeout(() => console.log('t'), 0)
+      - {
+          text: "Reading the same file concurrently from many requests corrupts the OS file cache",
+          correct: false,
+        }
 
-      async function f() {
-        console.log('f start')
-        await null
-        console.log('f after await')
-      }
-
-      f()
-      process.nextTick(() => console.log('tick'))
-      queueMicrotask(() => console.log('micro'))
-      console.log('end')
-    codeLanguage: javascript
-    explanation: "Sync part: `f start`, `end`. Then the `nextTick` queue (tick), then microtasks in the order they were queued: the `await null` continuation was queued by `f()` before `queueMicrotask`, so `f after await` precedes `micro`. The timer fires last, in the timers phase."
-    theoryUrl: https://nodejs.org/api/globals.html#queuemicrotaskcallback
-    options:
-      - { text: "f start, end, micro, f after await, tick, t", correct: false }
-      - { text: "f start, end, tick, f after await, micro, t", correct: true }
-      - { text: "f start, end, tick, micro, f after await, t", correct: false }
-      - { text: "f start, tick, end, f after await, micro, t", correct: false }
-  - type: single
-    prompt: "An Express handler calls `JSON.parse` on a 60 MB request body and then runs a CPU-heavy aggregation, taking about 800 ms. Under load, unrelated endpoints show latency spikes of the same size. What is the best architectural fix?"
-    explanation: "While the JS thread is busy, the event loop cannot run any other callback, so every request waits. Moving the CPU-bound work to a `worker_threads` pool (or a separate service) keeps the loop free. Adding `async` to the handler does not help since the work is still synchronous, and a bigger thread pool only affects libuv offloaded I/O."
-    theoryUrl: https://nodejs.org/en/learn/asynchronous-work/dont-block-the-event-loop
-    options:
-      - {
-          text: "Mark the handler `async` so that Node runs it concurrently with the others",
-          correct: false,
-        }
-      - {
-          text: "Raise `UV_THREADPOOL_SIZE` so that more threads can run the parsing",
-          correct: false,
-        }
-      - {
-          text: "Offload the parsing and aggregation to a worker thread pool or a separate service",
-          correct: true,
-        }
-      - {
-          text: "Wrap the aggregation in `setImmediate` so it runs after the response is sent",
-          correct: false,
-        }
-  - type: single
-    prompt: "What does this script print?"
-    code: |
-      setImmediate(() => {
-        console.log('imm1')
-        process.nextTick(() => console.log('tick'))
-      })
-
-      setImmediate(() => console.log('imm2'))
-    codeLanguage: javascript
-    explanation: "Since Node 11 the `nextTick` and microtask queues are drained between each individual `setImmediate`/timer callback, not only after the whole phase. So `tick` runs right after `imm1` and before `imm2`. In Node 10 and older, it would have printed imm1, imm2, tick."
-    theoryUrl: https://nodejs.org/en/learn/asynchronous-work/understanding-setimmediate
-    options:
-      - { text: "imm1, imm2, tick", correct: false }
-      - { text: "imm1, tick, imm2", correct: true }
-      - { text: "tick, imm1, imm2", correct: false }
-      - { text: "imm1, imm2, and tick never runs", correct: false }
-  - type: boolean
-    prompt: A function that recursively schedules itself with `process.nextTick` can starve I/O, because the event loop never gets to advance to the next phase.
-    answer: true
-    explanation: "The `nextTick` queue is drained completely before the loop continues, and callbacks added while draining are processed in the same drain. An endless chain of ticks therefore blocks timers and I/O. `setImmediate` does not have this problem because each recursion defers to the next loop iteration."
-    theoryUrl: https://nodejs.org/en/learn/asynchronous-work/understanding-processnexttick
-  - type: single
-    prompt: "What guarantee does `setTimeout(fn, 100)` give in Node?"
-    explanation: "The delay is a minimum: the callback becomes eligible after at least 100 ms, but it runs only when the loop reaches the timers phase and the JS thread is free. A long synchronous task or a busy poll phase delays it further. It is neither exact nor a hard upper bound."
-    theoryUrl: https://nodejs.org/api/timers.html
-    options:
-      - {
-          text: "It runs at exactly 100 ms, as the libuv timer wheel is precise to the millisecond",
-          correct: false,
-        }
-      - {
-          text: "It runs within 100 ms at most, otherwise Node throws a timeout error",
-          correct: false,
-        }
-      - {
-          text: "It runs on a separate thread, so it is not affected by what the main thread does",
-          correct: false,
-        }
-      - { text: "It runs after at least 100 ms, and later if the loop is busy", correct: true }
-  - type: single
-    prompt: "What does this CommonJS module export?"
-    code: |
-      exports.a = 1
-      module.exports = { b: 2 }
-      exports.c = 3
-
-      console.log(module.exports)
-    codeLanguage: javascript
-    explanation: "`exports` is just a variable that initially points to the same object as `module.exports`. Reassigning `module.exports` replaces the object that `require` returns, so the later `exports.c = 3` mutates the old, orphaned object. The printed value is `{ b: 2 }`."
-    theoryUrl: https://nodejs.org/api/modules.html#exports-shortcut
-    options:
-      - { text: "{ a: 1, b: 2, c: 3 }", correct: false }
-      - { text: "{ a: 1, c: 3 }", correct: false }
-      - { text: "{ b: 2, c: 3 }", correct: false }
-      - { text: "{ b: 2 }", correct: true }
-  - type: single
-    prompt: "`main.js` requires `a.js`, and `a.js` and `b.js` require each other. What does `node main.js` print?"
-    code: |
-      // a.js
-      exports.loaded = false
-      const b = require('./b')
-      console.log('in a, b.loaded =', b.loaded)
-      exports.loaded = true
-
-      // b.js
-      exports.loaded = false
-      const a = require('./a')
-      console.log('in b, a.loaded =', a.loaded)
-      exports.loaded = true
-
-      // main.js
-      require('./a')
-      console.log('main done')
-    codeLanguage: javascript
-    explanation: "When `b.js` requires `a.js`, `a` is already in the cache but only partially executed, so `b` receives its incomplete exports (`loaded` is still `false`). `b` then finishes, and `a` resumes and sees `b.loaded === true`. Node does not throw on cycles, it hands back the unfinished exports."
-    theoryUrl: https://nodejs.org/api/modules.html#cycles
-    options:
-      - {
-          text: "in a, b.loaded = true, then in b, a.loaded = true, then main done",
-          correct: false,
-        }
-      - {
-          text: "in b, a.loaded = false, then in a, b.loaded = true, then main done",
-          correct: true,
-        }
-      - {
-          text: "in b, a.loaded = true, then in a, b.loaded = true, then main done",
-          correct: false,
-        }
-      - { text: "It throws a RangeError for the circular dependency", correct: false }
-  - type: single
-    prompt: "This file is saved as `check.mjs` and run with `node check.mjs`. What does it print?"
-    code: |
-      console.log(typeof require, typeof __dirname, typeof import.meta.url)
-    codeLanguage: javascript
-    explanation: "ES modules have no `require`, `module`, `exports`, `__filename` or `__dirname`. `typeof` on an undeclared identifier returns `'undefined'` instead of throwing. The ESM replacement for the location is `import.meta.url` (a string) or `import.meta.dirname` in recent Node."
-    theoryUrl: https://nodejs.org/api/esm.html#no-require-exports-or-moduleexports
-    options:
-      - { text: "function string string", correct: false }
-      - { text: "undefined undefined string", correct: true }
-      - { text: "undefined undefined undefined", correct: false }
-      - { text: "It throws a ReferenceError on `require`", correct: false }
   - type: multi
-    prompt: "Which statements about ES modules compared to CommonJS in Node.js are true? Select all that apply."
-    explanation: "ESM supports top-level `await`, exports are live bindings (an importer sees later updates), and `import` declarations are statically analysable, which enables tree shaking. CommonJS `require` is synchronous and returns a snapshot of `module.exports`, but that is a CJS trait, not an ESM one. ESM loading is asynchronous."
+    prompt: "Which statements about ES modules (ESM), compared with CommonJS, are true? Select all that apply."
+    explanation: "ESM `import`/`export` declarations are static, so the module graph is known before any code runs, and ESM supports top-level `await`. Imported names are live bindings to the exporter's variables, not copies. Static `import` declarations must be at the top level; for conditional loading you use dynamic `import()`, which returns a promise."
     theoryUrl: https://nodejs.org/api/esm.html
     options:
-      - { text: "Top-level `await` is supported", correct: true }
       - {
-          text: "An imported binding reflects later changes made by the exporting module",
+          text: "Imports and exports are static, so the module graph is known before any code runs",
           correct: true,
         }
+      - { text: "`await` can be used at the top level of a module", correct: true }
       - {
-          text: "Imports are resolved synchronously at the line where each `import` runs",
+          text: "Imported names are copies of the exported values taken at import time",
           correct: false,
         }
       - {
-          text: "Import specifiers can be statically analysed, which enables tree shaking",
-          correct: true,
+          text: "A static `import` declaration can be placed inside an `if` block to load a module conditionally",
+          correct: false,
         }
+
   - type: single
-    prompt: "In a CommonJS file, `require('lodash')` is called from `/app/src/utils/index.js`. Which lookup does Node perform?"
-    explanation: "A bare specifier is searched in `node_modules` directories, starting from the requiring file's folder and walking up through every parent (`/app/src/utils/node_modules`, `/app/src/node_modules`, `/app/node_modules`, `/node_modules`). It does not look at the current working directory, and it does not use a global registry."
-    theoryUrl: https://nodejs.org/api/modules.html#loading-from-node_modules-folders
+    prompt: "You are starting a new Node project and want all its `.js` files treated as ES modules. What is the clear, explicit way to do that?"
+    explanation: 'Setting `"type": "module"` in the nearest `package.json` tells Node that `.js` files in that package are ESM; `.mjs` and `.cjs` extensions can override it file by file. Relying on Node to guess from the syntax is not explicit, and a `use module` directive or a CLI flag per file does not exist as a project setting.'
+    theoryUrl: https://nodejs.org/api/packages.html#determining-module-system
     options:
-      - {
-          text: "The `node_modules` folder in the current working directory, then the global npm folder",
-          correct: false,
-        }
-      - {
-          text: "Only the `node_modules` folder next to the project's `package.json`",
-          correct: false,
-        }
-      - {
-          text: "Each `node_modules` folder from the file's directory up to the filesystem root",
-          correct: true,
-        }
-      - {
-          text: "A central registry cache keyed by package name, regardless of the file location",
-          correct: false,
-        }
+      - { text: "Add a `'use module'` directive at the top of every file", correct: false }
+      - { text: 'Set `"type": "module"` in the project''s `package.json`', correct: true }
+      - { text: "Rely on Node's guess based on whether the code uses `import`", correct: false }
+      - { text: "Always start the app with a flag that turns on ESM mode", correct: false }
+
   - type: single
-    prompt: 'In an ES module with `"type": "module"`, `import { helper } from ''./util''` fails even though `util.js` exists next to the file. Why?'
-    explanation: "The ESM resolver does not do extension searching or directory index lookup: relative specifiers must be fully specified (`./util.js`). CommonJS `require('./util')` is the one that tries `.js`, `.json`, `.node` and `index.js`. Named exports are not the issue, and `.js` files are ESM here thanks to `type`."
-    theoryUrl: https://nodejs.org/api/esm.html#mandatory-file-extensions
-    options:
-      - { text: "Named imports are not allowed from a `.js` file in ESM mode", correct: false }
-      - {
-          text: "ESM does not append file extensions, so the specifier needs `./util.js`",
-          correct: true,
-        }
-      - { text: "ESM can only import from files that have the `.mjs` extension", correct: false }
-      - {
-          text: "Relative imports are disabled unless `util` is listed in `package.json` dependencies",
-          correct: false,
-        }
-  - type: single
-    prompt: "A module `config.js` is `require`d from ten different files, and it builds a database client at its top level. How many times does the top-level code run, and why?"
-    explanation: "Node caches modules by their resolved filename in `require.cache`, so the module body runs once and every `require` returns the same `module.exports` object. This is why a module export works as a lightweight singleton. The caveat: a different resolved path (e.g. a duplicated package in nested `node_modules`) gives a separate instance."
+    prompt: "Two different files in the same process both import `./db.js`, which creates a connection pool at module level. How many pools are created?"
+    explanation: "Node caches a module after it is first loaded and evaluated (by resolved path), so every later import or require gets the same instance. Module-level state is therefore shared across the process, which is why modules often act as natural singletons. Each worker thread or child process, however, has its own module cache."
     theoryUrl: https://nodejs.org/api/modules.html#caching
     options:
       - {
-          text: "Ten times, since each `require` call re-executes the file for isolation",
+          text: "Two, because each importing file gets its own fresh evaluation of the module",
           correct: false,
         }
       - {
-          text: "Once per directory, since the cache is scoped to the requiring folder",
-          correct: false,
-        }
-      - { text: "Once per process, since modules are cached by resolved filename", correct: true }
-      - {
-          text: "Once per event loop tick, since the cache is cleared between ticks",
-          correct: false,
-        }
-  - type: boolean
-    prompt: "In an ES module, `import config from './legacy.cjs'` gives you the value of `module.exports` of the CommonJS file as the default import."
-    answer: true
-    explanation: "When ESM imports a CommonJS module, the default export is always `module.exports`. Named imports work only when Node can statically detect them (cjs-module-lexer), so the safe habit is to import the default and destructure."
-    theoryUrl: https://nodejs.org/api/esm.html#interoperability-with-commonjs
-  - type: single
-    prompt: "What does this CommonJS script print?"
-    code: |
-      Promise.reject(new Error('x'))
-        .catch(() => console.log('caught'))
-        .then(() => console.log('then'))
-        .finally(() => console.log('finally'))
-
-      process.nextTick(() => console.log('tick'))
-    codeLanguage: javascript
-    explanation: "`tick` runs first because the `nextTick` queue is drained before promise jobs. The rejection is handled by `catch`, which returns a fulfilled promise, so `then` and then `finally` run in sequence. Each link in the chain is a separate microtask."
-    theoryUrl: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise/finally
-    options:
-      - { text: "caught, then, finally, tick", correct: false }
-      - { text: "tick, caught, finally, then", correct: false }
-      - { text: "tick, caught, then, finally", correct: true }
-      - { text: "tick, then an unhandled rejection error", correct: false }
-  - type: single
-    prompt: "A service runs on Node with the default settings and starts 8 `crypto.pbkdf2` calls (async, callback form) at the same time. Each takes about 100 ms of CPU. What do you expect?"
-    explanation: "`pbkdf2` runs on libuv's thread pool, which has 4 threads by default. Four jobs run in parallel and finish at about 100 ms, the other four wait for a free thread and finish at about 200 ms. Raising `UV_THREADPOOL_SIZE` (set before the pool is first used) changes that. They are not all parallel, and they do not block the main thread."
-    theoryUrl: https://nodejs.org/api/cli.html#uv_threadpool_sizesize
-    options:
-      - {
-          text: "All 8 finish at about 100 ms, since each call gets its own thread",
-          correct: false,
-        }
-      - {
-          text: "The calls run one after another, so the last finishes at about 800 ms",
-          correct: false,
-        }
-      - {
-          text: "The main thread is blocked for about 800 ms, as hashing is synchronous CPU work",
-          correct: false,
-        }
-      - {
-          text: "Four finish at about 100 ms and four at about 200 ms, due to the 4-thread pool",
+          text: "One, because the module is evaluated once and then served from Node's module cache",
           correct: true,
         }
-  - type: single
-    prompt: 'A project has a `package.json` with `"type": "module"`. A legacy script in it must still use `require()` and `module.exports`. What is the minimal change?'
-    explanation: 'With `"type": "module"` every `.js` file is treated as ESM, but `.cjs` files are always CommonJS regardless of `type`. Renaming the legacy script to `.cjs` is the smallest change. Removing `type` would turn all the other files into CommonJS, and `--experimental-modules` is not needed.'
-    theoryUrl: https://nodejs.org/api/packages.html#determining-module-system
-    options:
-      - { text: "Rename the script to `.cjs`, which is always loaded as CommonJS", correct: true }
       - {
-          text: "Add a `// @commonjs` pragma comment on the first line of the file",
+          text: "One per request, because modules are re-evaluated whenever the importing code runs",
           correct: false,
         }
-      - { text: "Run it with `node --experimental-modules` to re-enable `require`", correct: false }
       - {
-          text: 'Remove `"type": "module"` from `package.json`, as it applies to one file',
+          text: "None until the first query, because Node evaluates modules lazily at first use",
+          correct: false,
+        }
+
+  - type: single
+    prompt: "You publish an internal library and want consumers to import only its public entry points, not reach into files under `src/internal/`. Which `package.json` feature is designed for that?"
+    explanation: "The `exports` field defines a package's public entry points; any subpath not listed cannot be imported by consumers, so internals stay private. The older `main` field only names a default entry and does not block deep imports. `files` controls what gets published to npm, not what can be imported."
+    theoryUrl: https://nodejs.org/api/packages.html#package-entry-points
+    options:
+      - {
+          text: "The `main` field, which forbids importing any file other than the one it names",
+          correct: false,
+        }
+      - {
+          text: "The `exports` field, which defines the entry points and blocks unlisted subpaths",
+          correct: true,
+        }
+      - {
+          text: "The `files` field, which hides every unlisted file from consumers at import time",
+          correct: false,
+        }
+      - {
+          text: "The `private` field, which marks a package's internal folders as non-importable",
           correct: false,
         }
