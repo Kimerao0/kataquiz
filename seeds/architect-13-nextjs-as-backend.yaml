@@ -371,24 +371,24 @@ questions:
           correct: false,
         }
   - type: single
-    prompt: "A webhook handler verifies the provider's HMAC signature against `JSON.stringify(await req.json())` instead of the raw body text, and valid events are sometimes rejected. Why?"
-    explanation: "The provider signed the exact bytes it sent. Parsing and re-serialising can change whitespace, key order, escaping or number formatting, so the recomputed HMAC no longer matches. Read the raw text first, verify the signature over it, then `JSON.parse` the same string."
-    theoryUrl: https://nextjs.org/docs/app/guides/backend-for-frontend
+    prompt: "Your billing provider posts `subscription.updated` webhooks to a Route Handler. Deliveries are retried and can arrive out of order, and sometimes an old `active` event overwrites a newer cancellation. How should the handler apply events?"
+    explanation: "Providers do not guarantee delivery order, so the handler must not trust arrival order. Keep a version or event timestamp per subscription and ignore any event older than what is stored (or treat the event as a signal and fetch the current state from the provider's API). Deduplicating by event id stops replays but not reordering, and a lock only serialises events in the wrong order."
+    theoryUrl: https://docs.stripe.com/webhooks
     options:
       - {
-          text: "Re-serialised JSON can differ byte-for-byte from the body the provider signed",
+          text: "Store a version or timestamp per subscription, and ignore any event older than it",
           correct: true,
         }
       - {
-          text: "req.json() removes the signature header from the request, so the check has nothing to compare",
+          text: "Deduplicate by event id, which also makes the provider deliver events in order",
           correct: false,
         }
       - {
-          text: "HMAC can only be computed over binary data, never over a JavaScript string",
+          text: "Return a non-2xx status for late events, so the provider resends them in the right order",
           correct: false,
         }
       - {
-          text: "Providers sign the parsed object, so the check fails only when a payload is very large",
+          text: "Apply events under a lock, so they are written in the order in which they arrive",
           correct: false,
         }
   - type: single

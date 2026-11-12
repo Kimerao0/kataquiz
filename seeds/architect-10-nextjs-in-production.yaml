@@ -264,11 +264,11 @@ questions:
       - { text: "Add the host to a robots.txt allowlist that next/image reads", correct: false }
   - type: single
     prompt: "`next/image` lazy-loads images by default. Why is that a good default for most images but a poor choice for the hero image that is your Largest Contentful Paint element?"
-    explanation: 'Lazy loading defers images until they approach the viewport, which saves bandwidth for content further down. The LCP image is visible immediately, so deferring it delays the metric; load it eagerly with a high fetch priority (for example `fetchPriority="high"` or `preload`). Lazy loading does not make images smaller or remove the need for dimensions.'
+    explanation: 'Lazy loading defers images until they approach the viewport, which saves bandwidth for content further down. The LCP image is visible immediately, so deferring it delays the metric; load it eagerly (`loading="eager"`) with a high fetch priority (for example `fetchPriority="high"` or `preload`). Lazy loading does not make images smaller or remove the need for dimensions.'
     theoryUrl: https://nextjs.org/docs/app/api-reference/components/image
     options:
       - {
-          text: "Lazy loading only defers off-screen images, so the hero should load eagerly with high priority",
+          text: "Lazy images start loading late and at low priority, so load the hero eagerly with high priority",
           correct: true,
         }
       - {

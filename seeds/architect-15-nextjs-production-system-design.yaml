@@ -82,24 +82,24 @@ questions:
           correct: false,
         }
   - type: single
-    prompt: "You place the app behind a corporate reverse proxy. Since then, every Server Action fails with a rejected-origin error. The proxy forwards requests with its own internal hostname in `Host`. What do you do?"
-    explanation: "Next.js protects Server Actions against CSRF by comparing the `Origin` host with the app's host taken from `x-forwarded-host` or `host`. Make the proxy forward the public host in `x-forwarded-host`, and only if that is impossible list the public host in `serverActions.allowedOrigins`. Disabling the check is not an option."
-    theoryUrl: https://nextjs.org/docs/app/api-reference/config/next-config-js/serverActions
+    prompt: "Before launch, a security reviewer notices that your Server Actions use no CSRF tokens and asks what stops another site from submitting a forged form to them with the user's cookies. What is the right answer?"
+    explanation: "Server Actions can only be invoked with `POST`, which together with `SameSite` cookies (the browser default) blocks most cross-site requests, and Next.js also aborts any action call whose `Origin` does not match the app's host. Action IDs are visible in the client bundle, so they are not secrets, and no hidden token is added. This protects against CSRF only: each action must still authenticate and authorize the caller."
+    theoryUrl: https://nextjs.org/docs/app/guides/data-security
     options:
       - {
-          text: "Forward the public host in x-forwarded-host, or list it in allowedOrigins",
+          text: "Only POST can invoke them, and Next.js rejects requests whose Origin is not the app's host",
           correct: true,
         }
       - {
-          text: "Switch the actions to GET, because the origin check applies only to POST",
+          text: "Action IDs are unguessable secrets that a forged cross-site request has no way of knowing",
           correct: false,
         }
       - {
-          text: "Set the encryption key to the same value on both, which fixes origin checks",
+          text: "Next.js adds a hidden CSRF token to every form that uses an action and verifies it on submit",
           correct: false,
         }
       - {
-          text: "Remove the Origin header at the proxy, so that the comparison is skipped",
+          text: "Actions never read cookies, so a forged request cannot act with the user's session",
           correct: false,
         }
   - type: single
