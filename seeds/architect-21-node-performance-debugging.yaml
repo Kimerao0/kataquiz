@@ -1,6 +1,6 @@
 version: 1
 title: "Architect Roadmap 21: Node.js performance and debugging"
-description: CPU profiling and flame graphs, memory leaks and heap snapshots, the V8 garbage collector, and finding code that blocks the event loop.
+description: Reasoning from symptom to cause in Node.js services, event-loop lag, latency percentiles, CPU profiles and flame graphs, memory leaks and heap snapshots, and how V8 hidden classes, deopts and the garbage collector affect performance.
 language: en
 tags: [architect-roadmap, nodejs, performance, profiling, memory, v8]
 run:
@@ -9,27 +9,96 @@ run:
   timePerQuestionSec: 90
 questions:
   - type: single
-    prompt: "You open a CPU flame graph captured with `node --cpu-prof`. One function `renderReport` has a very wide box at the top of a stack, with nothing above it. What does that tell you?"
-    explanation: "In a flame graph, width is the share of samples where that frame was on the stack, and a wide box with nothing on top means the time is spent in that function's own code (self time), so it is the first place to look. Height only shows call depth, and the left-to-right order is alphabetical or arbitrary, not chronological."
-    theoryUrl: https://nodejs.org/en/learn/getting-started/profiling
+    prompt: "Every endpoint of a Node.js API, including the trivial `/health`, becomes slow at the same moments, and the process sits at 100% of one CPU core during those moments. What is the most likely cause, and what do you capture first?"
+    explanation: "When even a handler that does no work is slow, the shared resource is the event loop, and one core pinned at 100% says JavaScript is running synchronously and blocking it. A sampled CPU profile taken during the slow window shows which function is burning the time. A slow database or a small connection pool would make the DB-backed routes slow, not `/health`, and would show low CPU."
+    theoryUrl: https://nodejs.org/en/learn/asynchronous-work/dont-block-the-event-loop
     options:
       - {
-          text: "It ran first in time, since the x-axis is chronological and the leftmost frame always costs the most",
+          text: "The database is slow; capture slow-query logs from the database server",
           correct: false,
         }
-      - { text: "It is deeply nested, so it has the most call frames above it", correct: false }
       - {
-          text: "Its own code takes a large share of the samples, making it a prime optimisation target",
+          text: "Synchronous CPU work is blocking the event loop; capture a CPU profile in the slow window",
           correct: true,
         }
-      - { text: "It allocated the most memory, so it probably leaks", correct: false }
+      - {
+          text: "The HTTP keep-alive pool is too small for the traffic; raise the agent's maxSockets and compare response times",
+          correct: false,
+        }
+      - {
+          text: "The heap is too small; take a heap snapshot and raise the old-space limit",
+          correct: false,
+        }
   - type: single
-    prompt: "p99 latency of a production Node service doubles for ten minutes every afternoon. You want a CPU profile from the live process with minimal overhead and no code changes. Which approach fits best?"
-    explanation: "Sampling profilers (the V8 CPU profiler via `--cpu-prof` or the inspector) record the stack at intervals, so their overhead is low enough for production. Instrumenting every function call, or logging every request with timing, changes the behaviour you are measuring and is invasive. Heap snapshots answer memory questions and pause the process."
+    prompt: "A Node.js service has p95 latency of 2 seconds, but its CPU usage stays around 5% and the event-loop delay is a few milliseconds. Where should you look first?"
+    explanation: "Low CPU and a healthy event loop mean the process is mostly waiting, not computing. The time goes into something the request awaits: a downstream call, a database query, or waiting for a free connection in a pool. Distributed tracing or timing around each awaited call shows which. A CPU profile would show an idle process, and adding instances does not help if they all wait on the same bottleneck."
+    theoryUrl: https://nodejs.org/en/learn/diagnostics/poor-performance
+    options:
+      - {
+          text: "At what the requests are waiting on: downstream calls, queries and connection-pool wait time",
+          correct: true,
+        }
+      - {
+          text: "At a CPU flame graph, because slow requests always mean a hot function somewhere in the JavaScript code",
+          correct: false,
+        }
+      - {
+          text: "At the garbage collector, since low CPU usage means GC is starving the main thread",
+          correct: false,
+        }
+      - {
+          text: "At the instance count, since more replicas will divide the latency between them",
+          correct: false,
+        }
+  - type: single
+    prompt: "You want one metric on your dashboard that tells you when a Node.js process is too busy to respond promptly. Why is event-loop delay (for example from `perf_hooks.monitorEventLoopDelay()`) a better signal than CPU percentage?"
+    explanation: "Event-loop delay measures how late the loop gets to scheduled work, which is exactly the delay every callback and request experiences. CPU percentage can be high while the loop is still responsive (work spread in small chunks, or in other threads), and it can look moderate while a single long synchronous task freezes the loop. Event-loop delay is not a memory metric and it does not replace request latency, it explains part of it."
+    theoryUrl: https://nodejs.org/api/perf_hooks.html#perf_hooksmonitoreventloopdelayoptions
+    options:
+      - {
+          text: "It measures directly how late the loop runs scheduled work, which every request then feels",
+          correct: true,
+        }
+      - {
+          text: "It includes the time spent waiting for database responses, so it covers I/O as well",
+          correct: false,
+        }
+      - {
+          text: "It counts the bytes held by pending callbacks, so it reveals memory pressure as well as CPU pressure",
+          correct: false,
+        }
+      - {
+          text: "It is the only metric that stays correct when the process uses worker threads",
+          correct: false,
+        }
+  - type: single
+    prompt: "You open a CPU flame graph of a slow service. The function `renderReport` is a very wide box at the top of its stack, with nothing above it. What does that tell you?"
+    explanation: "In a flame graph the width of a box is the share of samples in which that frame was on the stack, and a wide box with nothing above it means the samples were in that function's own code (self time). That makes it a prime optimisation target. Height is only call depth, the x-axis is not a timeline, and a CPU profile says nothing about memory."
+    theoryUrl: https://www.brendangregg.com/flamegraphs.html
+    options:
+      - {
+          text: "It ran first, because the x-axis of a flame graph is a timeline from left to right",
+          correct: false,
+        }
+      - {
+          text: "It is called from many places, which is why it appears at the very top of the graph",
+          correct: false,
+        }
+      - {
+          text: "Its own code takes a large share of the CPU samples, so optimising it pays off most",
+          correct: true,
+        }
+      - {
+          text: "It allocated the most memory in the profile, so it is the likely source of a leak",
+          correct: false,
+        }
+  - type: single
+    prompt: "p99 latency of a production service doubles for ten minutes every afternoon. You need a CPU profile from the live process during that window, with minimal overhead and no code changes. Which approach fits best?"
+    explanation: "A sampling profiler, such as the V8 profiler started via the inspector or `--cpu-prof`, records the stack at intervals, so its overhead is low enough for production and it shows real behaviour. Wrapping every function in timing code changes what you measure and needs a redeploy. A heap snapshot answers memory questions and pauses the process, and replaying traffic on a laptop rarely reproduces production conditions."
     theoryUrl: https://nodejs.org/en/learn/getting-started/profiling
     options:
       - {
-          text: "Wrap every function with timing code and redeploy with the extra logging",
+          text: "Wrap every function in timing code and redeploy with the extra logging enabled",
           correct: false,
         }
       - {
@@ -37,386 +106,431 @@ questions:
           correct: false,
         }
       - {
-          text: "Attach the inspector or start `--cpu-prof` and capture a sampled CPU profile in the slow window",
+          text: "Capture a sampled CPU profile from the running process during the slow window",
           correct: true,
         }
       - {
-          text: "Replay the production traffic on a laptop and look at the average response time",
+          text: "Replay the afternoon traffic on a laptop and compare the average response times",
           correct: false,
         }
   - type: single
-    prompt: "In what order does this CommonJS script print its lines?"
-    code: |
-      setTimeout(() => console.log('timeout'), 0)
-      setImmediate(() => console.log('immediate'))
-      Promise.resolve().then(() => console.log('promise'))
-      process.nextTick(() => console.log('tick'))
-      const end = Date.now() + 50
-      while (Date.now() < end) {}
-      console.log('loop done')
-    codeLanguage: javascript
-    explanation: "The synchronous loop and its log run first because nothing else can run while the call stack is busy. Then the `nextTick` queue is drained, then promise microtasks. The 0 ms timer is already overdue after the 50 ms block, so the timers phase runs it before the check phase runs `setImmediate`."
-    theoryUrl: https://nodejs.org/en/learn/asynchronous-work/event-loop-timers-and-nexttick
-    options:
-      - { text: "loop done, promise, tick, timeout, immediate", correct: false }
-      - { text: "loop done, tick, promise, immediate, timeout", correct: false }
-      - { text: "timeout, loop done, tick, promise, immediate", correct: false }
-      - { text: "loop done, tick, promise, timeout, immediate", correct: true }
-  - type: single
-    prompt: "What does this script print, and in which order?"
-    code: |
-      setTimeout(() => console.log('timer fired'), 10)
-      function fib(n) {
-        return n < 2 ? n : fib(n - 1) + fib(n - 2)
-      }
-      fib(36)
-      console.log('fib done')
-    codeLanguage: javascript
-    explanation: "The timer cannot fire until the call stack is empty. `fib(36)` takes far longer than 10 ms, so `fib done` is logged first, and the callback only runs afterwards, late. Timers are a minimum delay, not a guarantee, which is why a blocked loop shows up as delayed timers."
-    theoryUrl: https://nodejs.org/en/learn/asynchronous-work/dont-block-the-event-loop
+    prompt: "A flame graph of a busy JSON API shows a large share of the samples in garbage-collection frames rather than in your own functions. What is the most useful conclusion?"
+    explanation: "Time spent in GC is driven by how much the code allocates (and how much stays alive). The fix is to find the allocation hot spots, for example with a sampling heap profile (`--heap-prof`), and reduce them: fewer intermediate arrays and strings, no needless copies or re-serialisation. Disabling or tuning the GC away is not an option in Node, and more cores do not speed up the main thread's allocation rate."
+    theoryUrl: https://nodejs.org/en/learn/diagnostics/memory/using-heap-profiler
     options:
       - {
-          text: "timer fired, then fib done, because the timer was scheduled first",
-          correct: false,
-        }
-      - { text: "fib done, then timer fired", correct: true }
-      - { text: "Only fib done; the timer is cancelled when the stack is blocked", correct: false }
-      - { text: "timer fired and fib done are interleaved, as `fib` is recursive", correct: false }
-  - type: multi
-    prompt: "Which of these operations, when done inside a request handler, can block the event loop for all other requests? Select all that apply."
-    explanation: "Synchronous APIs (`readFileSync`), large synchronous JSON parsing and regular expressions with catastrophic backtracking all run on the main thread. The asynchronous `crypto.pbkdf2` runs on the libuv threadpool, and `fs.promises.readFile` hands the I/O to the threadpool, so neither blocks the loop while they work."
-    theoryUrl: https://nodejs.org/en/learn/asynchronous-work/dont-block-the-event-loop
-    options:
-      - { text: "`JSON.parse` of a 60 MB request body", correct: true }
-      - { text: "`await fs.promises.readFile(path)` on a large file", correct: false }
-      - { text: "`fs.readFileSync(path)` on every request", correct: true }
-      - { text: "A regex like `/^(a+)+$/` applied to user-provided text", correct: true }
-      - { text: "The asynchronous `crypto.pbkdf2(...)` with a callback", correct: false }
-  - type: single
-    prompt: "A regex `/^(a+)+$/` is tested against two strings, each 26 or 27 characters long. Which input is the dangerous one?"
-    code: |
-      const re = /^(a+)+$/
-      re.test('a'.repeat(26))
-      re.test('a'.repeat(26) + 'b')
-    codeLanguage: javascript
-    explanation: "The nested quantifier `(a+)+` can split a run of `a` in exponentially many ways. When the final `$` fails because of the `b`, the engine backtracks through all of them (a ReDoS), blocking the loop for seconds, while the all-`a` string matches at once. Running it confirms the first is fast and the second very slow."
-    theoryUrl: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Regular_expressions#avoiding_catastrophic_backtracking
-    options:
-      - { text: "The all-`a` string, because it is the one that matches", correct: false }
-      - {
-          text: "The one ending with `b`, because the failure forces exponential backtracking",
+          text: "The code allocates too much; profile allocations and cut the temporary objects on the hot path",
           correct: true,
         }
-      - { text: "Both take the same time, since the lengths are almost identical", correct: false }
-      - { text: "Neither, since V8 caches compiled regexes and skips matching", correct: false }
-  - type: single
-    prompt: "You want to measure how late the event loop is running in production and expose it as a metric. Which built-in tool is designed for this?"
-    explanation: "`monitorEventLoopDelay` from `perf_hooks` returns a histogram of event loop delay (min, max, mean, percentiles) with low overhead, so you can alert on p99 delay. `process.hrtime` only gives a clock, `os.loadavg` measures the machine rather than the loop, and `--trace-gc` reports garbage collection."
-    theoryUrl: https://nodejs.org/api/perf_hooks.html#perf_hooksmonitoreventloopdelayoptions
-    options:
-      - { text: "`os.loadavg()`, since a loaded machine means a delayed loop", correct: false }
-      - { text: "`process.hrtime()`, called at the start and end of every request", correct: false }
-      - { text: "`--trace-gc`, because GC pauses are the only cause of delay", correct: false }
-      - { text: "`monitorEventLoopDelay()` from `perf_hooks`, read as a histogram", correct: true }
-  - type: single
-    prompt: "What does the array contain at the end of this script?"
-    code: |
-      const crypto = require('node:crypto')
-      const order = []
-      crypto.pbkdf2('p', 's', 100000, 64, 'sha512', () => order.push('async done'))
-      order.push('after async call')
-      crypto.pbkdf2Sync('p', 's', 100000, 64, 'sha512')
-      order.push('sync done')
-      setTimeout(() => console.log(order), 300)
-    codeLanguage: javascript
-    explanation: "The async `pbkdf2` is handed to the libuv threadpool and returns immediately, so `after async call` is pushed first. `pbkdf2Sync` blocks the main thread until finished, then `sync done` is pushed, and the callback of the async one can only run on a later loop iteration. This is why the sync variants are dangerous in servers."
-    theoryUrl: https://nodejs.org/api/crypto.html#cryptopbkdf2password-salt-iterations-keylen-digest-callback
-    options:
-      - { text: "[ 'async done', 'after async call', 'sync done' ]", correct: false }
-      - { text: "[ 'after async call', 'async done', 'sync done' ]", correct: false }
-      - { text: "[ 'after async call', 'sync done', 'async done' ]", correct: true }
-      - { text: "[ 'sync done', 'after async call', 'async done' ]", correct: false }
-  - type: single
-    prompt: "A service's memory grows for hours. Which observation most reliably indicates a true leak rather than normal GC behaviour?"
-    explanation: "A heap that grows and shrinks in a sawtooth is normal: garbage accumulates and is collected. A leak shows as the heap size measured after full (major) GCs trending upward over time, because retained objects cannot be reclaimed. A single high RSS reading or a few scavenges say little, since V8 and the allocator hold memory for reuse."
-    theoryUrl: https://nodejs.org/en/learn/diagnostics/memory/using-gc-traces
-    options:
       - {
-          text: "`heapUsed` jumps up for a moment, and then drops again after each request",
-          correct: false,
-        }
-      - { text: "RSS is much higher than `heapUsed` during one measurement", correct: false }
-      - { text: "Scavenge collections run several times per second under load", correct: false }
-      - { text: "The heap size after each major GC keeps trending up across hours", correct: true }
-  - type: single
-    prompt: "In Chrome DevTools, you compare two heap snapshots taken during a suspected leak. A `Map` entry shows a shallow size of 48 bytes but a retained size of 380 MB. What does the retained size mean?"
-    explanation: "Retained size is the memory that would be freed if this object were garbage collected: the object plus everything reachable only through it. A tiny shallow size with a huge retained size means a small object (like a `Map` or a closure) keeps a big graph alive, which is exactly what you look for. Shallow size is only the object itself."
-    theoryUrl: https://developer.chrome.com/docs/devtools/memory-problems/memory-101
-    options:
-      - {
-          text: "The object was allocated 380 MB ago and has been kept for that long",
+          text: "The GC is misconfigured; turn it off for request handlers and let it run at night",
           correct: false,
         }
       - {
-          text: "The memory freed when this object is collected, including what only it keeps alive",
+          text: "The machine has too few cores; moving to a larger instance will let the collector run on the spare cores and remove the cost",
+          correct: false,
+        }
+      - {
+          text: "The profiler is wrong, since GC time never shows up in CPU profiles of real apps",
+          correct: false,
+        }
+  - type: single
+    prompt: "A service's p50 latency is a steady 20 ms, but its p99 jumps to 900 ms every few minutes, in short bursts, with no change in traffic. Which hypothesis is most worth checking first, and how?"
+    explanation: "Periodic tail spikes with an unchanged median point to something that stops the event loop for a moment: a long GC pause or a periodic synchronous job (a timer that rebuilds a cache, compresses logs, and so on). Correlating the spikes with GC events (`--trace-gc` or `PerformanceObserver` with `gc` entries) and with event-loop delay confirms or rules this out. Slow clients affect their own requests, not everyone's at fixed intervals."
+    theoryUrl: https://nodejs.org/api/perf_hooks.html#class-performanceobserver
+    options:
+      - {
+          text: "A few clients have slow networks; check the client IP addresses of the slow requests and block them",
+          correct: false,
+        }
+      - {
+          text: "A periodic pause of the loop (GC or a timer job); correlate the spikes with GC events and loop delay",
           correct: true,
         }
-      - { text: "The size of the object after V8 compacts the heap", correct: false }
       - {
-          text: "The memory that the operating system has reserved for the object, including its share of the page tables",
+          text: "The median is wrong; switch the dashboard to the average latency, which smooths out the spikes",
+          correct: false,
+        }
+      - {
+          text: "The database index is missing; add one, since tail latency is always caused by queries",
           correct: false,
         }
   - type: single
-    prompt: "What does this script print?"
-    code: |
-      const cache = new Map()
-      let calls = 0
-      function getUser(id) {
-        calls++
-        if (!cache.has(id)) cache.set(id, { id, big: new Array(1000).fill(0) })
-        return cache.get(id)
-      }
-      for (let i = 0; i < 1000; i++) getUser('req-' + i)
-      for (let i = 0; i < 1000; i++) getUser('req-' + i)
-      console.log(cache.size, calls)
-    codeLanguage: javascript
-    explanation: "The second loop hits the cache, so the Map ends with 1000 entries after 2000 calls. If the key were unique per request (for example a request id) and the cache had no eviction or size limit, it would grow forever: a classic Node leak. Use an LRU or TTL cache with a maximum size."
+    prompt: "A teammate benchmarks two implementations of a parser by running each once on a small input and timing it. The 'faster' one turns out slower in production. What is the most likely flaw in the benchmark?"
+    explanation: "V8 starts by interpreting code and only optimises functions that become hot, so the first runs measure warm-up, not steady state. A single small run also hides GC effects and is noisy. Benchmarks should warm up, run many iterations on realistic data, and report a distribution. Node does not compile all code ahead of time, and timers are precise enough for this purpose."
+    theoryUrl: https://v8.dev/blog/maglev
+    options:
+      - {
+          text: "It measured cold code before V8 optimised it, on one small run that hides GC and noise",
+          correct: true,
+        }
+      - {
+          text: "Node compiles every function ahead of time, so the first run is always the fastest",
+          correct: false,
+        }
+      - {
+          text: "`Date.now()` cannot measure durations under one second, so all short timings are zero",
+          correct: false,
+        }
+      - {
+          text: "Benchmarks are only valid when run under the inspector with the debugger attached",
+          correct: false,
+        }
+  - type: single
+    prompt: "A Node.js process is restarted by its orchestrator every few days. Its memory graph shows a sawtooth (GC frees memory regularly), but the low point after each collection keeps rising. What does that indicate?"
+    explanation: "Each low point is what survives a full collection, so a rising floor means live objects accumulate: something keeps references it no longer needs. A sawtooth with a flat floor would be healthy churn. The next step is heap snapshots over time to find what grows. Raising the heap limit only delays the crash."
     theoryUrl: https://nodejs.org/en/learn/diagnostics/memory
     options:
-      - { text: "1000 2000", correct: true }
-      - { text: "1000 1000", correct: false }
-      - { text: "2000 2000", correct: false }
-      - { text: "1 2000", correct: false }
-  - type: single
-    prompt: "What does this script print?"
-    code: |
-      const wm = new WeakMap()
-      const strong = new Map()
-      let k = {}
-      wm.set(k, 1)
-      strong.set(k, 1)
-      k = null
-      console.log(strong.size, [...strong.keys()].length, wm.has({}))
-    codeLanguage: javascript
-    explanation: "Setting `k = null` only removes one reference. The `Map` still holds the object strongly, so it is retained, `size` is 1 and it has one key. `wm.has({})` is false because a fresh object is a different key. A `WeakMap` would let the original object be collected, but it has no `size` or iteration."
-    theoryUrl: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/WeakMap
-    options:
-      - { text: "0 0 false", correct: false }
-      - { text: "1 1 true", correct: false }
-      - { text: "1 1 false", correct: true }
-      - { text: "0 1 false", correct: false }
-  - type: single
-    prompt: "What does this script print, and what is the memory-leak lesson?"
-    code: |
-      const { EventEmitter } = require('node:events')
-      const bus = new EventEmitter()
-      function handleRequest() {
-        bus.on('tick', () => {})
-      }
-      for (let i = 0; i < 12; i++) handleRequest()
-      console.log(bus.listenerCount('tick'))
-    codeLanguage: javascript
-    explanation: "It prints 12, and Node also emits a `MaxListenersExceededWarning` after the 11th listener. Registering a listener per request on a long-lived emitter without removing it is a typical leak, because the emitter keeps every callback (and everything its closure captures) alive. Use `once`, `off`, or register the listener a single time."
-    theoryUrl: https://nodejs.org/api/events.html#emittersetmaxlistenersn
-    options:
-      - { text: "10, because extra listeners beyond the limit are ignored", correct: false }
-      - { text: "12, with a warning about a possible memory leak", correct: true }
-      - { text: "0, since the arrow functions are garbage collected immediately", correct: false }
-      - { text: "It throws a `RangeError` when the eleventh listener is added", correct: false }
-  - type: multi
-    prompt: "Which of these are common causes of memory leaks in a long-running Node.js server? Select all that apply."
-    explanation: "Unbounded module-level caches, listeners that are never removed and `setInterval` timers that are never cleared all keep references alive forever. Closures that capture large objects also retain them as long as the closure lives. Using `const` or small short-lived allocations is not a leak: those objects are collected as soon as they become unreachable."
-    theoryUrl: https://nodejs.org/en/learn/diagnostics/memory/using-heap-snapshot
-    options:
-      - { text: "A module-level object used as a cache without eviction", correct: true }
-      - { text: "A `setInterval` that is never cleared and references request data", correct: true }
-      - { text: "Declaring variables with `const` inside hot functions", correct: false }
-      - { text: "Event listeners added on a long-lived emitter and never removed", correct: true }
       - {
-          text: "Creating many short-lived objects inside a single request handler",
+          text: "Normal behaviour: V8 always grows the heap up to the limit before collecting it",
           correct: false,
         }
-  - type: single
-    prompt: "How is V8's heap organised for garbage collection, and why?"
-    explanation: "V8 uses a generational heap based on the observation that most objects die young. New objects go to the small young generation, collected often and cheaply by a Scavenge. Survivors are promoted to the old generation, which is collected less often by the more expensive Mark-Sweep-Compact, partly done concurrently. It is not a reference-counting collector."
-    theoryUrl: https://v8.dev/blog/trash-talk
-    options:
       - {
-          text: "A young generation scavenged often and an old generation collected by mark-sweep-compact",
+          text: "A leak: objects survive collections and accumulate, so find what keeps them alive",
           correct: true,
         }
       - {
-          text: "One flat heap with reference counting, so every object is freed the instant its last reference disappears, even cycles",
+          text: "Too frequent GC: the collector frees memory too eagerly and should be slowed down",
           correct: false,
         }
       - {
-          text: "Per-request heaps that are discarded when the response has been sent",
+          text: "A CPU problem: the rising line is the event loop falling behind the incoming traffic",
           correct: false,
         }
-      - { text: "Two equal halves collected in turn, with objects never promoted", correct: false }
+  - type: boolean
+    prompt: "A memory graph that rises during a traffic burst and falls back to the same baseline afterwards is a sign of a memory leak."
+    explanation: "False. Memory that returns to the same baseline after load is released when it is no longer needed, which is the opposite of a leak. A leak shows as a baseline that keeps rising across GC cycles and traffic cycles. High peak usage can still be a problem (for limits and GC time), but it is not a leak."
+    theoryUrl: https://nodejs.org/en/learn/diagnostics/memory
+    answer: false
   - type: single
-    prompt: "A Node.js pod with a 512 MiB memory limit is OOM-killed under load, with no `JavaScript heap out of memory` error in the logs. The container runs with default Node settings. What is the most sensible first step?"
-    explanation: "An OOM kill by the container runtime means the whole process (heap plus buffers, native memory, stacks) exceeded the cgroup limit before V8 hit its own limit. Set `--max-old-space-size` to leave headroom (for example about 75% of the limit) so V8 collects harder or fails with a readable error, and check `external` and `arrayBuffers` memory for off-heap use. Making V8's limit equal to the container limit guarantees the kill."
-    theoryUrl: https://nodejs.org/api/cli.html#--max-old-space-sizesize-in-mib
-    options:
-      - { text: "Set `--max-old-space-size` to 512 so V8 can use the whole limit", correct: false }
-      - {
-          text: "Set `--max-old-space-size` well below the limit and inspect off-heap memory usage",
-          correct: true,
-        }
-      - {
-          text: "Disable the garbage collector with `--expose-gc` to avoid GC pauses",
-          correct: false,
-        }
-      - { text: "Run `global.gc()` after every request so the heap never grows", correct: false }
-  - type: single
-    prompt: "A service shows a `heapUsed` of 80 MB but an RSS of 1.4 GB and growing. The code handles file uploads with `Buffer`s. Where should you look first?"
-    explanation: "`Buffer` and `ArrayBuffer` memory is allocated outside the V8 heap, and is reported in `process.memoryUsage().external` and `arrayBuffers`, so a leak there leaves `heapUsed` small while RSS grows. A heap snapshot of JavaScript objects will show only the small wrapper objects. Increasing the heap limit does nothing for off-heap memory."
+    prompt: "The RSS of a service grows by several hundred MB a day, but `heapUsed` from `process.memoryUsage()` stays flat. Where is the growth most likely to be?"
+    explanation: "RSS covers everything the process holds, while `heapUsed` only covers the JavaScript heap. If RSS grows and the heap does not, the memory is outside it: Buffers and ArrayBuffers (reported as `external` and `arrayBuffers`), native addons, or allocator fragmentation. A heap snapshot of the JS heap would not show it, so you track `external`/`arrayBuffers` and look at buffer-heavy code paths."
     theoryUrl: https://nodejs.org/api/process.html#processmemoryusage
     options:
       - {
-          text: "At `external` and `arrayBuffers` in `process.memoryUsage()`, since Buffers live off-heap",
-          correct: true,
-        }
-      - { text: "At `--max-old-space-size`, which limits Buffers as well", correct: false }
-      - {
-          text: "At the young generation size, because Buffers are always allocated there and counted as RSS once scavenged",
+          text: "In the JavaScript heap, since `heapUsed` only counts the objects created in the last GC cycle",
           correct: false,
         }
       - {
-          text: "At `heapTotal`, which includes all memory the process has allocated",
+          text: "In memory outside the JS heap, such as Buffers, ArrayBuffers or a native addon",
+          correct: true,
+        }
+      - {
+          text: "In the call stack, which grows with every request until the process is restarted",
+          correct: false,
+        }
+      - {
+          text: "Nowhere: RSS growth is an accounting error of the operating system and can be ignored",
           correct: false,
         }
   - type: single
-    prompt: "You start Node with `--trace-gc`. The log shows many short `Scavenge` lines, and occasionally a `Mark-Compact` line that takes 400 ms, during which the service is unresponsive. What is the best interpretation?"
-    explanation: "Scavenges are the cheap young-generation collections, and frequent ones are normal. A long Mark-Compact is a major GC of the old generation, which usually means a large or growing set of long-lived objects. The fix is to reduce the retained heap (caches, big arrays), not to remove the scavenges. Nothing here suggests the loop is blocked by user code."
-    theoryUrl: https://nodejs.org/en/learn/diagnostics/memory/using-gc-traces
+    prompt: "To find a leak, you take heap snapshot A after warm-up, run the suspected workload, take B, run it again, and take C. What do you look for?"
+    explanation: "Objects allocated between A and B that are still present in C survived a whole extra round of work, so they are the leak candidates. Comparing two snapshots alone mixes leaks with objects that are still legitimately in use, and the largest object type overall is often a cache or a pool that is fine. Snapshot size alone tells you there is growth, not what grows."
+    theoryUrl: https://developer.chrome.com/docs/devtools/memory-problems/heap-snapshots
     options:
       - {
-          text: "The scavenges are the problem, so reduce the young generation to collect less often",
-          correct: false,
-        }
-      - {
-          text: "Node has a bug, because Mark-Compact should never take more than a few ms",
-          correct: false,
-        }
-      - {
-          text: "The old generation is large, so shrink what the process retains and check for leaks",
+          text: "Objects allocated between A and B that are still alive in C, grouped by constructor",
           correct: true,
         }
       - {
-          text: "The code is blocking the event loop, as a GC pause cannot exceed 10 ms",
+          text: "The biggest object type in A, because the leak is usually there from the very start",
           correct: false,
         }
-  - type: boolean
-    prompt: "Setting a variable to `null` immediately frees the memory of the object it pointed to."
-    answer: false
-    explanation: "It only removes one reference. The object becomes eligible for collection only when nothing else can reach it, and it is actually freed whenever the garbage collector next runs, which you do not control."
-    theoryUrl: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Memory_management
+      - {
+          text: "Only the total size of each file, since that is enough to identify the leaking object",
+          correct: false,
+        }
+      - {
+          text: "Objects present in A but missing from C, since those are the ones the collector failed to keep track of",
+          correct: false,
+        }
   - type: single
-    prompt: "What does this script print before exiting?"
+    prompt: "In a heap snapshot, a small `Map` object has a shallow size of 80 bytes but a retained size of 400 MB. What does that mean?"
+    explanation: "Shallow size is the memory of the object itself; retained size is what would be freed if it were collected, including everything reachable only through it. A small Map holding 400 MB means its entries keep a lot alive, so it is a strong leak suspect. The snapshot is not wrong, and Maps are not stored outside the heap."
+    theoryUrl: https://developer.chrome.com/docs/devtools/memory-problems/memory-101
+    options:
+      - {
+          text: "The snapshot is corrupt, since an 80-byte object cannot be linked to 400 MB of memory",
+          correct: false,
+        }
+      - {
+          text: "Freeing the Map would free about 400 MB, because those objects are only reachable through it",
+          correct: true,
+        }
+      - {
+          text: "The Map has 400 MB of its own data stored off-heap in a native buffer",
+          correct: false,
+        }
+      - {
+          text: "The Map was allocated 400 MB ago, so it is old and will soon be collected",
+          correct: false,
+        }
+  - type: single
+    prompt: "You have found a leaked object in a heap snapshot. How do you find out why it is still alive?"
+    explanation: "An object survives GC only if a chain of references leads to it from a GC root (globals, the stack, active handles). The retainers view shows that chain; the first link that should not exist (a module-level cache, a listener, a timer closure) is the bug. Forcing GC cannot free a reachable object, and the allocation stack shows where it was created, not who holds it."
+    theoryUrl: https://developer.chrome.com/docs/devtools/memory-problems/memory-101
+    options:
+      - {
+          text: "Follow its retainers path back to a GC root and find the reference that should be gone",
+          correct: true,
+        }
+      - {
+          text: "Call `global.gc()` repeatedly until the object disappears from the next snapshot",
+          correct: false,
+        }
+      - {
+          text: "Look at the line that allocated it, since the creator is always the one that keeps it alive",
+          correct: false,
+        }
+      - {
+          text: "Sort by shallow size, because the retaining object is always the largest one",
+          correct: false,
+        }
+  - type: multi
+    prompt: "Which of these are common causes of memory leaks in a long-running Node.js service? Select all that apply."
+    explanation: "Unbounded caches, module-level collections that only grow, intervals that are never cleared (and the closures they keep), and listeners added per request to a long-lived emitter all keep references forever. Local variables in a function that has returned are not retained unless a closure or another object still references them, and using `async/await` itself does not leak."
+    theoryUrl: https://nodejs.org/en/learn/diagnostics/memory
+    options:
+      - { text: "An in-memory cache with no size limit or expiry", correct: true }
+      - {
+          text: "`setInterval` callbacks that are never cleared and capture large objects",
+          correct: true,
+        }
+      - {
+          text: "Listeners added on a long-lived emitter in every request and never removed",
+          correct: true,
+        }
+      - {
+          text: "Local variables inside a function that has already returned and is not referenced",
+          correct: false,
+        }
+      - { text: "Using `async/await` instead of callbacks for I/O", correct: false }
+  - type: single
+    prompt: "Heap usage of this Express service grows in step with the number of requests served. What is the problem and a sound fix?"
     code: |
-      const timer = setInterval(() => {}, 1000)
-      timer.unref()
-      setTimeout(() => console.log('exiting soon'), 10)
+      const inflight = new Map()
+
+      app.use((req, res, next) => {
+        inflight.set(req.id, { user: req.user, body: req.body, startedAt: Date.now() })
+        next()
+      })
     codeLanguage: javascript
-    explanation: "An `unref`'d timer does not keep the event loop alive. Only the 10 ms timeout is a live handle, so after it fires and logs, nothing else is pending and the process exits by itself. Without `unref()` the interval would keep the process running forever, a common cause of hanging scripts and tests."
-    theoryUrl: https://nodejs.org/api/timers.html#timeoutunref
+    explanation: "Entries are added for every request and never removed, so the module-level Map keeps every request body alive. Remove the entry when the response finishes (`res.on('close', ...)`) or bound it with a TTL/LRU. A `WeakMap` does not work here because its keys must be objects, and `req.id` is a string; a `WeakMap` keyed by `req` would work, but then the Map is pointless for lookups by id."
+    theoryUrl: https://nodejs.org/en/learn/diagnostics/memory
     options:
       - {
-          text: "Nothing, because the unref'd interval stops the timeout from running",
+          text: "Entries are never deleted; remove them when the response closes or bound the map",
+          correct: true,
+        }
+      - {
+          text: "Swap the `Map` for a `WeakMap` keyed by `req.id`, so the collector can drop old entries",
           correct: false,
         }
-      - { text: "It prints exiting soon every second until the process is killed", correct: false }
-      - { text: "It throws, as `unref` can only be called on a `setTimeout`", correct: false }
-      - { text: "It prints exiting soon once, and then exits", correct: true }
-  - type: boolean
-    prompt: "You can enable the inspector on an already running Node.js process on Linux by sending it `SIGUSR1`, and then attach Chrome DevTools to take a CPU profile or heap snapshot."
-    answer: true
-    explanation: "By default, `SIGUSR1` starts the inspector in a running Node process (listening on 127.0.0.1:9229). You can then connect DevTools to capture profiles and snapshots without restarting the process. In production, keep the port bound to localhost and tunnel to it, because the inspector gives full code execution."
-    theoryUrl: https://nodejs.org/en/learn/getting-started/debugging
+      - {
+          text: "Nothing is wrong: V8 evicts old `Map` entries automatically when memory runs low",
+          correct: false,
+        }
+      - {
+          text: "The `Date.now()` call allocates a timer for each request; replace it with `performance.now()` to fix the growth",
+          correct: false,
+        }
   - type: single
-    prompt: "An endpoint sorts and aggregates an array of 2 million records in memory, taking 900 ms of synchronous CPU, and it stalls the loop. The result is needed in the same response. Which change addresses the root cause best?"
-    explanation: "The loop is blocked by CPU work, so the work must leave the main thread (a worker thread pool) or be avoided by pushing the aggregation into the database. Wrapping the code in `async` or a resolved promise does not make it run elsewhere, and `setImmediate` chunking only helps if you can split the work into slices, and makes the total time longer."
+    prompt: "A service crashes with `JavaScript heap out of memory` after two days of uptime. A colleague proposes raising `--max-old-space-size` from 2 GB to 8 GB. What is the right reasoning?"
+    explanation: "If memory grows without bound, a bigger heap only moves the crash to later, and longer full-GC pauses on a larger heap can hurt latency first. Raising the limit is fine when the steady-state working set genuinely needs it, but here the two-day pattern points to a leak, so capture heap snapshots (for example with `--heapsnapshot-near-heap-limit`) and fix the cause. Also keep the container's memory limit above the heap limit, or the kernel kills the process first."
+    theoryUrl: https://nodejs.org/en/learn/diagnostics/memory/understanding-and-tuning-memory
+    options:
+      - {
+          text: "It is the correct fix, because V8 will compact the heap better with more space available",
+          correct: false,
+        }
+      - {
+          text: "It only delays the crash if it is a leak; capture snapshots near the limit and fix the cause",
+          correct: true,
+        }
+      - {
+          text: "It cannot work, because Node ignores `--max-old-space-size` on 64-bit systems",
+          correct: false,
+        }
+      - {
+          text: "It removes the problem for good, since the collector releases memory sooner when the configured heap limit is larger",
+          correct: false,
+        }
+  - type: boolean
+    prompt: "Taking a heap snapshot of a production process with a large heap is not free: it blocks the event loop while it is written and can need extra memory of about the heap's size."
+    explanation: "True. Writing a heap snapshot is synchronous, so the process stops serving requests for its duration, and the Node docs warn it needs memory about twice the heap size at that moment, which can itself trigger an out-of-memory kill. Take snapshots on an instance removed from the load balancer, or on a replica, and leave memory headroom."
+    theoryUrl: https://nodejs.org/api/v8.html#v8writeheapsnapshotfilenameoptions
+    answer: true
+  - type: single
+    prompt: "You need to debug a production instance with the inspector. Which way of enabling it is safe?"
+    explanation: "The inspector gives full code execution to anyone who can connect, so it must only listen on localhost and be reached through an authenticated tunnel such as SSH or `kubectl port-forward`. Binding to `0.0.0.0` exposes remote code execution to the network, and obscurity of the port is not protection."
+    theoryUrl: https://nodejs.org/en/learn/getting-started/debugging
+    options:
+      - {
+          text: "Bind it to `0.0.0.0` on an unusual port so that the whole team can attach from their laptops",
+          correct: false,
+        }
+      - {
+          text: "Bind it to localhost and reach it through an SSH tunnel or a port-forward",
+          correct: true,
+        }
+      - {
+          text: "Bind it publicly, since the inspector only allows reading values and not running code",
+          correct: false,
+        }
+      - {
+          text: "Leave it enabled in every container all the time, so it is ready when an incident starts",
+          correct: false,
+        }
+  - type: single
+    prompt: "A signup endpoint validates emails with the regex below. One request with a 40-character crafted string freezes the whole service for many seconds, and the CPU profile shows all the time inside the RegExp engine. What is going on?"
+    code: |
+      const EMAIL = /^([a-zA-Z0-9]+)*@example\.com$/
+
+      app.post('/signup', (req, res) => {
+        if (!EMAIL.test(req.body.email)) return res.status(400).end()
+        // ...
+      })
+    codeLanguage: javascript
+    explanation: "The nested quantifier `([...]+)*` lets the engine split the input in exponentially many ways before failing, so a short input that almost matches causes catastrophic backtracking. The match runs synchronously on the main thread and blocks every other request (a ReDoS). Fix the pattern so it has no ambiguous nested repetition, cap the input length, or use a linear-time engine. Moving the regex to another file or making the route `async` does not change the work."
     theoryUrl: https://nodejs.org/en/learn/asynchronous-work/dont-block-the-event-loop
     options:
       - {
-          text: "Mark the function `async` and `await` it so other requests are served meanwhile",
+          text: "The regex is recompiled on every request; hoisting it out of the handler fixes the freeze",
           correct: false,
         }
       - {
-          text: "Wrap the call in `Promise.resolve().then(...)` to defer it off the main thread",
-          correct: false,
-        }
-      - {
-          text: "Run it in a worker thread, or aggregate in the database and return only the result",
+          text: "Catastrophic backtracking in the nested quantifier blocks the event loop on a crafted input",
           correct: true,
         }
       - {
-          text: "Increase `UV_THREADPOOL_SIZE`, so that the sort uses more threads",
+          text: "`req.body` parsing is slow for long strings; switch to a streaming JSON parser",
+          correct: false,
+        }
+      - {
+          text: "The handler is synchronous; declaring it `async` would let the regex run in the background thread pool",
           correct: false,
         }
   - type: single
-    prompt: "What do the two logged arrays look like?"
+    prompt: "A hot function `distance(p)` reads `p.x` and `p.y`, and profiling shows it is slower than expected. The points come from the factory below. What is the most likely reason, from V8's point of view?"
     code: |
-      async function main() {
-        const serial = []
-        for (const n of [3, 1, 2]) {
-          await new Promise((r) => setTimeout(r, n * 10))
-          serial.push(n)
-        }
-        console.log(serial)
-        const parallel = []
-        await Promise.all(
-          [3, 1, 2].map(async (n) => {
-            await new Promise((r) => setTimeout(r, n * 10))
-            parallel.push(n)
-          })
-        )
-        console.log(parallel)
+      function makePoint(x, y, withLabel) {
+        const p = {}
+        if (withLabel) p.label = 'pt'
+        p.x = x
+        p.y = y
+        return p
       }
-      main()
     codeLanguage: javascript
-    explanation: "The `for...of` with `await` runs the waits one after another, so the order is the input order and the total time is about 60 ms. With `Promise.all`, the waits run together: the shortest finishes first, giving `[1, 2, 3]` in about 30 ms. Serial awaits on independent I/O is a very common latency bug."
-    theoryUrl: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise/all
-    options:
-      - { text: "[ 3, 1, 2 ] and then [ 1, 2, 3 ]", correct: true }
-      - { text: "[ 1, 2, 3 ] and then [ 1, 2, 3 ]", correct: false }
-      - { text: "[ 3, 1, 2 ] and then [ 3, 1, 2 ]", correct: false }
-      - { text: "[ 1, 2, 3 ] and then [ 3, 1, 2 ]", correct: false }
-  - type: single
-    prompt: "After a deploy, requests are slow and CPU is at 100% on one core. A CPU profile shows most self time in `JSON.stringify` and `JSON.parse` called by a logging middleware that serialises every request and response body. What is the best fix?"
-    explanation: "The profile points at synchronous serialisation on the main thread, done twice per request on large bodies. Log only the fields you need (or sample), use a structured logger that serialises lazily or off-thread, and avoid logging bodies in the hot path. Adding instances treats the symptom, and the profile gives no sign of a leak or a GC problem."
-    theoryUrl: https://nodejs.org/en/learn/asynchronous-work/dont-block-the-event-loop#blocking-the-event-loop-json-dos
+    explanation: "V8 gives objects hidden classes (shapes) based on which properties were added and in which order. Points with and without a label get different shapes, so the property access sites in `distance` see several shapes, their inline caches become polymorphic and slower. Initialising every property in the same order (for example `label: undefined` always) keeps one shape. Object literals are not slower than classes per se, and numbers are not boxed into strings."
+    theoryUrl: https://v8.dev/docs/hidden-classes
     options:
       - {
-          text: "Log only selected fields (or sample requests) instead of serialising whole bodies",
-          correct: true,
-        }
-      - { text: "Raise `--max-old-space-size`, so JSON operations get more memory", correct: false }
-      - {
-          text: "Add more instances behind the balancer and leave the middleware as it is",
-          correct: false,
-        }
-      - { text: "Take a heap snapshot to find which JSON strings are leaking", correct: false }
-  - type: single
-    prompt: "During a login burst, 40 concurrent `bcrypt.hash` calls (the native async implementation) make `fs.readFile` calls in the same process slow, although the event loop delay metric stays low. What is the most likely explanation?"
-    explanation: "Native async bcrypt, like `fs`, `zlib`, `crypto.pbkdf2` and `dns.lookup`, runs on the libuv threadpool, which has 4 threads by default. Forty CPU-heavy hashes occupy all of them, so file reads queue behind them even though the main thread is idle. Raising `UV_THREADPOOL_SIZE` (up to the core count) or limiting concurrency helps; the loop itself is not blocked."
-    theoryUrl: https://nodejs.org/en/learn/asynchronous-work/dont-block-the-event-loop#the-worker-pool
-    options:
-      - {
-          text: "The event loop is blocked by the hashes, but the delay metric is wrong",
+          text: "Object literals are always slower than class instances, regardless of their property order",
           correct: false,
         }
       - {
-          text: "The hashes saturate the 4-thread libuv pool that `fs` also uses, so reads wait in line",
+          text: "Points get different hidden classes, so the access sites in `distance` turn polymorphic",
           correct: true,
         }
       - {
-          text: "The V8 heap is full, so every `fs` call triggers a major garbage collection that stalls the read until it ends",
+          text: "Storing numbers in an object converts them to strings, which makes the arithmetic slow",
           correct: false,
         }
       - {
-          text: "`fs.readFile` is synchronous and cannot run while any async work is pending",
+          text: "The `if` statement stops V8 from compiling `makePoint` at all, so every call is executed by the interpreter",
+          correct: false,
+        }
+  - type: single
+    prompt: "A numeric hot path is fast during a load test, then occasionally becomes several times slower in production. `--trace-deopt` shows the function being deoptimised. What is the typical cause?"
+    explanation: "The optimising compiler specialises code on the types it has seen, for example small integers. When a different type arrives (a string, `undefined`, a double), the assumption fails, the optimised code is thrown away and execution falls back to slower tiers until it is re-optimised. Keeping inputs type-stable, for instance by validating and converting at the boundary, avoids it. Deopts are not caused by the size of the file or by logging."
+    theoryUrl: https://v8.dev/blog/maglev
+    options:
+      - {
+          text: "The function was optimised for certain types and production sends it different ones",
+          correct: true,
+        }
+      - {
+          text: "The source file got too long, so V8 refuses to keep its functions optimised",
+          correct: false,
+        }
+      - {
+          text: "Calling `console.log` anywhere in the process deoptimises every function permanently",
+          correct: false,
+        }
+      - {
+          text: "The function is called too often; V8 deoptimises any function that runs more than a fixed number of times",
+          correct: false,
+        }
+  - type: single
+    prompt: "Why is collecting V8's young generation (the 'scavenge') usually fast, even when the code allocates a lot?"
+    explanation: "Most objects die young. The scavenger copies only the live objects out of the young space, so its cost is proportional to survivors, not to how much was allocated, and the dead objects are freed in bulk. Objects that survive a couple of scavenges are promoted to the old generation, which is collected with the more expensive mark-compact. Full GC does not run on every allocation."
+    theoryUrl: https://v8.dev/blog/trash-talk
+    options:
+      - {
+          text: "It only works on the old generation, where few objects are allocated",
+          correct: false,
+        }
+      - {
+          text: "Its cost tracks the number of survivors, and most young objects are already dead",
+          correct: true,
+        }
+      - {
+          text: "It never touches the main thread, so its cost is invisible to request latency",
+          correct: false,
+        }
+      - {
+          text: "It runs on every allocation, so each pass only has one object to inspect",
+          correct: false,
+        }
+  - type: single
+    prompt: "As a service's heap approaches its limit, latency degrades sharply and CPU climbs to 100% minutes before the process finally dies with an out-of-memory error. What explains the slowdown?"
+    explanation: "Near the limit, each full mark-compact frees little, so V8 runs it again and again; the main thread spends most of its time in GC pauses instead of serving requests. That is why a leak often shows up as latency and CPU first and as a crash later. Alerting on heap usage against the limit gives warning before this phase."
+    theoryUrl: https://v8.dev/blog/trash-talk
+    options:
+      - {
+          text: "The OS starts swapping the heap to disk, which is the only reason Node slows down before an out-of-memory crash",
+          correct: false,
+        }
+      - {
+          text: "Full collections run repeatedly and free little, so GC crowds out request handling",
+          correct: true,
+        }
+      - {
+          text: "V8 disables the optimising compiler when memory is low, so all code runs interpreted",
+          correct: false,
+        }
+      - {
+          text: "The event loop switches to a slower polling mode to save memory near the limit",
+          correct: false,
+        }
+  - type: single
+    prompt: "Heap snapshots show that each call to `handler()` keeps a large array alive, even though the returned function never mentions `big`. Why?"
+    code: |
+      function handler() {
+        const big = new Array(1_000_000).fill('x')
+        const unused = () => big.length
+        return () => 'ok'
+      }
+
+      const keep = []
+      setInterval(() => keep.push(handler()), 1000)
+    codeLanguage: javascript
+    explanation: "V8 stores the variables captured by any closure in a scope in one shared context object, and every closure created in that scope points to it. Because `unused` captures `big`, `big` lives in the shared context, and the returned function keeps that context alive. Removing the other closure, or nulling `big` after use, lets it be collected; the cause is not `fill` or `setInterval` itself."
+    theoryUrl: https://v8.dev/blog/trash-talk
+    options:
+      - {
+          text: "`Array.prototype.fill` pins its array in memory so it can never be garbage collected",
+          correct: false,
+        }
+      - {
+          text: "Closures created in the same scope share one context, and `unused` put `big` in it",
+          correct: true,
+        }
+      - {
+          text: "Every function returned from another function keeps all its parent's locals alive",
+          correct: false,
+        }
+      - {
+          text: "`setInterval` copies the return value of its callback, so every array is duplicated",
           correct: false,
         }
