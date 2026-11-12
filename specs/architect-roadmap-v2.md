@@ -107,7 +107,7 @@ Follow-up: Kill the old path, and the old quiz, i want a new quiz and new path. 
 4. [built] On a database holding the R2 content, `pnpm release` leaves exactly one seed quiz per title for 16–23, each with the R3 question set.
 5. [built] On a fresh database, `pnpm release` runs the R1–R3 migrations without error and imports every seed, the path included.
 6. [built] After `pnpm release` on a database holding the R2 content, the "Road to Software Architect" page lists 41 steps and step 16 opens the R3 version of quiz 16.
-7. [open] Reading quizzes 16–20, 22 and 23, no question turns on an edge case or a trick output; quiz 21 may.
+7. [built] Reading quizzes 16–20, 22 and 23, no question turns on an edge case or a trick output; quiz 21 may.
 
 ### R4 — Architecture 24–41
 
