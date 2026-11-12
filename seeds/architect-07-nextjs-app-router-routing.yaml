@@ -212,24 +212,21 @@ questions:
           correct: true,
         }
   - type: single
-    prompt: "In the `error.tsx` props of Next.js 16.4, what is the difference between `retry()` and `reset()`?"
-    explanation: "`retry()` asks the router to re-fetch and re-render the boundary's children, which is what you want when the cause was transient (a failed request). `reset()` only clears the error state and re-renders the children without re-fetching their content, so a server error will usually just come back. The docs recommend `retry()` in most cases."
+    prompt: "A dashboard page failed to render because an upstream API was briefly down, and `app/dashboard/error.tsx` is showing. What should its 'Try again' button do so the page can actually recover?"
+    explanation: "The cause was transient and lives on the server, so recovery means fetching the segment's content again and re-rendering it, which is what the `retry()` prop does. Merely clearing the boundary's error state (`reset()`) re-renders without re-fetching, so the same failure usually comes back. A full browser reload also works but throws away all client state, and server errors are not permanent."
     theoryUrl: https://nextjs.org/docs/app/api-reference/file-conventions/error
     options:
       - {
-          text: "retry() reloads the whole browser page, reset() calls the server action again",
+          text: "Clear the boundary's error state so the children re-render from what is already loaded",
+          correct: false,
+        }
+      - { text: "Re-fetch and re-render the failed segment, for example with `retry()`", correct: true }
+      - {
+          text: "Force a full browser reload, since server code only runs again on a hard navigation",
           correct: false,
         }
       - {
-          text: "retry() re-fetches and re-renders the children, reset() only clears the error state",
-          correct: true,
-        }
-      - {
-          text: "They are aliases kept for backward compatibility with identical behaviour",
-          correct: false,
-        }
-      - {
-          text: "retry() only works in production, reset() only works in development",
+          text: "Nothing useful, because a segment that failed on the server stays broken until redeploy",
           correct: false,
         }
   - type: single
@@ -306,7 +303,7 @@ questions:
           correct: true,
         }
       - {
-          text: "page.tsx wins for GET and route.ts only handles the other HTTP verbs",
+          text: "page.tsx wins for GET requests and route.ts only handles the other HTTP verbs such as POST",
           correct: false,
         }
       - {
@@ -349,7 +346,7 @@ questions:
           correct: true,
         }
       - {
-          text: "It stores the last visited subpage of the slot in the browser's session",
+          text: "It stores the last visited subpage of each slot in the browser's sessionStorage for reloads",
           correct: false,
         }
   - type: single
@@ -427,20 +424,23 @@ questions:
       - { text: "A full photo page after the click, and a modal after the reload", correct: false }
       - { text: "A modal after the click, and the full photo page after the reload", correct: true }
   - type: single
-    prompt: "Which folder intercepts `/photo/[id]` when the intercepting route lives at `app/feed/@modal/(..)photo/[id]/page.tsx`?"
-    explanation: "The `(..)` convention matches one route-segment level up, and slot folders such as `@modal` are not route segments. So `(..)` from `feed/@modal` points to `app/photo`, one segment above `feed`, even though it is two levels up in the file system. `(...)` would match from the root and `(.)` the same level."
+    prompt: "Which feature is the best fit for an intercepting route?"
+    explanation: "Intercepting routes load another route inside the current layout on client navigation while the URL changes, and the real page still renders on a refresh or a shared link. That suits a login or cart modal opened from the navbar that also has its own `/login` or `/cart` page. Access control, URL migrations and experiments belong in the data layer, `redirects` or Proxy."
     theoryUrl: https://nextjs.org/docs/app/api-reference/file-conventions/intercepting-routes
     options:
-      - { text: "app/photo/[id], because slots do not count as a segment level", correct: true }
       - {
-          text: "app/feed/photo/[id], because (..) means the parent folder on disk",
+          text: "A login modal opened from the navbar that also exists as a full /login page",
+          correct: true,
+        }
+      - {
+          text: "Blocking anonymous users from /admin by intercepting the route before it renders on the server",
           correct: false,
         }
       - {
-          text: "app/feed/@modal/photo/[id], because (..) matches the slot's sibling",
+          text: "Permanently sending visitors of the old /blog URLs to the new /articles pages",
           correct: false,
         }
       - {
-          text: "It cannot intercept anything, because (..) is valid only without slots",
+          text: "Splitting traffic between two versions of the pricing page for an A/B test",
           correct: false,
         }

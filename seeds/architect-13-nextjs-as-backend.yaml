@@ -29,7 +29,7 @@ questions:
     theoryUrl: https://nextjs.org/docs/app/getting-started/mutating-data
     options:
       - {
-          text: "A Route Handler plus a Client Component that calls fetch and refreshes",
+          text: "A Route Handler plus a Client Component that calls fetch and then refreshes the router",
           correct: false,
         }
       - {
@@ -54,7 +54,7 @@ questions:
           correct: true,
         }
       - {
-          text: "A Server Action, with its action ID configured as the webhook URL",
+          text: "A Server Action, with its generated action ID configured as the webhook URL in the dashboard",
           correct: false,
         }
       - {
@@ -131,7 +131,7 @@ questions:
     theoryUrl: https://nextjs.org/docs/app/guides/backend-for-frontend
     options:
       - {
-          text: "Raise the function timeout to 15 minutes and keep the action synchronous",
+          text: "Raise the function timeout to 15 minutes and keep the action synchronous, so the user gets the file",
           correct: false,
         }
       - {
@@ -147,31 +147,24 @@ questions:
           correct: false,
         }
   - type: single
-    prompt: "A Server Action validates a signup form with Zod. The user leaves the optional quantity field empty. What does this do?"
-    code: |
-      const schema = z.object({
-        qty: z.coerce.number().int().min(0),
-        email: z.email(),
-      })
-
-      const parsed = schema.safeParse(Object.fromEntries(formData))
-      // formData: qty = '' (left empty), email = 'a@b.co'
-      // parsed.success ?
-    codeLanguage: typescript
-    explanation: "`z.coerce.number()` runs `Number('')`, which is `0`, so the blank field passes and `qty` becomes 0 (verified with Zod 4). That is a classic trap with FormData: an empty string is not 'missing'. If you want blank to be invalid, validate the string first or preprocess empty strings to `undefined`."
-    theoryUrl: https://zod.dev/api
+    prompt: "The same 'create product' input arrives through a Server Action (the admin form) and a Route Handler (the partner API). Where should the Zod schema live?"
+    explanation: "Both entry points are public server boundaries, so both must validate, and a single shared schema keeps the rules from drifting apart. The client form can import the same schema for instant feedback, but that is only UX: anyone can bypass the browser. Database constraints are a useful last line, but they cannot return field-level errors for a form."
+    theoryUrl: https://zod.dev/basics
     options:
       - {
-          text: "success is false, because an empty string cannot be coerced to a number",
+          text: "Only in the client form, since the server then receives data that was already validated",
           correct: false,
         }
       - {
-          text: "success is false with a 'required' error for the missing qty field",
+          text: "In one shared module that both server entry points parse with",
+          correct: true,
+        }
+      - {
+          text: "Separately in each entry point, so the action and the API can change their rules independently",
           correct: false,
         }
-      - { text: "success is true and qty is 0, because Number('') is 0", correct: true }
       - {
-          text: "It throws a ZodError, because safeParse does not accept FormData objects",
+          text: "Nowhere in code, because database constraints already reject invalid rows",
           correct: false,
         }
   - type: single
@@ -308,7 +301,7 @@ questions:
     theoryUrl: https://www.pgbouncer.org/features.html
     options:
       - {
-          text: "PgBouncer blocks every statement that is not a plain SELECT or an INSERT in transaction mode",
+          text: "PgBouncer blocks every statement that is not a plain SELECT or an INSERT while in transaction pooling mode",
           correct: false,
         }
       - {
@@ -381,32 +374,24 @@ questions:
           correct: false,
         }
   - type: single
-    prompt: "A webhook handler must verify an HMAC signature over the raw body, then parse the JSON. What happens with this code?"
-    code: |
-      export async function POST(req: Request) {
-        const payload = await req.json()
-        const raw = await req.text()
-        verifySignature(raw, req.headers.get('x-signature'))
-        return Response.json({ ok: true })
-      }
-    codeLanguage: typescript
-    explanation: "A request body is a stream that can be read once. After `req.json()` consumed it, `req.text()` throws `TypeError: Body is unusable: Body has already been read` (verified in Node). Read the raw text first, verify the signature, then `JSON.parse` it, or `clone()` the request before reading."
+    prompt: "A webhook handler verifies the provider's HMAC signature against `JSON.stringify(await req.json())` instead of the raw body text, and valid events are sometimes rejected. Why?"
+    explanation: "The provider signed the exact bytes it sent. Parsing and re-serialising can change whitespace, key order, escaping or number formatting, so the recomputed HMAC no longer matches. Read the raw text first, verify the signature over it, then `JSON.parse` the same string."
     theoryUrl: https://nextjs.org/docs/app/guides/backend-for-frontend
     options:
       - {
-          text: "It works, since text() returns the body from an internal copy kept by Next.js",
-          correct: false,
-        }
-      - {
-          text: "It throws a TypeError, because the body was already read by json()",
+          text: "Re-serialised JSON can differ byte-for-byte from the body the provider signed",
           correct: true,
         }
       - {
-          text: "It returns an empty string for raw, so the signature never matches",
+          text: "req.json() removes the signature header from the request, so the check has nothing to compare",
           correct: false,
         }
       - {
-          text: "It works only when the Content-Type is text/plain instead of JSON",
+          text: "HMAC can only be computed over binary data, never over a JavaScript string",
+          correct: false,
+        }
+      - {
+          text: "Providers sign the parsed object, so the check fails only when a payload is very large",
           correct: false,
         }
   - type: single

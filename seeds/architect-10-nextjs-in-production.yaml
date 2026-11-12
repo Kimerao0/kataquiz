@@ -30,21 +30,24 @@ questions:
           correct: true,
         }
   - type: single
-    prompt: "Which runtime does `proxy.ts` use by default in Next.js 16?"
-    explanation: "Proxy defaults to the Node.js runtime, so you can use Node.js APIs and most packages. The `runtime` segment option is not available in Proxy files, and setting it throws an error. The Edge Runtime is the limited alternative and is not what Proxy uses."
-    theoryUrl: https://nextjs.org/docs/app/api-reference/file-conventions/proxy
+    prompt: "A teammate plans to put more logic in `proxy.ts`. Which job is Proxy designed for?"
+    explanation: "Proxy runs before a request completes, so it fits cheap request-level decisions: redirects and rewrites based on the request (A/B buckets, locale, optimistic auth) and setting headers. It is not meant for slow data fetching or full session management, it does not render UI, and route handlers remain the place for API endpoints."
+    theoryUrl: https://nextjs.org/docs/app/getting-started/proxy
     options:
-      - { text: "The Edge Runtime, with no Node.js APIs and no way to change it", correct: false }
       - {
-          text: "The Node.js runtime, and a `runtime` option in the file is an error",
-          correct: true,
-        }
-      - {
-          text: "The Edge Runtime by default, and `runtime = 'nodejs'` switches it",
+          text: "Fetching the page's data once, so every Server Component can reuse it",
           correct: false,
         }
       - {
-          text: "The browser runtime, since it runs before the request reaches the server",
+          text: "Request-level redirects, rewrites and headers decided before routing",
+          correct: true,
+        }
+      - {
+          text: "Rendering the shared header and footer that wrap every page of the app",
+          correct: false,
+        }
+      - {
+          text: "Serving the app's JSON API, so that route handlers are no longer needed at all",
           correct: false,
         }
   - type: single
@@ -218,24 +221,24 @@ questions:
           correct: true,
         }
   - type: single
-    prompt: "A social crawler such as Slackbot requests a dynamic page. Where does Next.js put the metadata for it?"
-    explanation: "For dynamic pages Next.js streams metadata for browsers, injecting it after `generateMetadata` resolves. For bots that expect tags in the `<head>` (detected by user agent), streaming is disabled and the metadata is in the initial HTML. The `htmlLimitedBots` config customises the list."
+    prompt: "A product page sets its title and Open Graph tags with `document.title` and DOM calls in a `useEffect`. Link previews in chat apps show a generic title. Why, and what is the fix?"
+    explanation: "Many crawlers and link-preview bots read the HTML the server sends and never run your JavaScript, so tags added after hydration are invisible to them. Export `metadata` or `generateMetadata` from the page or layout so Next.js renders the tags on the server. Previews are not generated from the sitemap, and the tags are not limited to the root layout."
     theoryUrl: https://nextjs.org/docs/app/getting-started/metadata-and-og-images
     options:
       - {
-          text: "It is streamed after the body, same as for browsers, and crawlers wait for it",
-          correct: false,
-        }
-      - {
-          text: "Streaming is disabled for such bots, so the tags are in the initial head",
+          text: "Bots often skip client JavaScript, so generate the tags with generateMetadata on the server",
           correct: true,
         }
       - {
-          text: "The metadata is omitted, since bots must run JavaScript to find it",
+          text: "Open Graph tags are allowed only in the root layout, so move them up from the page to the app root",
           correct: false,
         }
       - {
-          text: "It is sent in an HTTP header called Link instead of the HTML head",
+          text: "Previews are built from sitemap.xml, so add the product title to the sitemap entry",
+          correct: false,
+        }
+      - {
+          text: "useEffect runs too early, so set the tags in a useLayoutEffect after the paint",
           correct: false,
         }
   - type: single
@@ -260,24 +263,24 @@ questions:
       - { text: "A wildcard on every hostname so new CDN domains work immediately", correct: false }
       - { text: "Add the host to a robots.txt allowlist that next/image reads", correct: false }
   - type: single
-    prompt: "The hero image is your Largest Contentful Paint element, and your code uses `<Image priority />`. What changed in Next.js 16?"
-    explanation: 'In Next.js 16 the `priority` prop is deprecated in favour of `preload`, to make the behaviour explicit (it inserts a preload link in the head). In many cases the docs suggest `loading="eager"` or `fetchPriority="high"` instead of preloading.'
+    prompt: "`next/image` lazy-loads images by default. Why is that a good default for most images but a poor choice for the hero image that is your Largest Contentful Paint element?"
+    explanation: "Lazy loading defers images until they approach the viewport, which saves bandwidth for content further down. The LCP image is visible immediately, so deferring it delays the metric; load it eagerly with a high fetch priority (for example `fetchPriority=\"high\"` or `preload`). Lazy loading does not make images smaller or remove the need for dimensions."
     theoryUrl: https://nextjs.org/docs/app/api-reference/components/image
     options:
       - {
-          text: "priority is deprecated, and `preload` replaces it, with `fetchPriority` as an alternative",
+          text: "Lazy loading only defers off-screen images, so the hero should load eagerly with high priority",
           correct: true,
         }
       - {
-          text: "Nothing, since priority is still the preferred prop for LCP images in Next 16",
+          text: "Lazy loading compresses images harder, so the hero would look blurry above the fold",
           correct: false,
         }
       - {
-          text: "priority now means lazy loading, so remove it from every above-the-fold image",
+          text: "It is fine for the hero too, because lazy images load before the first paint anyway",
           correct: false,
         }
       - {
-          text: "priority was removed and every image is now eager by default, without any prop",
+          text: "Lazy images skip the optimizer entirely, so the hero would be served at its full original size",
           correct: false,
         }
   - type: single
@@ -323,36 +326,47 @@ questions:
           correct: false,
         }
   - type: single
-    prompt: "In client code, what does this produce for a variable declared as `NEXT_PUBLIC_ANALYTICS_ID=abc123`?"
-    code: |
-      const name = 'NEXT_PUBLIC_ANALYTICS_ID'
-      console.log(process.env[name])
-    codeLanguage: typescript
-    explanation: "Next.js inlines `process.env.NEXT_PUBLIC_*` by replacing static references at build time. A dynamic lookup like `process.env[name]` (or destructuring from `env`) is not replaced, so in the browser the value is `undefined`. Write the full property name literally."
+    prompt: "A Server Component needs a Stripe secret key. A developer names it `NEXT_PUBLIC_STRIPE_SECRET` 'so it works everywhere'. What is the problem?"
+    explanation: "Variables without the prefix are available only on the server, which is exactly where a secret belongs. The `NEXT_PUBLIC_` prefix inlines the value into the client JavaScript at build time, so anyone can read the key from the bundle. Name it `STRIPE_SECRET` and read it only in server code."
     theoryUrl: https://nextjs.org/docs/app/guides/environment-variables
     options:
       - {
-          text: '"abc123", since the prefix makes the variable available everywhere',
+          text: "Nothing, because Server Components never send environment variables to the browser at all",
           correct: false,
         }
-      - { text: "An empty string, as dynamic keys are replaced by a placeholder", correct: false }
       - {
-          text: "A build error, since process.env cannot be indexed with a variable",
+          text: "The prefix inlines the secret into the client bundle, so drop it and read it on the server",
+          correct: true,
+        }
+      - {
+          text: "Prefixed variables are read only at runtime, so the key is missing during the build",
           correct: false,
         }
-      - { text: "undefined, because dynamic lookups are not inlined at build time", correct: true }
+      - {
+          text: "The prefix encrypts the value, so the server cannot read the key without a client round trip",
+          correct: false,
+        }
   - type: single
-    prompt: "`NODE_ENV` is `development`. `API_URL` is defined in both `.env` and `.env.development.local`. Which value does `process.env.API_URL` have?"
-    explanation: "Next.js looks up variables in a fixed order and stops at the first match, so `.env.development.local` wins over `.env`. `.env*.local` files are meant to stay out of git, and `.env.local` is not loaded when `NODE_ENV` is `test`."
+    prompt: "Where should the production database password for a deployed Next.js app live?"
+    explanation: "Secrets belong in the hosting platform's environment settings or a secret manager, injected into the server at build or run time. `.env` files are meant to stay out of git (the default template ignores them), and anything committed is visible to everyone with repository access and in its history. A `NEXT_PUBLIC_` variable would also ship it to every browser."
     theoryUrl: https://nextjs.org/docs/app/guides/environment-variables
     options:
       - {
-          text: "The one in .env, because it is the base file and cannot be overridden",
+          text: "In a committed .env.production file, since only the production build reads it",
           correct: false,
         }
-      - { text: "Both values, joined with a comma in the order of loading", correct: false }
-      - { text: "The one in .env.development.local, which has higher priority", correct: true }
-      - { text: "undefined, because duplicates across files cancel each other out", correct: false }
+      - {
+          text: "In the hosting platform's environment settings or a secret manager",
+          correct: true,
+        }
+      - {
+          text: "In a NEXT_PUBLIC_ variable, so both the server and the client can open the connection",
+          correct: false,
+        }
+      - {
+          text: "Hard-coded in next.config.ts, which is never shipped to the browser or committed",
+          correct: false,
+        }
   - type: single
     prompt: "Which cookie attributes does the Next.js authentication guide recommend for a session cookie set on the server?"
     explanation: "Set the cookie on the server with HttpOnly (not readable from JavaScript), Secure (HTTPS only), a SameSite policy, an expiry (Max-Age or Expires) and a Path. Cookies set client-side can be tampered with, and a readable session token is exposed to XSS."

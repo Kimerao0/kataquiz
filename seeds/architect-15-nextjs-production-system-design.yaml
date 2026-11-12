@@ -32,7 +32,7 @@ questions:
           correct: false,
         }
       - {
-          text: "Put the admin role in the JWT payload, so that it is rechecked on each request",
+          text: "Put the admin role in the JWT payload, so that it is rechecked by the server on each request",
           correct: false,
         }
       - {
@@ -116,7 +116,7 @@ questions:
           correct: false,
         }
       - {
-          text: "Create one folder per tenant under app/ at build time, and redeploy for each new one",
+          text: "Create one folder per tenant under app/ at build time, and redeploy the app for each new tenant",
           correct: false,
         }
       - {
@@ -179,7 +179,7 @@ questions:
           correct: false,
         }
       - {
-          text: "Add an index on tenant_id, since tenant filtering is the only slow part",
+          text: "Add an index on tenant_id, since tenant filtering is the only slow part of the query",
           correct: false,
         }
       - {
@@ -222,7 +222,7 @@ questions:
           correct: false,
         }
       - {
-          text: "Network retries, so cache each response to answer duplicate requests",
+          text: "Network retries, so cache each response and answer the duplicate requests from it",
           correct: false,
         }
   - type: single
@@ -260,7 +260,7 @@ questions:
           correct: true,
         }
       - {
-          text: "Move the call before the response, so the user waits until it finishes",
+          text: "Move the call before the response, so the user waits until the email has been accepted",
           correct: false,
         }
       - {

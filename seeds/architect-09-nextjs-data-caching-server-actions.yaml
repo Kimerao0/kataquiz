@@ -156,25 +156,25 @@ questions:
           correct: false,
         }
   - type: single
-    prompt: "What is the effect of `cacheLife('seconds')` on a cached component inside a page that is prerendered?"
-    explanation: "Very short lifetimes (revalidate of 0, expire under 5 minutes, or stale under 30 seconds) are excluded from prerenders and become dynamic holes resolved at request time. The `seconds` preset has a 1 minute expire, so it falls in that group. Wrap such a component in `<Suspense>` so a fallback can sit in the static shell."
-    theoryUrl: https://nextjs.org/docs/app/api-reference/functions/cacheLife
+    prompt: "A page is mostly static, but one stock-ticker widget must show near real-time prices. With Cache Components, what is the sensible design?"
+    explanation: "Keep the static parts in the prerendered shell and let only the fast-changing widget run per request: leave it uncached (or with a very short lifetime) inside its own `<Suspense>` boundary so it streams in. Reading cookies just to force the whole page dynamic throws the shell away, and a long-lived cache refreshed by a cron job still serves stale prices between runs."
+    theoryUrl: https://nextjs.org/docs/app/getting-started/caching
     options:
       - {
-          text: "It is included in the static shell and refreshed every second by the server",
+          text: "Cache the whole page with cacheLife('max') and have a cron job revalidate its tag every second",
           correct: false,
         }
       - {
-          text: "It makes the whole route dynamic and removes the static shell for every visitor, not just this component",
+          text: "Read cookies() at the top of the page, so the entire route renders per request",
           correct: false,
         }
       - {
-          text: "It is ignored in production builds and applies only in local development mode",
-          correct: false,
-        }
-      - {
-          text: "It is excluded from the prerender and resolved at request time as a dynamic hole",
+          text: "Keep the shell static and stream the uncached widget per request behind Suspense",
           correct: true,
+        }
+      - {
+          text: "Render the widget at build time and rely on the browser's HTTP cache for freshness",
+          correct: false,
         }
   - type: single
     prompt: "A user submits a comment form and must see their comment in the list right after the redirect. The list is cached with `cacheTag('comments')`. Which call should the Server Action make?"
@@ -218,36 +218,42 @@ questions:
     explanation: "`updateTag` is designed for read-your-own-writes and can only be used in Server Actions. From Route Handlers or other contexts use `revalidateTag` instead."
     theoryUrl: https://nextjs.org/docs/app/api-reference/functions/updateTag
   - type: single
-    prompt: "You want to invalidate every `app/blog/[slug]/page.tsx` page after a bulk import, without knowing the tags. Which call does it?"
-    explanation: "`revalidatePath` accepts a route pattern with dynamic segments, but then the `type` argument is required: `revalidatePath('/blog/[slug]', 'page')`. For a literal path such as `/blog/hello` you omit `type`. Tags are still more precise when you can use them."
-    theoryUrl: https://nextjs.org/docs/app/api-reference/functions/revalidatePath
+    prompt: "A product appears on its own page, in category listings, in search results and in a home-page carousel. After an admin edits it, every place must show the change. Which invalidation strategy scales best?"
+    explanation: "Tag every cached read that includes the product (for example `cacheTag('product-42')`) and invalidate the tag after the edit, so all entries that depend on it refresh wherever they are rendered. Listing paths by hand breaks as soon as a new page shows the product, invalidating the whole site throws away unrelated cache, and short lifetimes trade freshness for constant recomputation."
+    theoryUrl: https://nextjs.org/docs/app/api-reference/functions/cacheTag
     options:
-      - { text: "revalidatePath('/blog/*')", correct: false }
-      - { text: "revalidatePath('/blog/[slug]/page.tsx')", correct: false }
       - {
-          text: "revalidatePath('/blog') alone, which always invalidates every child page",
+          text: "Call revalidatePath for each path that shows the product, keeping that list in the action",
           correct: false,
         }
-      - { text: "revalidatePath('/blog/[slug]', 'page')", correct: true }
+      - { text: "Tag the cached reads with the product and invalidate that tag", correct: true }
+      - {
+          text: "Revalidate the root layout after each edit, so that every page of the site is rebuilt",
+          correct: false,
+        }
+      - {
+          text: "Give every cached read a cacheLife of a few seconds, so no invalidation is needed",
+          correct: false,
+        }
   - type: single
-    prompt: "Code in your repo calls `revalidateTag('products')` with a single argument. What is the status of that form?"
-    explanation: "The single-argument form is deprecated. It behaves like an immediate expiry (`{ expire: 0 }`) and may be removed. Migrate to `updateTag` inside Server Actions, or to `revalidateTag(tag, 'max')` for stale-while-revalidate."
-    theoryUrl: https://nextjs.org/docs/app/api-reference/functions/revalidateTag
+    prompt: "A price list changes unpredictably a few times a week, and showing an old price for more than a minute after a change costs money. How do you combine time-based and on-demand revalidation?"
+    explanation: "Changes are rare but must show up quickly, so cache with a long lifetime and invalidate the tag on demand from the code path that changes the price. A short time-based lifetime recomputes constantly and still lags by up to its window, `cacheLife('max')` alone would serve stale prices indefinitely, and skipping the cache wastes work on data that rarely changes."
+    theoryUrl: https://nextjs.org/docs/app/getting-started/revalidating
     options:
       - {
-          text: "It is the recommended form, and the second argument is only for custom profiles",
+          text: "A short cacheLife on the price list, so it refreshes itself every minute without any extra code",
           correct: false,
         }
       - {
-          text: "It throws at runtime, because the profile argument is required everywhere",
-          correct: false,
-        }
-      - {
-          text: "It is deprecated and acts like immediate expiry, so migrate to updateTag or 'max'",
+          text: "A long cacheLife plus invalidating the tag whenever a price is changed",
           correct: true,
         }
       - {
-          text: "It invalidates only the current route instead of every entry with that tag, since the tag is scoped to the caller's path",
+          text: "cacheLife('max') alone, since prices change so rarely that revalidation is not needed",
+          correct: false,
+        }
+      - {
+          text: "No caching at all, because any cached price can be stale for some visitors",
           correct: false,
         }
   - type: single
