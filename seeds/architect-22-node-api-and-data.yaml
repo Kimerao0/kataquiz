@@ -84,20 +84,20 @@ questions:
           correct: false,
         }
   - type: boolean
-    prompt: "Browsers can call a gRPC service directly with `fetch`, with no proxy or special client library, because gRPC runs over HTTP/2."
+    prompt: "Because GraphQL clients select only the fields they need, a GraphQL API can remove or rename fields without breaking existing clients."
     answer: false
-    explanation: "gRPC needs trailers and fine-grained control of HTTP/2 framing that browser APIs do not expose, so browsers use gRPC-Web through a proxy (such as Envoy) or a Connect-style protocol. That is one reason gRPC is mostly used between backend services."
-    theoryUrl: https://grpc.io/docs/platforms/web/basics/
+    explanation: "Field selection makes additions safe: a new field is invisible to clients that do not ask for it. But a client that still queries a removed or renamed field gets a validation error. GraphQL APIs usually evolve without version numbers by adding fields, marking old ones `@deprecated`, and removing them only once usage has dropped."
+    theoryUrl: https://graphql.org/learn/best-practices/
   - type: multi
-    prompt: "According to the HTTP specification, which methods are defined as idempotent? Select all that apply."
-    explanation: "`PUT` (replace), `DELETE` (remove) and `GET` have the same intended effect on the server whether you send them once or many times. `POST` is not idempotent: each call may create a new resource. `PATCH` is not guaranteed to be idempotent, because it may describe a relative change (for example 'increment')."
-    theoryUrl: https://developer.mozilla.org/en-US/docs/Glossary/Idempotent
+    prompt: "A public JSON REST API is used by many third-party integrations. Which of these changes are breaking for existing clients? Select all that apply."
+    explanation: "Removing or renaming a response field breaks every client that reads it, and making an optional request field required rejects requests that were valid yesterday. Adding an optional response field or a new endpoint does not change anything existing clients rely on, as long as they ignore fields they do not know, which is why tolerant readers are part of the contract."
+    theoryUrl: https://google.aip.dev/180
     options:
-      - { text: "`POST`", correct: false }
-      - { text: "`PUT`", correct: true }
-      - { text: "`DELETE`", correct: true }
-      - { text: "`PATCH`", correct: false }
-      - { text: "`GET`", correct: true }
+      - { text: "Removing a field from a response", correct: true }
+      - { text: "Renaming a response field from `zip` to `postalCode`", correct: true }
+      - { text: "Making a previously optional request field required", correct: true }
+      - { text: "Adding a new optional field to a response", correct: false }
+      - { text: "Adding a new endpoint next to the existing ones", correct: false }
   - type: single
     prompt: "An API stores an idempotency key for each `POST /payments`. Why should it keep the original response with the key, and not only a flag saying the key was already seen?"
     explanation: "The client usually retries because it never saw the first response (a timeout or a dropped connection). Replaying the stored result gives it the outcome, such as the payment id, exactly as if the first call had arrived. A bare 409 only says that something happened, rerunning the payment would charge twice, and HTTP has no rule that servers must cache `POST` responses."
@@ -121,7 +121,7 @@ questions:
         }
   - type: single
     prompt: "A mobile client calls `POST /payments`, the network drops before it receives the response, and the client retries. You must guarantee the customer is charged once, even if the two requests arrive at the same time on different instances. What do you implement?"
-    explanation: "Require an `Idempotency-Key` header and store the key with the outcome in a shared database, protected by a unique constraint so that concurrent duplicates cannot both proceed: the second one waits or receives the stored result. A per-instance in-memory check fails across instances, and disabling retries leaves the client unable to recover from timeouts."
+    explanation: "Require an `Idempotency-Key` header and store the key with the outcome in a shared database, protected by a unique constraint so that concurrent duplicates cannot both proceed. A retry that arrives after the first request finished receives the stored result; a truly concurrent duplicate gets a conflict (409, retry later), since there is no stored result yet. A per-instance in-memory check fails across instances, and disabling retries leaves the client unable to recover from timeouts."
     theoryUrl: https://datatracker.ietf.org/doc/draft-ietf-httpapi-idempotency-key-header/
     options:
       - { text: "An in-memory `Map` of recent request bodies in each instance", correct: false }
@@ -136,7 +136,7 @@ questions:
         }
   - type: single
     prompt: "Your payments API stores idempotency keys. A client sends `POST /payments` with key `abc` and amount 10, then later sends key `abc` again with amount 500. How should the API respond?"
-    explanation: "Reusing a key with a different payload is a client bug that could silently cause the wrong money movement, so the API should reject it with an error (commonly 422 or 409) rather than replaying the old response or processing the new one. Replaying the first result would hide the mistake, and processing it would break the guarantee."
+    explanation: "Reusing a key with a different payload is a client bug that could silently cause the wrong money movement, so the API should reject it with an error (the IETF idempotency-key draft uses 422; 409 is for a request with that key still in progress) rather than replaying the old response or processing the new one. Replaying the first result would hide the mistake, and processing it would break the guarantee."
     theoryUrl: https://datatracker.ietf.org/doc/draft-ietf-httpapi-idempotency-key-header/
     options:
       - {
@@ -215,24 +215,24 @@ questions:
           correct: false,
         }
   - type: single
-    prompt: "Listing pages are cached under keys like `list:cat:42:page:3:sort:price`. When a product in category 42 changes, the code runs `KEYS list:cat:42:*` and deletes the matches. As the keyspace grows, every Redis client sees latency spikes during invalidations. What is the problem and a better design?"
-    explanation: "Redis executes commands one at a time, and `KEYS` walks the entire keyspace, so every other client waits while it runs. A version in the key prefix (`list:cat:42:v7:...`, bumped to v8 on change while the old keys expire) or a set that tracks the keys to delete makes invalidation cheap. The blocking happens inside Redis, so worker threads or extra connections in Node do not help, and Redis has no secondary index to rebuild."
-    theoryUrl: https://redis.io/docs/latest/commands/keys/
+    prompt: "A Node API serves three kinds of data from a slow upstream: exchange rates that a feed refreshes every minute, product descriptions edited a few times a month (each edit publishes an event), and the user's current balance, used to approve payments. Which caching plan fits best?"
+    explanation: "A TTL should match how fast the data changes and how much staleness hurts. Rates change on a known schedule, so a TTL near the refresh interval is enough; descriptions rarely change and edits are signalled, so a long TTL plus invalidation on the event gives high hit rates; a stale balance can approve a payment that should fail, so it is read from the source of truth. One uniform TTL is either too stale for the balance or too short for descriptions."
+    theoryUrl: https://learn.microsoft.com/en-us/azure/architecture/best-practices/caching
     options:
       - {
-          text: "`KEYS` blocks the Node event loop while it runs, so do the invalidation in a worker thread",
-          correct: false,
-        }
-      - {
-          text: "`KEYS` scans the whole keyspace and blocks Redis, so version the key prefix and bump it",
+          text: "Rates with a TTL near one minute, descriptions long-lived and invalidated on edit, balance not cached",
           correct: true,
         }
       - {
-          text: "Redis runs one command at a time per connection, so open a separate connection only for `KEYS`",
+          text: "One five-minute TTL for all three, so that the caching behaviour is uniform and easy to reason about for everyone",
           correct: false,
         }
       - {
-          text: "Deleting many keys makes Redis rebuild its index, so delete them inside one `MULTI` block",
+          text: "Cache all three with no TTL and invalidate each on change, since any TTL serves stale data",
+          correct: false,
+        }
+      - {
+          text: "Rates not cached since they change often, descriptions and balance with a one-hour TTL",
           correct: false,
         }
   - type: single
@@ -397,24 +397,24 @@ questions:
           correct: false,
         }
   - type: single
-    prompt: "A developer writes a transaction with a `pg` pool as `await pool.query('BEGIN')`, two awaited `pool.query` inserts, then `await pool.query('COMMIT')`. When the second insert fails, the first one is sometimes still saved. Why?"
-    explanation: "`BEGIN`, the inserts and `COMMIT` may each run on a different pooled connection, so the inserts can run outside the transaction in autocommit mode while `BEGIN` leaves some other connection idle in a transaction. Check out one client with `pool.connect()`, run every statement on it, and release it in `finally`. Isolation levels do not change this, and `pg` neither buffers nor retries statements."
-    theoryUrl: https://node-postgres.com/features/transactions
+    prompt: "A public API returns errors in several shapes: some handlers send `{ error: 'Not found' }`, others `{ message, code }`, and validation failures return 200 with `{ ok: false }`. Integrators match on English message strings to decide whether to retry. What should the error contract look like?"
+    explanation: "Clients need to branch on errors reliably, so every error should use the HTTP status that matches its class and one documented body with a stable machine-readable code; RFC 9457 problem details is a standard shape for that. Human messages can then change freely. A 200 for failures hides errors from proxies, monitoring and retry logic, and stack traces leak internals without giving clients anything stable."
+    theoryUrl: https://www.rfc-editor.org/rfc/rfc9457.html
     options:
       - {
-          text: "`BEGIN` only takes effect at SERIALIZABLE isolation, which the pool does not use by default",
+          text: "Always return 200 and put success or failure in the body, so clients have a single code path",
           correct: false,
         }
       - {
-          text: "The pool retries failed statements automatically, and the retry commits the first insert",
-          correct: false,
-        }
-      - {
-          text: "A transaction belongs to one connection, and each `pool.query` may use a different one",
+          text: "A matching HTTP status and one documented body with a stable error code",
           correct: true,
         }
       - {
-          text: "`pg` buffers the inserts until `COMMIT`, and a failed flush keeps whatever was sent first",
+          text: "Return the exception message and stack trace, so integrators can diagnose failures themselves",
+          correct: false,
+        }
+      - {
+          text: "Keep the messages as the contract, but freeze their wording so string matching keeps working",
           correct: false,
         }
   - type: single
@@ -438,24 +438,24 @@ questions:
     explanation: "Two-phase commit couples the availability of all participants, holds locks while waiting for the coordinator, and is unsupported by many modern datastores and brokers. Most microservice systems prefer sagas, outbox and idempotent consumers, accepting eventual consistency."
     theoryUrl: https://microservices.io/patterns/data/saga.html
   - type: single
-    prompt: "To stop a write-skew bug, you run a booking transaction at SERIALIZABLE isolation in PostgreSQL. Under contention, some requests now fail with a serialization failure error. How should the Node code handle it?"
-    explanation: "Under SERIALIZABLE, PostgreSQL aborts one of the conflicting transactions instead of letting an anomaly through, and applications are expected to retry the complete transaction, re-reading the data. The failed transaction is aborted, so a single statement cannot be retried inside it and nothing from it was applied, and falling back to a weaker level brings the write skew back."
-    theoryUrl: https://www.postgresql.org/docs/current/transaction-iso.html#XACT-SERIALIZABLE
+    prompt: "Product wants the `price` field of `GET /products/:id`, a decimal in dollars, to become an integer in cents. Hundreds of third-party integrations read `price`. What is the least disruptive way to evolve the API?"
+    explanation: "Additive change first: a new `priceCents` field breaks nobody, the old field is marked deprecated and announced, and it is removed only when usage has dropped or in the next major version. Changing the meaning of `price` in place silently corrupts every integration, since the JSON still parses. A brand-new API version with a one-week cutoff forces all clients to migrate at once for a change that did not need it."
+    theoryUrl: https://google.aip.dev/180
     options:
       - {
-          text: "Retry only the statement that failed, inside the same transaction that is still open",
+          text: "Change `price` to cents in place and announce it in the changelog, since the field name stays the same",
           correct: false,
         }
       - {
-          text: "Treat it as success, since PostgreSQL has already applied the change before the error",
-          correct: false,
-        }
-      - {
-          text: "Retry the whole transaction from the start, a bounded number of times",
+          text: "Add a `priceCents` field, deprecate `price`, and remove it once usage has dropped",
           correct: true,
         }
       - {
-          text: "Run the failed requests again at READ COMMITTED, where this error cannot happen",
+          text: "Publish a `/v2` of the whole API with the new format and switch `/v1` off next week",
+          correct: false,
+        }
+      - {
+          text: "Return cents by default, and dollars only to clients that send an `Accept-Version: 1` header",
           correct: false,
         }
   - type: single

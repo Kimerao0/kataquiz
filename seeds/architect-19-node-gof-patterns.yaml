@@ -113,24 +113,24 @@ questions:
         }
       - { text: "It frees memory by discarding the executor after it runs", correct: false }
   - type: single
-    prompt: "A file `db.js` creates one connection pool and exports it. Thirty modules `require` or `import` it, yet only one pool is ever created. Why?"
-    explanation: "Node caches a module after its first load, so every later import receives the same exported object. That makes a module a natural singleton, without any `getInstance()` code. The pool is created once per process, not shared across processes."
-    theoryUrl: https://nodejs.org/api/modules.html#caching
+    prompt: "Publishing a video takes five steps across subsystems: transcode it, upload the renditions to object storage, write a database record, purge the CDN and notify subscribers. A route handler, a CLI script and a cron job each repeat these steps, and the three copies have drifted apart. Which pattern fits?"
+    explanation: "A facade gives the subsystems one simple entry point, such as `publishVideo(file)`, that runs the steps in the right order; the three callers use it and no longer know the details. An adapter translates one interface into another and would leave the five steps in every caller. Independent listeners on an event cannot guarantee that transcoding finishes before the upload."
+    theoryUrl: https://refactoring.guru/design-patterns/facade
     options:
       - {
-          text: "The pool library detects duplicates and returns the existing pool",
-          correct: false,
-        }
-      - {
-          text: "Node evaluates a module once and hands every later import the cached exports",
+          text: "Facade: one `publishVideo()` call that hides the subsystems and their order",
           correct: true,
         }
       - {
-          text: "Node shares module state across all processes on the same machine",
+          text: "Adapter: wrap each subsystem so it exposes the interface the route handler expects",
           correct: false,
         }
       - {
-          text: "Each import creates a new pool, but the database merges them into one connection",
+          text: "Observer: each caller emits `videoUploaded`, and every subsystem listens and runs its own step",
+          correct: false,
+        }
+      - {
+          text: "Decorator: wrap the route handler so the five steps run around it",
           correct: false,
         }
   - type: single
@@ -152,10 +152,10 @@ questions:
           correct: false,
         }
   - type: boolean
-    prompt: "A module-level singleton (say, an in-memory cache) is shared between the main thread and all worker threads of the same Node.js process."
-    answer: false
-    explanation: "Each worker thread runs its own JavaScript environment with its own module cache, so importing the module in a worker creates a separate instance. A module singleton is one per JavaScript realm, not one per process or machine. Sharing state across threads needs explicit tools such as messages or `SharedArrayBuffer`."
-    theoryUrl: https://nodejs.org/api/worker_threads.html
+    prompt: "With the Composite pattern, a single item and a group of items share one interface, so client code (for example, computing the total size of a folder tree) can treat both the same way without checking which one it has."
+    answer: true
+    explanation: "That is the point of Composite: a group implements the same interface as a leaf and delegates to its children, so a call like `size()` works on a file or on a whole tree. The cost is a more general interface, since operations that only make sense for groups (such as `add`) must be handled somehow on leaves."
+    theoryUrl: https://refactoring.guru/design-patterns/composite
   - type: single
     prompt: "In a service with 30 classes using constructor injection, where should the concrete dependencies be created and wired together?"
     explanation: "A single composition root at the entry point (for example `main.js`) creates the concrete objects and passes them into the constructors. The rest of the code receives dependencies and never builds them, which is what makes it easy to replace them. Scattering `new` calls or a global lookup brings the coupling back."
@@ -335,21 +335,24 @@ questions:
       - { text: "Decorator: your function wraps the stream to add new behaviour", correct: false }
       - { text: "Command: each chunk is an object that can be queued and undone", correct: false }
   - type: single
-    prompt: "An API returns items in pages, with a cursor for the next page. Callers want to loop over all items as if they were one list, with pages fetched lazily as the loop advances. What is the idiomatic Node.js approach?"
-    explanation: "An async generator that fetches a page and yields its items one by one implements the iterator pattern: callers write `for await (const item of allItems())` and the next page is only fetched when needed. Fetching everything up front wastes memory and time, and callbacks per page push the paging logic onto every caller."
-    theoryUrl: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/for-await...of
+    prompt: "In a checkout module, the cart, pricing, promotions, inventory and shipping objects call each other directly, so a change in one ripples through the others. You introduce a mediator that they all talk to instead of each other. What is the main cost to watch for?"
+    explanation: "A mediator removes the many-to-many links, but all the coordination logic moves into it, and without care it grows into a god object that every change has to touch. The five objects become less coupled, not more, since they only know the mediator. A mediator is an in-process object and needs no broker, and the objects stay testable with a fake mediator."
+    theoryUrl: https://refactoring.guru/design-patterns/mediator
     options:
-      - { text: "Fetch every page first and return one big array", correct: false }
       - {
-          text: "An async generator that yields items and fetches the next page on demand",
+          text: "The mediator can grow into a god object holding all the coordination logic",
           correct: true,
         }
       - {
-          text: "An EventEmitter that emits each page as soon as it arrives, even if the caller is busy",
+          text: "The five objects become more coupled, since each must now know all the others through the mediator",
           correct: false,
         }
       - {
-          text: "A singleton cache that stores the full result set for every caller",
+          text: "Every interaction needs a message broker, since a mediator must be asynchronous",
+          correct: false,
+        }
+      - {
+          text: "The objects can no longer be unit tested, because they all depend on the mediator",
           correct: false,
         }
   - type: single
