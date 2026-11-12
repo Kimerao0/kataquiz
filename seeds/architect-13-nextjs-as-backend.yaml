@@ -155,10 +155,7 @@ questions:
           text: "Only in the client form, since the server then receives data that was already validated",
           correct: false,
         }
-      - {
-          text: "In one shared module that both server entry points parse with",
-          correct: true,
-        }
+      - { text: "In one shared module that both server entry points parse with", correct: true }
       - {
           text: "Separately in each entry point, so the action and the API can change their rules independently",
           correct: false,

@@ -13,19 +13,43 @@ questions:
     explanation: "Most of a typical page is non-interactive markup, so rendering it as Server Components keeps its code and its dependencies out of the browser bundle, and lets it read data close to the source. Client Components are still prerendered to HTML, so the default is not about avoiding blank pages, and data fetching in Client Components still works."
     theoryUrl: https://nextjs.org/docs/app/getting-started/server-and-client-components#when-to-use-server-and-client-components
     options:
-      - { text: "Most UI needs no interactivity, so its code can stay off the browser bundle", correct: true }
-      - { text: "Client Components cannot be prerendered to HTML, so pages would be blank until JavaScript loads", correct: false }
-      - { text: "React 19 no longer allows data fetching from components that run in the browser", correct: false }
-      - { text: "Server Components skip reconciliation, so they update faster in the browser", correct: false }
+      - {
+          text: "Most UI needs no interactivity, so its code can stay off the browser bundle",
+          correct: true,
+        }
+      - {
+          text: "Client Components cannot be prerendered to HTML, so pages would be blank until JavaScript loads",
+          correct: false,
+        }
+      - {
+          text: "React 19 no longer allows data fetching from components that run in the browser",
+          correct: false,
+        }
+      - {
+          text: "Server Components skip reconciliation, so they update faster in the browser",
+          correct: false,
+        }
   - type: single
     prompt: "What does putting `'use client'` at the top of a file actually declare?"
     explanation: "The directive marks the file as an entry point into the client module graph: the module and everything it imports are bundled for the browser. It does not stop the component from being rendered to HTML on the server, and it is not a lazy-loading hint. Imports of a client module do not stay on the server."
     theoryUrl: https://nextjs.org/docs/app/api-reference/directives/use-client
     options:
-      - { text: "That the component skips the server entirely and renders only in the browser", correct: false }
-      - { text: "A boundary: this module and everything it imports join the client bundle", correct: true }
-      - { text: "That only the default export is a Client Component, while its imports stay server-only", correct: false }
-      - { text: "That the component is lazy-loaded after hydration, like a dynamic import", correct: false }
+      - {
+          text: "That the component skips the server entirely and renders only in the browser",
+          correct: false,
+        }
+      - {
+          text: "A boundary: this module and everything it imports join the client bundle",
+          correct: true,
+        }
+      - {
+          text: "That only the default export is a Client Component, while its imports stay server-only",
+          correct: false,
+        }
+      - {
+          text: "That the component is lazy-loaded after hydration, like a dynamic import",
+          correct: false,
+        }
   - type: boolean
     prompt: "Every file that contains a Client Component must start with its own `'use client'` directive."
     explanation: "False. The directive is only needed at the entry points that a Server Component imports. Once a file is marked, the modules it imports and the components it renders directly are already part of the client module graph, so marking each of them again adds nothing."
@@ -36,54 +60,120 @@ questions:
     explanation: "On a direct visit a Client Component renders on the server to produce HTML and then runs again in the browser to hydrate that HTML. The word 'client' means its code also ships to the browser, not that it skips the server. Only Server Components never reach the browser."
     theoryUrl: https://nextjs.org/docs/app/guides/server-and-client-boundary#rendering-environments
     options:
-      - { text: "Only in the browser; the server sends an empty placeholder for it", correct: false }
-      - { text: "On the server to produce the HTML, then again in the browser to hydrate it", correct: true }
-      - { text: "Only on the server; the browser reuses the HTML and never downloads its code", correct: false }
-      - { text: "In a Web Worker, so it does not block the main thread during hydration", correct: false }
+      - {
+          text: "Only in the browser; the server sends an empty placeholder for it",
+          correct: false,
+        }
+      - {
+          text: "On the server to produce the HTML, then again in the browser to hydrate it",
+          correct: true,
+        }
+      - {
+          text: "Only on the server; the browser reuses the HTML and never downloads its code",
+          correct: false,
+        }
+      - {
+          text: "In a Web Worker, so it does not block the main thread during hydration",
+          correct: false,
+        }
   - type: single
     prompt: "A teammate says: 'This page is server-rendered, so it is all Server Components.' What is wrong with the sentence?"
     explanation: "Server rendering is about how the HTML was produced (at build time, with ISR or per request), and Client Components take part in it too. 'Server Component' is about where the component code runs and whether it ships to the browser. A server-rendered page can be made mostly of Client Components."
     theoryUrl: https://nextjs.org/docs/app/guides/server-and-client-boundary#rendering-environments
     options:
-      - { text: "Nothing; server rendering and Server Components are two names for the same thing", correct: false }
-      - { text: "Server rendering is only for static pages, Server Components are only for dynamic ones", correct: false }
-      - { text: "Server-rendered HTML is what Next.js produced; Client Components contribute to it too", correct: true }
-      - { text: "Server-rendered pages cannot contain Server Components, only Client Components with data props", correct: false }
+      - {
+          text: "Nothing; server rendering and Server Components are two names for the same thing",
+          correct: false,
+        }
+      - {
+          text: "Server rendering is only for static pages, Server Components are only for dynamic ones",
+          correct: false,
+        }
+      - {
+          text: "Server-rendered HTML is what Next.js produced; Client Components contribute to it too",
+          correct: true,
+        }
+      - {
+          text: "Server-rendered pages cannot contain Server Components, only Client Components with data props",
+          correct: false,
+        }
   - type: single
     prompt: "What is hydration in a React app?"
     explanation: "Hydration is React taking server-rendered HTML and attaching event handlers and state to it, so the static preview becomes interactive. The DOM is not thrown away and rebuilt, and hydration has nothing to do with filling a data cache."
     theoryUrl: https://react.dev/reference/react-dom/client/hydrateRoot
     options:
-      - { text: "Throwing away the server HTML and rendering the page again from scratch in the browser", correct: false }
-      - { text: "Attaching event handlers and state to server HTML so it becomes interactive", correct: true }
-      - { text: "Filling the client data cache with the responses fetched during the server render", correct: false }
-      - { text: "Streaming the remaining Server Components after the static shell is sent", correct: false }
+      - {
+          text: "Throwing away the server HTML and rendering the page again from scratch in the browser",
+          correct: false,
+        }
+      - {
+          text: "Attaching event handlers and state to server HTML so it becomes interactive",
+          correct: true,
+        }
+      - {
+          text: "Filling the client data cache with the responses fetched during the server render",
+          correct: false,
+        }
+      - {
+          text: "Streaming the remaining Server Components after the static shell is sent",
+          correct: false,
+        }
   - type: single
     prompt: "What is the React Server Component Payload (RSC Payload)?"
     explanation: "The RSC Payload is a compact serialized description of the rendered Server Component tree: their output, placeholders for Client Components with references to their JavaScript, and the props passed to those Client Components. It is not HTML and not the Server Components' source code."
     theoryUrl: https://nextjs.org/docs/app/getting-started/server-and-client-components#on-the-server
     options:
-      - { text: "The bundled source code of the Server Components, sent so the browser can re-run them", correct: false }
-      - { text: "The final HTML document, minified and compressed for the first paint", correct: false }
-      - { text: "Server Components' rendered output, slots for Client Components and their props", correct: true }
-      - { text: "A JSON dump of every database response the page read while rendering", correct: false }
+      - {
+          text: "The bundled source code of the Server Components, sent so the browser can re-run them",
+          correct: false,
+        }
+      - {
+          text: "The final HTML document, minified and compressed for the first paint",
+          correct: false,
+        }
+      - {
+          text: "Server Components' rendered output, slots for Client Components and their props",
+          correct: true,
+        }
+      - {
+          text: "A JSON dump of every database response the page read while rendering",
+          correct: false,
+        }
   - type: single
     prompt: "After the first load, the user clicks a `<Link>` to another page. What does the browser get from the server for that navigation?"
     explanation: "On client-side navigations the browser fetches (often prefetches) the RSC Payload for the new route, and React reconciles it with the current tree. Client Components on the new page render in the browser without server-rendered HTML. A full HTML document is only needed on a direct visit or a hard reload."
     theoryUrl: https://nextjs.org/docs/app/getting-started/server-and-client-components#subsequent-navigations
     options:
-      - { text: "A full new HTML document, which replaces the current page like a normal link", correct: false }
-      - { text: "The RSC Payload, and Client Components render in the browser without new HTML", correct: true }
-      - { text: "Only JSON data; every component of the new page renders in the browser", correct: false }
-      - { text: "Nothing; all routes are bundled into the first load and switched locally", correct: false }
+      - {
+          text: "A full new HTML document, which replaces the current page like a normal link",
+          correct: false,
+        }
+      - {
+          text: "The RSC Payload, and Client Components render in the browser without new HTML",
+          correct: true,
+        }
+      - {
+          text: "Only JSON data; every component of the new page renders in the browser",
+          correct: false,
+        }
+      - {
+          text: "Nothing; all routes are bundled into the first load and switched locally",
+          correct: false,
+        }
   - type: multi
     prompt: "Which of these need a Client Component? Select all that apply."
     explanation: "A list filtered live as the user types needs state that changes in the browser, and reading `localStorage` needs a browser API, so both need client code. A `<details>` disclosure toggles natively, and a `<form>` whose `action` is a Server Function submits without any client code, so both can stay in a Server Component."
     theoryUrl: https://nextjs.org/docs/app/guides/server-and-client-boundary#state-and-interactivity
     options:
-      - { text: "A product list that filters itself as the user types in a search box", correct: true }
+      - {
+          text: "A product list that filters itself as the user types in a search box",
+          correct: true,
+        }
       - { text: "Remembering a dismissed banner in `localStorage`", correct: true }
-      - { text: "An FAQ entry that opens and closes using a native `<details>` element", correct: false }
+      - {
+          text: "An FAQ entry that opens and closes using a native `<details>` element",
+          correct: false,
+        }
       - { text: "A contact form whose `action` prop is a Server Function", correct: false }
   - type: multi
     prompt: "Which are real benefits of rendering a component as a Server Component? Select all that apply."
@@ -99,28 +189,64 @@ questions:
     explanation: "Push the boundary down to the leaf that needs it: a small `AddToCart` Client Component, rendered by a page that stays a Server Component. Marking the page pulls the whole page and everything it imports into the client bundle and stops it from reading data on the server directly. Adding `'use client'` to more files does not undo that."
     theoryUrl: https://nextjs.org/docs/app/getting-started/server-and-client-components#reducing-js-bundle-size
     options:
-      - { text: "Keep it, because a page with any interactive element has to be a Client Component", correct: false }
-      - { text: "Extract an `AddToCart` Client Component and keep the page a Server Component", correct: true }
-      - { text: "Keep the directive on the page and also add `'use client'` to every child to be explicit", correct: false }
-      - { text: "Move the button into the root layout so the page itself has nothing interactive left in it", correct: false }
+      - {
+          text: "Keep it, because a page with any interactive element has to be a Client Component",
+          correct: false,
+        }
+      - {
+          text: "Extract an `AddToCart` Client Component and keep the page a Server Component",
+          correct: true,
+        }
+      - {
+          text: "Keep the directive on the page and also add `'use client'` to every child to be explicit",
+          correct: false,
+        }
+      - {
+          text: "Move the button into the root layout so the page itself has nothing interactive left in it",
+          correct: false,
+        }
   - type: single
     prompt: "A blog post page turns Markdown into HTML with a 150 kB parsing library, and has a small 'Like' button. How do you keep the client bundle small?"
     explanation: "Parse the Markdown in a Server Component, so the library runs only on the server and never ships, and make just the Like button a Client Component. Lazy-loading the parser still sends it to the browser, and parsing in an effect also hides the content from the first HTML."
     theoryUrl: https://nextjs.org/docs/app/guides/server-and-client-boundary#state-and-interactivity
     options:
-      - { text: "Parse in a Server Component and make only the Like button a Client Component", correct: true }
-      - { text: "Mark the page `'use client'` and lazy-load the parser with `next/dynamic` after hydration", correct: false }
-      - { text: "Parse inside a `useEffect` in the browser so the server render stays fast", correct: false }
-      - { text: "Mark the whole page `'use client'`; tree shaking drops the parser if the Like button is small", correct: false }
+      - {
+          text: "Parse in a Server Component and make only the Like button a Client Component",
+          correct: true,
+        }
+      - {
+          text: "Mark the page `'use client'` and lazy-load the parser with `next/dynamic` after hydration",
+          correct: false,
+        }
+      - {
+          text: "Parse inside a `useEffect` in the browser so the server render stays fast",
+          correct: false,
+        }
+      - {
+          text: "Mark the whole page `'use client'`; tree shaking drops the parser if the Like button is small",
+          correct: false,
+        }
   - type: single
     prompt: "Why must the props a Server Component passes to a Client Component be serializable?"
     explanation: "Server Component output, including props for Client Components, travels to the browser inside the RSC Payload, and the browser rebuilds those values there. A value that cannot be serialized, such as a plain function or a class instance, cannot make that trip. It has nothing to do with memoization or TypeScript."
     theoryUrl: https://nextjs.org/docs/app/getting-started/server-and-client-components#passing-data-from-server-to-client-components
     options:
-      - { text: "Because Client Components are memoized and need props that compare by value", correct: false }
-      - { text: "Because they travel in the RSC Payload and are rebuilt in the browser", correct: true }
-      - { text: "Because TypeScript cannot infer prop types across a module boundary otherwise", correct: false }
-      - { text: "Because they are written to the HTML as data attributes for hydration", correct: false }
+      - {
+          text: "Because Client Components are memoized and need props that compare by value",
+          correct: false,
+        }
+      - {
+          text: "Because they travel in the RSC Payload and are rebuilt in the browser",
+          correct: true,
+        }
+      - {
+          text: "Because TypeScript cannot infer prop types across a module boundary otherwise",
+          correct: false,
+        }
+      - {
+          text: "Because they are written to the HTML as data attributes for hydration",
+          correct: false,
+        }
   - type: multi
     prompt: "A Server Component renders a Client Component. Which props can it pass? Select all that apply."
     explanation: "Plain objects and arrays of serializable values, rendered JSX elements and Promises all cross the boundary; a Client Component can read a Promise with `use`. An inline event handler is a plain function, which cannot be serialized, and a class instance loses its prototype and methods, so React rejects it."
@@ -144,10 +270,22 @@ questions:
     explanation: "A plain function cannot be serialized, so passing an event handler across the boundary throws. Define the handler inside the Client Component, or pass a Server Function (marked `'use server'`) if the click must run code on the server. Functions are not silently dropped or converted into network calls."
     theoryUrl: https://nextjs.org/docs/app/guides/server-and-client-boundary#crossing-the-boundary
     options:
-      - { text: "It works; Next.js turns the arrow function into a network call to the server", correct: false }
-      - { text: "It errors; move the handler into the Client Component or pass a Server Function", correct: true }
-      - { text: "It renders, but the prop is dropped silently, so the click does nothing at all", correct: false }
-      - { text: "It works once `Button` is wrapped in `<Suspense>`, which defers the handler to the client", correct: false }
+      - {
+          text: "It works; Next.js turns the arrow function into a network call to the server",
+          correct: false,
+        }
+      - {
+          text: "It errors; move the handler into the Client Component or pass a Server Function",
+          correct: true,
+        }
+      - {
+          text: "It renders, but the prop is dropped silently, so the click does nothing at all",
+          correct: false,
+        }
+      - {
+          text: "It works once `Button` is wrapped in `<Suspense>`, which defers the handler to the client",
+          correct: false,
+        }
   - type: single
     prompt: "`Modal` is a Client Component that toggles its visibility with `useState`. `Cart` is an async Server Component that queries the database. How do you show `Cart` inside `Modal`?"
     code: |
@@ -166,28 +304,61 @@ questions:
     explanation: "This is the intended pattern. `Page` renders `Cart` on the server and passes its output to `Modal` as `children`, which is serializable rendered content. `Modal` only places that output; it never imports or runs `Cart`'s code, so the database query stays on the server."
     theoryUrl: https://nextjs.org/docs/app/getting-started/server-and-client-components#interleaving-server-and-client-components
     options:
-      - { text: "This code is correct: `Cart` renders on the server and `Modal` only places its output", correct: true }
-      - { text: "It fails: a Server Component can never appear inside a Client Component", correct: false }
-      - { text: "It works, but `Cart` becomes a Client Component because its parent is one", correct: false }
-      - { text: "`Modal` must import `Cart` itself, because `children` cannot carry Server Components", correct: false }
+      - {
+          text: "This code is correct: `Cart` renders on the server and `Modal` only places its output",
+          correct: true,
+        }
+      - {
+          text: "It fails: a Server Component can never appear inside a Client Component",
+          correct: false,
+        }
+      - {
+          text: "It works, but `Cart` becomes a Client Component because its parent is one",
+          correct: false,
+        }
+      - {
+          text: "`Modal` must import `Cart` itself, because `children` cannot carry Server Components",
+          correct: false,
+        }
   - type: single
     prompt: "A Client Component file imports `Cart` from another module and renders `<Cart />` itself. `Cart` has no directive and calls the database. What is the problem?"
     explanation: "Whatever a client module imports joins the client module graph, so `Cart` is now treated as client code and would have to run in the browser, where its database client and secrets do not belong. The fix is to render `Cart` from a Server Component and pass it down as `children` or another prop."
     theoryUrl: https://nextjs.org/docs/app/guides/server-and-client-boundary#crossing-the-boundary
     options:
-      - { text: "None; Next.js detects the database call and keeps `Cart` on the server automatically", correct: false }
-      - { text: "Only performance: `Cart` still runs on the server but re-renders on every client update", correct: false }
-      - { text: "`Cart` becomes client code; pass it from a Server Component as a prop", correct: true }
-      - { text: "None as long as `Cart` is async, because async components always run on the server", correct: false }
+      - {
+          text: "None; Next.js detects the database call and keeps `Cart` on the server automatically",
+          correct: false,
+        }
+      - {
+          text: "Only performance: `Cart` still runs on the server but re-renders on every client update",
+          correct: false,
+        }
+      - {
+          text: "`Cart` becomes client code; pass it from a Server Component as a prop",
+          correct: true,
+        }
+      - {
+          text: "None as long as `Cart` is async, because async components always run on the server",
+          correct: false,
+        }
   - type: single
     prompt: "Many Client Components need a theme value from React Context, but Context is not available in Server Components. What is the recommended structure?"
     explanation: "Create a small Client Component provider that holds the context and renders `children`, and render it from the (server) root layout around `{children}`. The layout stays a Server Component, pages passed as children stay Server Components, and every Client Component below can read the context."
     theoryUrl: https://nextjs.org/docs/app/getting-started/server-and-client-components#context-providers
     options:
       - { text: "Mark the root layout `'use client'` and create the context there", correct: false }
-      - { text: "A Client Component provider that wraps `children`, rendered by the layout", correct: true }
-      - { text: "Store the theme in a module-level variable that both sides import", correct: false }
-      - { text: "Pass the theme as a prop through every Server Component down to each Client Component that reads it", correct: false }
+      - {
+          text: "A Client Component provider that wraps `children`, rendered by the layout",
+          correct: true,
+        }
+      - {
+          text: "Store the theme in a module-level variable that both sides import",
+          correct: false,
+        }
+      - {
+          text: "Pass the theme as a prop through every Server Component down to each Client Component that reads it",
+          correct: false,
+        }
   - type: boolean
     prompt: "Wrapping `{children}` in a Client Component provider in the root layout turns every page of the app into a Client Component."
     explanation: "False. The pages are passed to the provider as `children`, which are rendered by the server and handed over as output. Only modules that a client file imports join the client graph, so the pages stay Server Components and keep their code on the server."
@@ -199,9 +370,18 @@ questions:
     theoryUrl: https://nextjs.org/docs/app/getting-started/server-and-client-components#third-party-components
     options:
       - { text: "Re-export it from your own file that starts with `'use client'`", correct: true }
-      - { text: "Edit the file in `node_modules` to add the directive, and commit a patch for it", correct: false }
-      - { text: "Mark the page that renders it `'use client'`, since a library cannot be wrapped", correct: false }
-      - { text: "Load it with `next/dynamic` and `ssr: false` directly from the Server Component", correct: false }
+      - {
+          text: "Edit the file in `node_modules` to add the directive, and commit a patch for it",
+          correct: false,
+        }
+      - {
+          text: "Mark the page that renders it `'use client'`, since a library cannot be wrapped",
+          correct: false,
+        }
+      - {
+          text: "Load it with `next/dynamic` and `ssr: false` directly from the Server Component",
+          correct: false,
+        }
   - type: single
     prompt: "`lib/data.ts` reads a secret and is meant for the server only. How do you make sure it can never end up in client code by mistake?"
     code: |
@@ -218,37 +398,85 @@ questions:
     explanation: "Importing `server-only` turns any import of this module from client code into a build error, so the mistake is caught early. Without it, Next.js would replace the non-`NEXT_PUBLIC_` variable with an empty string in the client bundle and the call would just fail at runtime. Renaming the variable to `NEXT_PUBLIC_` would leak the secret."
     theoryUrl: https://nextjs.org/docs/app/getting-started/server-and-client-components#preventing-environment-poisoning
     options:
-      - { text: "Rename the variable to `NEXT_PUBLIC_API_KEY` so it works the same in both environments", correct: false }
-      - { text: "The `import 'server-only'` line: importing this module from client code fails the build", correct: true }
-      - { text: "Nothing is needed: Next.js never bundles a module that reads `process.env` for the client", correct: false }
-      - { text: "Wrap the body in `if (typeof window === 'undefined')` so it only runs on the server", correct: false }
+      - {
+          text: "Rename the variable to `NEXT_PUBLIC_API_KEY` so it works the same in both environments",
+          correct: false,
+        }
+      - {
+          text: "The `import 'server-only'` line: importing this module from client code fails the build",
+          correct: true,
+        }
+      - {
+          text: "Nothing is needed: Next.js never bundles a module that reads `process.env` for the client",
+          correct: false,
+        }
+      - {
+          text: "Wrap the body in `if (typeof window === 'undefined')` so it only runs on the server",
+          correct: false,
+        }
   - type: single
     prompt: "A Server Component loads a full user row, including `passwordHash` and `internalNotes`, and passes it as `user` to a Client Component that only shows the name and avatar. Why is that a problem?"
     explanation: "Props sent to a Client Component are serialized into the payload the browser receives, so every field is readable in the network response even if it is never rendered. Pass only the fields the component needs, ideally shaped by a data access layer. TypeScript types and rendering choices do not strip data."
     theoryUrl: https://nextjs.org/docs/app/guides/data-security#passing-data-from-server-to-client
     options:
-      - { text: "It is not a problem, because fields the component does not render are never sent", correct: false }
-      - { text: "Every field is serialized to the browser; pass only the fields it needs", correct: true }
-      - { text: "It is only a problem in development, because production builds strip unused props", correct: false }
-      - { text: "It is fine as long as the prop type only declares `name` and `avatar`", correct: false }
+      - {
+          text: "It is not a problem, because fields the component does not render are never sent",
+          correct: false,
+        }
+      - {
+          text: "Every field is serialized to the browser; pass only the fields it needs",
+          correct: true,
+        }
+      - {
+          text: "It is only a problem in development, because production builds strip unused props",
+          correct: false,
+        }
+      - {
+          text: "It is fine as long as the prop type only declares `name` and `avatar`",
+          correct: false,
+        }
   - type: single
     prompt: "A Server Component calls `getComments()` without awaiting it and passes the Promise to a Client Component, which reads it with `use()` inside a `<Suspense>` boundary. What does this gain?"
     explanation: "The request starts on the server right away, but the page does not wait for it: the rest of the UI streams immediately, the Suspense fallback shows, and the comments render when the Promise resolves. The Client Component does not have to fetch the same data again after mount."
     theoryUrl: https://react.dev/reference/react/use
     options:
-      - { text: "Nothing; the Promise is awaited on the server before the HTML is sent anyway", correct: false }
-      - { text: "The comments are fetched again in the browser so they are always fresh", correct: false }
-      - { text: "The rest of the page streams without waiting, and comments appear when ready", correct: true }
-      - { text: "The Promise result is cached permanently in the browser across sessions", correct: false }
+      - {
+          text: "Nothing; the Promise is awaited on the server before the HTML is sent anyway",
+          correct: false,
+        }
+      - {
+          text: "The comments are fetched again in the browser so they are always fresh",
+          correct: false,
+        }
+      - {
+          text: "The rest of the page streams without waiting, and comments appear when ready",
+          correct: true,
+        }
+      - {
+          text: "The Promise result is cached permanently in the browser across sessions",
+          correct: false,
+        }
   - type: single
     prompt: "A Client Component loads a product list in `useEffect` after mount. What does a crawler that does not run JavaScript find in the HTML for that list?"
     explanation: "The effect only runs in the browser after hydration, so the server HTML contains whatever the component rendered before the data arrived, typically a loading state. Fetching the list in a Server Component and passing it down as props puts the content in the first HTML response."
     theoryUrl: https://nextjs.org/docs/app/guides/server-and-client-boundary#rendering-environments
     options:
-      - { text: "The full list, because Next.js waits for effects to finish before sending the HTML", correct: false }
-      - { text: "Only the loading or empty state the component rendered before the effect ran", correct: true }
-      - { text: "The list from the previous build, because effects are cached at build time", correct: false }
-      - { text: "Nothing at all, because Client Components are never included in the HTML", correct: false }
+      - {
+          text: "The full list, because Next.js waits for effects to finish before sending the HTML",
+          correct: false,
+        }
+      - {
+          text: "Only the loading or empty state the component rendered before the effect ran",
+          correct: true,
+        }
+      - {
+          text: "The list from the previous build, because effects are cached at build time",
+          correct: false,
+        }
+      - {
+          text: "Nothing at all, because Client Components are never included in the HTML",
+          correct: false,
+        }
   - type: boolean
     prompt: "A Server Component can be an `async` function that awaits a database query directly in its body."
     explanation: "True. Server Components run only on the server, so they can be async and read data during their own render, without a separate loader or API route. Client Components cannot be async; they get data through props, `use` or a client fetching library."

@@ -220,7 +220,10 @@ questions:
           text: "Clear the boundary's error state so the children re-render from what is already loaded",
           correct: false,
         }
-      - { text: "Re-fetch and re-render the failed segment, for example with `retry()`", correct: true }
+      - {
+          text: "Re-fetch and re-render the failed segment, for example with `retry()`",
+          correct: true,
+        }
       - {
           text: "Force a full browser reload, since server code only runs again on a hard navigation",
           correct: false,
