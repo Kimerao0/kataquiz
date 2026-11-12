@@ -120,10 +120,10 @@ questions:
         }
 
   - type: boolean
-    prompt: "Calling an `async` function that throws before its first `await` throws the error synchronously at the call site, so a plain `try/catch` around the call without `await` catches it."
-    answer: false
-    explanation: "Any error thrown inside an `async` function, before or after an `await`, turns into a rejection of the promise it returns. A `try/catch` only sees it if you `await` the call, or you attach `.catch()`. Forgetting this is a common source of unhandled rejections."
-    theoryUrl: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/async_function
+    prompt: "With `async`/`await`, one `try/catch` around several awaited steps handles a failure in any of them, much like a single `.catch()` at the end of a promise chain."
+    answer: true
+    explanation: "When an awaited promise rejects, `await` rethrows the rejection at that point, so it travels to the nearest `catch` like a synchronous throw. That is what lets async code reuse ordinary error handling. It only covers promises you actually `await`: a call started without `await` can still fail outside the `try`."
+    theoryUrl: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/await
 
   - type: single
     prompt: "This handler loads a dashboard from three independent services, each taking about 300 ms. It feels slow. What is the main improvement?"
@@ -450,12 +450,12 @@ questions:
         }
 
   - type: single
-    prompt: "A search endpoint receives an `AbortSignal` and calls `controller.abort()` when the client disconnects. The `fetch` calls stop, but a long CPU loop over the results keeps running. Why?"
-    explanation: "Aborting only sets the signal's state and fires its `abort` event; it cannot stop code by force. APIs that accept a signal (such as `fetch`) listen for it and stop, but your own code must pass the signal along and check `signal.aborted` (or call `signal.throwIfAborted()`) between steps."
+    prompt: "A search endpoint creates an `AbortController`, calls `controller.abort()` when the client disconnects, and passes the signal to its `fetch` calls. It then processes the results in chunks, awaiting a database write after each chunk. When a client disconnects, the `fetch` calls stop but the chunk processing runs to the end. Why?"
+    explanation: "Aborting only sets the signal's state and fires its `abort` event; it cannot stop code by force. APIs that accept a signal, such as `fetch`, listen for it and stop, but your own loop must check `signal.aborted` (or call `signal.throwIfAborted()`) between chunks. That check works only because the loop awaits between chunks: the disconnect handler that calls `abort()` can run only when the loop yields, so a fully synchronous loop would never see the signal change."
     theoryUrl: https://nodejs.org/api/globals.html#class-abortcontroller
     options:
       - {
-          text: "`abort()` only works for network requests, and CPU loops can never be cancelled",
+          text: "`abort()` only works for network requests, and your own processing code can never be cancelled",
           correct: false,
         }
       - {
@@ -463,7 +463,7 @@ questions:
           correct: true,
         }
       - {
-          text: "The signal is delivered on the next event loop tick, after the loop has already finished",
+          text: "The `abort` event is held back until every pending database write completes, so all chunks finish first",
           correct: false,
         }
       - {

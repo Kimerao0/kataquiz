@@ -75,15 +75,30 @@ questions:
         }
 
   - type: multi
-    prompt: "Which kinds of work does libuv run on its thread pool, rather than through the OS's non-blocking socket notifications? Select all that apply."
-    explanation: "Most asynchronous file system calls, async compression and CPU-heavy async crypto such as key derivation run on the thread pool, because there is no portable non-blocking OS API for them or because they are CPU work. Socket reads and writes use the OS readiness mechanisms (epoll, kqueue, IOCP), and timers are tracked by the loop itself, so neither occupies a pool thread."
-    theoryUrl: https://nodejs.org/en/learn/asynchronous-work/dont-block-the-event-loop
+    prompt: "All your JavaScript runs on one thread, while the waiting for I/O happens elsewhere. Which consequences follow from that model? Select all that apply."
+    explanation: "Run-to-completion means a callback, or the code between two `await`s, is never interrupted by other JavaScript, so plain objects need no locks. But every `await` hands control back to the loop, so other requests can run and change shared state before the function resumes: check-then-act across an `await` is still a race. A connection that is waiting holds no thread at all."
+    theoryUrl: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Event_loop
     options:
-      - { text: "Most asynchronous file system operations", correct: true }
-      - { text: "Asynchronous compression and decompression with zlib", correct: true }
-      - { text: "Async CPU-heavy crypto such as password key derivation", correct: true }
-      - { text: "Reading and writing data on TCP sockets", correct: false }
-      - { text: "Keeping track of pending timers", correct: false }
+      - {
+          text: "Two of your callbacks never run at the same instant, so in-memory objects need no locks against parallel access",
+          correct: true,
+        }
+      - {
+          text: "State read before an `await` may have been changed by another request by the time the function resumes",
+          correct: true,
+        }
+      - {
+          text: "A synchronous block of code can be paused midway so that another request's callback runs",
+          correct: false,
+        }
+      - {
+          text: "Since only one thread runs JavaScript, async code cannot have race conditions",
+          correct: false,
+        }
+      - {
+          text: "Each open connection holds a JS thread while it waits, so concurrency is capped by the thread count",
+          correct: false,
+        }
 
   - type: single
     prompt: Why does libuv use a thread pool for file system operations but not for network sockets?
@@ -188,24 +203,24 @@ questions:
         }
 
   - type: single
-    prompt: "That same CPU-heavy report runs a few hundred times an hour and must not hurt the latency of other endpoints. Which approach fits best?"
-    explanation: "A small pool of worker threads runs the CPU work in parallel with the main thread, which stays free to serve requests. Raising the libuv pool size does nothing for JavaScript code, and wrapping it in `setTimeout` only delays the block. Simply adding instances spreads the stalls around without removing them."
-    theoryUrl: https://nodejs.org/api/worker_threads.html
+    prompt: "Each instance of a service sends a heartbeat to a coordinator from a `setInterval` every 2 s, and the coordinator declares an instance dead after 6 s of silence. During bursts of CPU-heavy requests, instances that are still running get declared dead and restarted. What is the most likely cause?"
+    explanation: "Timers cannot interrupt running code: the heartbeat callback waits on the same JS thread as the request handlers, so a few long synchronous handlers in a row delay it past the 6 s window. The process is alive, but its loop is not responsive, which is exactly what the heartbeat ends up measuring. CPU-bound JavaScript does not use the libuv pool, and there is no separate timer thread with its own priority."
+    theoryUrl: https://nodejs.org/en/learn/asynchronous-work/dont-block-the-event-loop
     options:
       - {
-          text: "Run the report generation in a small pool of worker threads and send the result back to the main thread",
+          text: "The heartbeat callback runs on the same JS thread, so it waits behind the long request handlers",
           correct: true,
         }
       - {
-          text: "Increase the libuv thread pool size so that the report code gets more threads to run on",
+          text: "`setInterval` drifts a little on every tick, and under load the accumulated drift exceeds the window",
           correct: false,
         }
       - {
-          text: "Wrap the call in `setTimeout(..., 0)` so the report starts on a later tick of the event loop",
+          text: "Under CPU load the OS gives the timer thread a lower priority than the request threads",
           correct: false,
         }
       - {
-          text: "Run more instances of the service so the chance of hitting a blocked one goes down",
+          text: "The heartbeat requests go through the libuv thread pool, which the CPU-heavy requests have saturated",
           correct: false,
         }
 
@@ -327,24 +342,24 @@ questions:
         }
 
   - type: single
-    prompt: "What is the role of the poll phase in the Node.js event loop?"
-    explanation: "In the poll phase the loop collects new I/O events and runs their callbacks. When there is nothing else to do it waits there for I/O, bounded by the next timer due, which is why an idle Node process uses almost no CPU. Timers and `setImmediate` callbacks have their own phases."
-    theoryUrl: https://nodejs.org/en/learn/asynchronous-work/event-loop-timers-and-nexttick
+    prompt: "A Node.js API server with no traffic shows almost 0% CPU, even though its event loop is still running and reacts instantly to the next request. How is that possible?"
+    explanation: "When no callback is ready, the loop asks the OS to put the thread to sleep until a socket has data or the next timer is due, and the OS wakes it as soon as either happens. Waiting this way costs no CPU, whereas a loop that kept checking sockets would burn a whole core. Nothing is suspended or restarted between requests."
+    theoryUrl: https://docs.libuv.org/en/v1.x/design.html
     options:
       - {
-          text: "It runs the callbacks of expired `setTimeout` and `setInterval` timers",
-          correct: false,
-        }
-      - {
-          text: "It retrieves new I/O events, runs their callbacks, and waits for I/O when idle",
+          text: "With nothing to do, the loop blocks in the OS until I/O arrives or a timer is due, instead of spinning",
           correct: true,
         }
       - {
-          text: "It checks every few milliseconds whether the garbage collector should run",
+          text: "The OS suspends the process between requests, and the load balancer wakes it up when traffic arrives",
           correct: false,
         }
       - {
-          text: "It runs all callbacks scheduled with `setImmediate`, then closes finished sockets",
+          text: "The loop keeps checking every socket in a tight cycle, but V8 optimises the check so it costs almost nothing",
+          correct: false,
+        }
+      - {
+          text: "Node stops the event loop when idle and starts a fresh one when the next connection is accepted",
           correct: false,
         }
 
