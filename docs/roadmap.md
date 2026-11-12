@@ -133,24 +133,27 @@ Spec: `specs/paths.md` (phase 1, KQ42, live in production since 2026-11-11; arch
 
 ## Architect Roadmap v2
 
-- [ ] KQ47: Architect Roadmap v2 R1 — Delete mechanism, snippet guard, React quizzes 01–06
-  Spec: `specs/architect-roadmap-v2.md` R1 · status: merged bc3cef9, pushed + deployed (on origin before 2026-11-12), awaiting prod check
+- [x] KQ47: Architect Roadmap v2 R1 — Delete mechanism, snippet guard, React quizzes 01–06
+  Spec: `specs/architect-roadmap-v2.md` R1 · status: merged bc3cef9, done — verified in prod 2026-11-12 (deploy d605c4f)
   Specs: R1.1 … R1.9 (the spec file holds the text; never copy it here)
   Verdicts: 9 proven — `.proofs/architect-roadmap-v2/`
   2026-11-11 — check: 9/9 implemented; 9 findings (0 blockers): 8 fixed, 1 accepted (user paths lose steps, decision 11)
   2026-11-11 — merged bc3cef9 (ff, rebase clean); pnpm check green: biome ok, tsc ok, 850/850 tests, portability ok
-- [ ] KQ48: Architect Roadmap v2 R2 — Next.js and React patterns 07–15
-  Spec: `specs/architect-roadmap-v2.md` R2 · status: merged ef0746d, pushed + deployed 2026-11-12 (d605c4f, Vercel Ready), awaiting prod check
+  2026-11-12 — closed: owner verified prod, deploy d605c4f
+- [x] KQ48: Architect Roadmap v2 R2 — Next.js and React patterns 07–15
+  Spec: `specs/architect-roadmap-v2.md` R2 · status: merged ef0746d, done — verified in prod 2026-11-12 (deploy d605c4f)
   Specs: R2.1 … R2.7 (the spec file holds the text; never copy it here)
   Verdicts: 6 proven · R2.7 owner-check — `.proofs/architect-roadmap-v2/`
   2026-11-12 — check: 7/7 implemented (R2.7 bounced once: ~10 edge-case questions replaced); 9 findings (0 blockers): 7 fixed, R2.4/R2.6 tightened + decision 13 via sync
   2026-11-12 — merged ef0746d (ff, rebase clean onto origin/main); pnpm check green: biome ok, tsc ok, 855/855 tests, portability ok
-- [ ] KQ49: Architect Roadmap v2 R3 — Node.js 16–23
-  Spec: `specs/architect-roadmap-v2.md` R3 · status: merged 9329c85, pushed + deployed 2026-11-12 (d605c4f, Vercel Ready), awaiting prod check
+  2026-11-12 — closed: owner verified prod, deploy d605c4f
+- [x] KQ49: Architect Roadmap v2 R3 — Node.js 16–23
+  Spec: `specs/architect-roadmap-v2.md` R3 · status: merged 9329c85, done — verified in prod 2026-11-12 (deploy d605c4f)
   Specs: R3.1 … R3.7 (the spec file holds the text; never copy it here)
   Verdicts: 6 proven · R3.7 owner-check — `.proofs/architect-roadmap-v2/`
   2026-11-12 — check: 7/7 implemented (R3.7 bounced once: 10 trivia questions replaced, 22 back to general API/data theory); 21 findings (0 blockers): all fixed, R3.3/R3.4/R3.6 reworded via sync
   2026-11-12 — merged 9329c85 (ff onto local main holding unpushed R2; origin had nothing new, no rebase needed); pnpm check green: biome ok, tsc ok, 860/860 tests, portability ok
+  2026-11-12 — closed: owner verified prod, deploy d605c4f
 - [ ] KQ50: Architect Roadmap v2 R4 — Architecture 24–41
   Spec: `specs/architect-roadmap-v2.md` R4 · status: open
   Specs: R4.1 … R4.7 (the spec file holds the text; never copy it here)
