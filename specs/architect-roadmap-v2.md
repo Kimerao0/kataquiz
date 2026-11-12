@@ -101,13 +101,13 @@ Follow-up: Kill the old path, and the old quiz, i want a new quiz and new path. 
 
 #### Specs
 
-1. [open] Running `check.mts` on `seeds/architect-1[6-9]-*.yaml seeds/architect-2[0-3]-*.yaml` prints ok for all eight files, each with at most 5 code questions, and none of them carries an `advanced` tag.
-2. [open] The title list in the R3 migration equals the set of quiz files changed in R3, as listed by `git diff --name-only` on `seeds/`.
-3. [open] On a database holding the R2 content, a quiz from 16–23 that R3 left unchanged keeps its attempts after `pnpm release`.
-4. [open] On a database holding the R2 content, `pnpm release` leaves exactly one seed quiz per title for 16–23.
-5. [open] On a fresh database, `pnpm release` runs the R1–R3 migrations without error and imports every seed, the path included.
-6. [open] After `pnpm release` on a database holding the R2 content, the "Road to Software Architect" page lists 41 steps.
-7. [open] Reading quizzes 16–20, 22 and 23, no question turns on an edge case or a trick output; quiz 21 may.
+1. [built] Running `check.mts` on `seeds/architect-1[6-9]-*.yaml seeds/architect-2[0-3]-*.yaml` prints ok for all eight files, each with at most 5 code questions, and none of them carries an `advanced` tag.
+2. [built] The title list in the R3 migration equals the set of quiz files changed in R3, as listed by `git diff --name-only` on `seeds/`.
+3. [built] On a database holding the R2 content, a quiz from 16–23 that R3 left unchanged keeps its attempts after `pnpm release`.
+4. [built] On a database holding the R2 content, `pnpm release` leaves exactly one seed quiz per title for 16–23.
+5. [built] On a fresh database, `pnpm release` runs the R1–R3 migrations without error and imports every seed, the path included.
+6. [built] After `pnpm release` on a database holding the R2 content, the "Road to Software Architect" page lists 41 steps.
+7. [built] Reading quizzes 16–20, 22 and 23, no question turns on an edge case or a trick output; quiz 21 may.
 
 ### R4 — Architecture 24–41
 
