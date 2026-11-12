@@ -152,6 +152,7 @@ questions:
         upload.write(chunk)
       })
       source.on('end', () => upload.end())
+    codeLanguage: javascript
     explanation: "The `data` handler keeps writing regardless of whether the upload can keep up, so backpressure is ignored and unsent data piles up in memory. It also has no error handling: if either stream fails, the other is not closed. `pipeline(source, upload)` handles both. Chunk order is preserved and `end` does fire, so those are not the issue."
     theoryUrl: https://nodejs.org/en/learn/modules/backpressuring-in-streams
     options:
@@ -305,6 +306,7 @@ questions:
         createGzip(),
         createWriteStream('out.txt.gz'),
       )
+    codeLanguage: javascript
     explanation: "Async iteration is pull based: the generator asks for the next chunk only after its previous `yield` has been taken by the next stage, and `pipeline` only takes it when downstream has room. A slow destination therefore slows the reading automatically. Nothing here buffers the whole file or runs in another thread."
     theoryUrl: https://nodejs.org/api/stream.html#streams-compatibility-with-async-generators-and-async-iterators
     options:

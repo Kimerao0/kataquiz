@@ -9,24 +9,24 @@ run:
   timePerQuestionSec: 60
 questions:
   - type: single
-    prompt: "A Node.js HTTP service is told to stop during a rolling deploy. Which shutdown sequence loses the fewest requests?"
-    explanation: "A graceful shutdown first stops taking new work (failing readiness so the load balancer stops routing, and closing the listener), then lets in-flight requests finish, then closes shared resources such as DB pools and broker connections, and only then exits, with a hard deadline as a backstop. Exiting at once drops in-flight work, and closing the DB first makes the active requests fail."
-    theoryUrl: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#pod-termination
+    prompt: "Every request to an ordinary product API (not a login endpoint) passes through a Redis-backed rate limiter used to smooth load and then a permissions service that decides whether the caller may access the resource. Either one can become unreachable. What is the usual failure policy for each?"
+    explanation: "Decide per dependency whether failing open (let the request through) or failing closed (reject it) does less harm. A rate limiter is a protective extra, so if its store is down the API usually lets requests through, perhaps with a local per-instance limit, rather than turning a Redis outage into a full API outage. An authorization check guards data, so if it cannot answer the request must be denied: failing open there hands every caller access to everything."
+    theoryUrl: https://owasp.org/www-community/Fail_securely
     options:
       - {
-          text: "Close the DB pool, then stop the server, then let the in-flight requests finish",
+          text: "Both fail closed: reject every request until both dependencies are reachable again",
           correct: false,
         }
       - {
-          text: "Exit at once, because the load balancer will transparently retry every request that was lost",
-          correct: false,
-        }
-      - {
-          text: "Stop taking new work, drain in-flight requests, close the DB and brokers, then exit",
+          text: "Rate limiter fails open, ideally with a local limit; permissions check fails closed",
           correct: true,
         }
       - {
-          text: "Ignore the signal and wait for the orchestrator to force-kill the process when it is ready",
+          text: "Both fail open, because availability for paying users always outweighs a temporary loss of checks",
+          correct: false,
+        }
+      - {
+          text: "Rate limiter fails closed to stop abuse; permissions check falls back to allowing reads",
           correct: false,
         }
   - type: single
@@ -124,24 +124,24 @@ questions:
           correct: false,
         }
   - type: single
-    prompt: "A request passes through three services, A → B → C → database. Each layer makes up to 3 attempts when the layer below fails. The database becomes slow and every call times out. What happens, and what is the usual remedy?"
-    explanation: "Retries multiply: 3 attempts at A, each making 3 at B, each making 3 at C, means up to 27 database calls per user request, exactly when the database is struggling. The usual remedy is to retry at a single layer (often the one closest to the failure or the edge), and to cap retries with a retry budget or a circuit breaker. Adding more attempts or removing timeouts makes the overload worse."
+    prompt: "A request passes through three services, A → B → C → database, and every layer retries failed calls to the layer below. During a brief database slowdown, the database ends up receiving far more traffic than users are sending, and it cannot recover. What explains this, and what is the usual design fix?"
+    explanation: "Each layer's retries multiply the ones above it, so a struggling database receives a burst of extra calls exactly when it has the least capacity, and the retries themselves keep it overloaded. The fix is to retry at only one layer, cap retries with a retry budget, add jitter, and put a circuit breaker in front of the database so callers fail fast while it recovers. Jitter alone only spreads the same volume over time, and a bigger pool or longer timeouts let even more work pile onto the database."
     theoryUrl: https://sre.google/sre-book/addressing-cascading-failures/
     options:
       - {
-          text: "Up to 27 database calls per request; retry at one layer only and cap retries with a budget",
+          text: "Retries multiply across layers; retry at one layer, with a budget, jitter and a breaker",
           correct: true,
         }
       - {
-          text: "Up to 9 database calls per request; that load is harmless, so leave the setup as it is",
+          text: "The retries are synchronised; adding jitter at every layer removes the extra database load",
           correct: false,
         }
       - {
-          text: "Exactly 3 database calls, because the layers coordinate and share one retry counter",
+          text: "The timeouts are too short; raise them at every layer so that fewer calls fail and get retried",
           correct: false,
         }
       - {
-          text: "Retries never reach the database, since a timeout cancels the whole chain at once",
+          text: "The pools are too small; enlarge the DB pool at C so all the retries can be served",
           correct: false,
         }
   - type: single
@@ -482,7 +482,7 @@ questions:
         }
   - type: single
     prompt: "A download endpoint serves `path.join('/srv/files', req.query.name)`. A tester requests `name=../../etc/passwd` and receives the file. Which fix reasons correctly about the threat?"
-    explanation: "Joining user input to a base path lets `..` segments walk outside it. Resolve the final path and check that it is still inside the base directory, or better, map an opaque id to a server-side path so users never supply paths. Blocklisting the literal string `../` is easily bypassed with encodings or absolute paths, and checking the file extension does not stop traversal."
+    explanation: "Joining user input to a base path lets `..` segments walk outside it. Resolve the final path and check that it is still inside the base directory, or better, map an opaque id to a server-side path so users never supply paths. Stripping the literal string `../` once is easily bypassed with nested sequences: `....//....//etc/passwd` becomes `../../etc/passwd` after the strip. Checking the file extension does not stop traversal either."
     theoryUrl: https://owasp.org/www-community/attacks/Path_Traversal
     options:
       - {
@@ -502,7 +502,7 @@ questions:
           correct: false,
         }
   - type: boolean
-    prompt: "Prototype pollution matters much more on a Node.js server than in a single user's browser tab, because one server process handles the requests of many users."
-    explanation: "True. A polluted `Object.prototype` lives for the whole process, so one attacker's request changes the behaviour of every later request from every user (for example an injected `isAdmin` default) until the process restarts. In a browser the damage is usually confined to that user's own page."
+    prompt: "On a Node.js server, a single request that pollutes `Object.prototype` can change how later requests from other users are handled, until the process restarts."
+    explanation: "True. A polluted `Object.prototype` lives for the whole process, and one process serves many users, so one attacker's request can affect every later request (for example through an injected `isAdmin` default). Client-side pollution is dangerous too: attackers deliver it to victims through crafted URLs and chain it with script gadgets into DOM XSS, so browser code needs the same defences."
     theoryUrl: https://cheatsheetseries.owasp.org/cheatsheets/Prototype_Pollution_Prevention_Cheat_Sheet.html
     answer: true

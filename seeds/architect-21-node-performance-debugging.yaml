@@ -515,7 +515,7 @@ questions:
       const keep = []
       setInterval(() => keep.push(handler()), 1000)
     codeLanguage: javascript
-    explanation: "V8 stores the variables captured by any closure in a scope in one shared context object, and every closure created in that scope points to it. Because `unused` captures `big`, `big` lives in the shared context, and the returned function keeps that context alive. Removing the other closure, or nulling `big` after use, lets it be collected; the cause is not `fill` or `setInterval` itself."
+    explanation: "V8 stores the variables captured by any closure in a scope in one shared context object, and every closure created in that scope points to it. Because `unused` captures `big`, `big` lives in the shared context, and the returned function keeps that context alive. Removing the other closure, or declaring `big` with `let` and setting it to `null` after use, lets it be collected; the cause is not `fill` or `setInterval` itself."
     theoryUrl: https://v8.dev/blog/trash-talk
     options:
       - {
