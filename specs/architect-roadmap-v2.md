@@ -91,7 +91,7 @@ Follow-up: Kill the old path, and the old quiz, i want a new quiz and new path. 
 4. [built] On a database holding the R1 content, `pnpm release` leaves exactly one seed quiz per title for 07–15, each changed one with the R2 question set.
 5. [built] On a fresh database, `pnpm release` runs the R1 and R2 migrations without error and imports every seed, the path included.
 6. [built] After `pnpm release` on a database holding the R1 content, the "Road to Software Architect" page lists 41 steps and step 7 opens the R2 version of quiz 07.
-7. [open] Reading quizzes 07–13 and 15, no question turns on an edge case or a trick output; quiz 14 may.
+7. [built] Reading quizzes 07–13 and 15, no question turns on an edge case or a trick output; quiz 14 may.
 
 ### R3 — Node.js 16–23
 
