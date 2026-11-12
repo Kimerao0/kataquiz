@@ -2,7 +2,7 @@
 
 feature: architect-roadmap-v2
 title: Architect Roadmap v2
-phase: proving
+phase: approved
 ---
 
 # Architect Roadmap v2
@@ -166,3 +166,4 @@ Follow-up: Kill the old path, and the old quiz, i want a new quiz and new path. 
 - 2026-11-12 — R2 merged ef0746d
 - 2026-11-12 — R3.3 reworded (every quiz 16–23 changed, so the unchanged neighbour is 24), R3.4 and R3.6 tightened like R2 (feature-check R3 triage)
 - 2026-11-12 — R3.7 reopened: trivia questions left in 16, 17, 19, 22, 23 (feature-check R3)
+- 2026-11-12 — R3 merged 9329c85
