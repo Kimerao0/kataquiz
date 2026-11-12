@@ -1,479 +1,415 @@
 version: 1
 title: "Architect Roadmap 18: Node.js streams"
-description: Readable, writable, duplex and transform streams, backpressure, pipeline, flowing vs paused mode and stream composition.
+description: Why streams exist, readable, writable, duplex and transform streams, backpressure, pipeline versus manual piping, object mode, push and pull consumption and streaming scenarios.
 language: en
 tags: [architect-roadmap, nodejs, streams, backpressure, pipeline]
 run:
   questionsPerRun: 10
   maxErrors: 3
-  timePerQuestionSec: 90
+  timePerQuestionSec: 60
 questions:
   - type: single
-    prompt: "Which pairing of stream type and example is correct?"
-    explanation: "`net.Socket` is a Duplex (independent read and write sides), `zlib.createGzip()` is a Transform (output derived from input), `fs.createReadStream` is a Readable and `http.ServerResponse` is a Writable. The common mix-up is calling a socket a Transform: its two sides are not related to each other."
+    prompt: "A service must compute a checksum of 3 GB backup files on a machine with 1 GB of free RAM. Why is a stream the right tool here?"
+    explanation: "A stream hands you the file in small chunks, so the checksum can be updated chunk by chunk while memory stays at roughly the size of a few chunks, whatever the file size. Reading the whole file into one buffer needs the full 3 GB at once. Streams do not make the disk faster or skip work: every byte is still read and hashed."
+    theoryUrl: https://nodejs.org/en/learn/modules/how-to-use-streams
+    options:
+      - { text: "Peak memory stays bounded by chunk size rather than file size", correct: true }
+      - {
+          text: "Streams read the disk faster because they bypass the OS page cache",
+          correct: false,
+        }
+      - {
+          text: "The checksum is only computed over a sample of the chunks, so far less data has to be read",
+          correct: false,
+        }
+      - { text: "Streams compress data in memory, so 3 GB fits into 1 GB", correct: false }
+  - type: single
+    prompt: "An endpoint builds a 200 MB CSV report from database rows. Today it builds the whole string and then sends it, and users stare at a blank download for 40 seconds. What does switching to a streamed response improve most directly?"
+    explanation: "With streaming, the first rows go out as soon as they are produced, so the download starts almost immediately (better time to first byte) and the server never holds the full report in memory. The total time to generate every row stays roughly the same: the work is overlapped with sending, not removed."
+    theoryUrl: https://nodejs.org/en/learn/modules/how-to-use-streams
+    options:
+      - {
+          text: "The total time to generate all rows drops, because streaming makes the database queries cheaper",
+          correct: false,
+        }
+      - { text: "Time to first byte, plus lower peak memory on the server", correct: true }
+      - {
+          text: "The report gets smaller, because streams deduplicate repeated rows",
+          correct: false,
+        }
+      - {
+          text: "Only the client's memory, since the server still has to build the whole report before sending",
+          correct: false,
+        }
+  - type: multi
+    prompt: "In which of these situations are streams a good fit? Select all that apply."
+    explanation: "Streams pay off when data is large, unbounded or arrives over time: big files, proxying a response you do not want to buffer, and continuous sources like a growing log. A 2 KB config file is read once and fits in memory trivially, so `readFile` plus `JSON.parse` is simpler and just as good."
+    theoryUrl: https://nodejs.org/en/learn/modules/how-to-use-streams
+    options:
+      - { text: "Gzipping 10 GB of nightly log archives", correct: true }
+      - { text: "Proxying a large upstream HTTP response to the client", correct: true }
+      - { text: "Following a log file that keeps growing and forwarding new lines", correct: true }
+      - { text: "Loading a 2 KB JSON config file once at startup", correct: false }
+  - type: boolean
+    prompt: "Processing a file as a stream usually needs less total CPU work than reading it into memory first and processing it in one go."
+    answer: false
+    explanation: "Streams change when and in what size pieces the work happens, not how much work there is: every byte is still read and processed. The gains are bounded memory and earlier output. Chunking even adds a little overhead per chunk."
+    theoryUrl: https://nodejs.org/en/learn/modules/how-to-use-streams
+  - type: single
+    prompt: "You are wrapping a TCP connection to a custom protocol server: you send commands and, independently, receive notifications that are not replies to what you sent. Which stream type fits?"
+    explanation: "A Duplex has a readable and a writable side that are independent, which is exactly a network connection where incoming data is not computed from outgoing data. A Transform is for output derived from input, like gzip. A Readable or Writable alone covers only one direction."
     theoryUrl: https://nodejs.org/api/stream.html#types-of-streams
     options:
-      - {
-          text: "`net.Socket` is a Transform, because it converts requests into responses",
-          correct: false,
-        }
-      - {
-          text: "`fs.createReadStream()` is a Duplex, because it reads and then closes the file",
-          correct: false,
-        }
-      - {
-          text: "`zlib.createGzip()` is a Transform, as its output is computed from its input",
-          correct: true,
-        }
-      - {
-          text: "`http.ServerResponse` is a Readable, because the client reads from it",
-          correct: false,
-        }
+      - { text: "Duplex", correct: true }
+      - { text: "Transform, because data flows both ways through the socket", correct: false }
+      - { text: "Readable, with commands sent by a separate HTTP call", correct: false }
+      - { text: "Writable, because commands are written to the server", correct: false }
   - type: single
-    prompt: "What is the difference between a Duplex stream and a Transform stream?"
-    explanation: "A Duplex has two independent channels, so what you write has no required relation to what you read (a TCP socket). A Transform is a Duplex whose readable side is computed from what was written to the writable side (gzip, encryption, parsing). Both are bidirectional, and both support backpressure."
-    theoryUrl: https://nodejs.org/api/stream.html#duplex-and-transform-streams
+    prompt: "You need a stage that receives raw CSV text and emits one parsed record object per line, to sit between a file reader and a database writer. Which stream type do you implement?"
+    explanation: "Output computed from input is the definition of a Transform: CSV text goes in, records come out. A plain Duplex would force you to connect the two sides yourself. A Writable would consume the text but give the next stage nothing to read, and a Readable would have no input side."
+    theoryUrl: https://nodejs.org/api/stream.html#implementing-a-transform-stream
     options:
       - {
-          text: "Transform is a Duplex whose output is derived from its input, while Duplex sides are independent",
+          text: "A Writable that parses each line and keeps the records in an array",
+          correct: false,
+        }
+      - {
+          text: "A Transform, as its output records are derived from the input text",
           correct: true,
         }
-      - {
-          text: "Duplex is for binary data and Transform is only for strings or objects",
-          correct: false,
-        }
-      - {
-          text: "Duplex supports backpressure, but Transform does not, as it processes chunks in place",
-          correct: false,
-        }
-      - {
-          text: "A Transform can only be piped once, while a Duplex can be piped many times",
-          correct: false,
-        }
+      - { text: "A Readable that reads the file itself and parses it inside", correct: false }
+      - { text: "A Duplex with unrelated sides, wired to each other by hand", correct: false }
   - type: single
-    prompt: "In Node.js streams, what does backpressure mean?"
-    explanation: "Backpressure is the mechanism that slows down a fast producer when the consumer cannot keep up, so that the buffered data stays bounded. It is signalled by `write()` returning `false` and the `drain` event. It is not an error condition and not a compression technique."
+    prompt: "The last stage of an import job receives record objects and inserts them into a database. Nothing reads from this stage afterwards. Which stream type is it?"
+    explanation: "A stage that only consumes data and produces nothing for a further stage is a Writable, the end of the chain. Its write function should finish the insert before signalling it is ready for more, so the database's pace propagates back up the pipeline."
+    theoryUrl: https://nodejs.org/api/stream.html#implementing-a-writable-stream
+    options:
+      - { text: "A Readable, since it reads records from the previous stage", correct: false }
+      - {
+          text: "A Transform that emits the inserted ids, even if nobody reads them",
+          correct: false,
+        }
+      - { text: "A Writable, as it is the sink at the end of the chain", correct: true }
+      - { text: "A Duplex, because the database also sends acknowledgements back", correct: false }
+  - type: single
+    prompt: "In Node.js streams, what is backpressure?"
+    explanation: "Backpressure is the feedback that lets a slow consumer tell a fast producer to stop sending until it catches up, so buffers stay bounded. It is not an error or a speed limit: it is flow control between stages. Without it, the gap between producer and consumer speed accumulates in memory."
     theoryUrl: https://nodejs.org/en/learn/modules/backpressuring-in-streams
     options:
       - {
-          text: "An error raised when a stream receives data after it has been closed",
+          text: "An error raised when a stream receives more data than its buffer size allows",
           correct: false,
         }
       - {
-          text: "Compressing the data in the internal buffer when it grows past the limit",
-          correct: false,
-        }
-      - {
-          text: "A signal that makes a fast producer pause until a slow consumer catches up",
+          text: "A slow consumer signalling the producer to pause until it catches up",
           correct: true,
         }
       - {
-          text: "A retry policy that re-sends chunks the consumer failed to process",
+          text: "A fixed throughput cap configured on each stream in bytes per second",
+          correct: false,
+        }
+      - {
+          text: "The delay the OS adds to disk writes when the page cache is full and must flush",
           correct: false,
         }
   - type: single
-    prompt: "What does this script print?"
-    code: |
-      const { Writable } = require('node:stream')
-
-      const w = new Writable({
-        highWaterMark: 3,
-        write(chunk, enc, cb) { setTimeout(cb, 10) },
-      })
-
-      console.log(w.write('ab'))
-      console.log(w.write('cd'))
-      console.log(w.write('e'))
-      w.on('drain', () => console.log('drain'))
-    codeLanguage: javascript
-    explanation: "`write()` returns `false` when the buffered bytes reach or exceed `highWaterMark`. 2 bytes is below 3 (true), 4 bytes is above (false), and 5 as well. The data is still accepted, `false` is just a request to stop writing. Once the buffer is flushed the `drain` event fires."
-    theoryUrl: https://nodejs.org/api/stream.html#writablewritechunk-encoding-callback
+    prompt: "A script reads 50 million rows from a fast local file and writes them to a slow remote API stream, calling `write()` for every row and ignoring what it returns. What typically happens?"
+    explanation: "When the consumer is slower, every unsent row waits in the writable's internal buffer. Ignoring the signal to slow down means that buffer grows with the speed difference, so memory climbs until the process slows to a crawl in GC or crashes. Nothing drops data or blocks the loop for you."
+    theoryUrl: https://nodejs.org/en/learn/modules/backpressuring-in-streams
     options:
-      - { text: "true, true, false, then drain", correct: false }
-      - { text: "false, false, false, then drain", correct: false }
-      - { text: "true, false, false, then drain", correct: true }
-      - { text: "true, false, false, and drain never fires", correct: false }
+      - { text: "Excess rows are silently dropped once the buffer is full", correct: false }
+      - {
+          text: "`write()` blocks the event loop until the remote side has caught up",
+          correct: false,
+        }
+      - {
+          text: "Memory grows with the backlog until the process struggles or crashes",
+          correct: true,
+        }
+      - {
+          text: "Node automatically throttles the file read to match the API's speed",
+          correct: false,
+        }
   - type: single
-    prompt: "A producer loops `for (const row of rows) writable.write(row)` and ignores the return value. The writable is slow (it writes to a remote disk). What is the most likely consequence with a large `rows` list?"
-    explanation: "`write()` never blocks or drops data: when the consumer is slow, the chunks pile up in the writable's internal buffer, so memory grows with the backlog. The right pattern is to stop when `write()` returns `false` and resume on `drain` (or use `pipeline`). The data is not dropped, and no error is raised automatically."
+    prompt: "You write a producer by hand that pushes data into a writable stream. The writable signals that its buffer is above its threshold. What should a well-behaved producer do?"
+    explanation: "The contract is cooperative: stop producing and resume when the writable reports its buffer has drained. Ending the stream loses the rest of the data, and retrying or shrinking chunks does not reduce the backlog. Using `pipeline` gives you this behaviour without writing it yourself."
+    theoryUrl: https://nodejs.org/api/stream.html#event-drain
+    options:
+      - { text: "Stop writing and resume once the writable reports it has drained", correct: true }
+      - {
+          text: "End the writable and open a new one to start with an empty buffer",
+          correct: false,
+        }
+      - {
+          text: "Keep writing, but split the data into smaller chunks so each one fits under the threshold",
+          correct: false,
+        }
+      - { text: "Write the same chunk again until the writable accepts it", correct: false }
+  - type: single
+    prompt: "This code copies a fast local file to a slow network upload. What is the main problem with it?"
+    code: |
+      source.on('data', (chunk) => {
+        upload.write(chunk)
+      })
+      source.on('end', () => upload.end())
+    explanation: "The `data` handler keeps writing regardless of whether the upload can keep up, so backpressure is ignored and unsent data piles up in memory. It also has no error handling: if either stream fails, the other is not closed. `pipeline(source, upload)` handles both. Chunk order is preserved and `end` does fire, so those are not the issue."
     theoryUrl: https://nodejs.org/en/learn/modules/backpressuring-in-streams
     options:
       - {
-          text: "Excess chunks are silently dropped once the buffer reaches the high water mark",
+          text: "Chunks can arrive at the upload out of order, because each `write` runs on its own thread",
           correct: false,
         }
+      - { text: "It ignores backpressure and has no error handling or cleanup", correct: true }
+      - { text: "The `end` event never fires while a `data` listener is attached", correct: false }
       - {
-          text: "Node throws `ERR_STREAM_WRITE_AFTER_END` as soon as the buffer is full",
+          text: "It reads the whole file into memory before the first `write` call",
           correct: false,
         }
-      - {
-          text: "The loop blocks inside `write()` until the remote disk has accepted each row",
-          correct: false,
-        }
-      - {
-          text: "Memory usage grows with the unflushed backlog, as nothing slows down the loop",
-          correct: true,
-        }
-  - type: boolean
-    prompt: "`highWaterMark` is a hard limit: a stream refuses to buffer more than that many bytes."
-    answer: false
-    explanation: "It is a threshold that triggers backpressure signals, not a cap. `write()` still accepts data above it and returns `false`, and a `Readable` may buffer slightly more than the mark. A producer that ignores the signal can exceed it arbitrarily."
-    theoryUrl: https://nodejs.org/api/stream.html#buffering
   - type: single
-    prompt: "What does this script print?"
-    code: |
-      const { Readable, Transform, Writable, pipeline } = require('node:stream')
-
-      const upper = new Transform({
-        transform(chunk, enc, cb) { cb(null, chunk.toString().toUpperCase()) },
-        flush(cb) { this.push('!'); cb() },
-      })
-
-      const out = []
-      pipeline(
-        Readable.from(['a', 'b', 'c']),
-        upper,
-        new Writable({ write(c, e, cb) { out.push(c.toString()); cb() } }),
-        (err) => console.log(err ? 'failed' : out.join('')),
-      )
-    codeLanguage: javascript
-    explanation: "Each chunk is upper-cased by `transform`. `flush` runs once, after the writable side has ended and before the readable side ends, and lets the transform emit trailing data, here the `!`. The pipeline callback fires when everything is finished, so it prints `ABC!`."
-    theoryUrl: https://nodejs.org/api/stream.html#transform_flushcallback
-    options:
-      - { text: "!ABC", correct: false }
-      - { text: "ABC", correct: false }
-      - { text: "ABC!", correct: true }
-      - { text: "abc!", correct: false }
-  - type: single
-    prompt: "What does this script print?"
-    code: |
-      const { Readable, Writable, pipeline } = require('node:stream')
-
-      const src = new Readable({ read() {} })
-      const dst = new Writable({ write(c, e, cb) { cb() } })
-      dst.on('close', () => console.log('dst closed'))
-
-      pipeline(src, dst, (err) => console.log('pipeline cb:', err && err.message))
-      src.destroy(new Error('source broke'))
-    codeLanguage: javascript
-    explanation: "`pipeline` forwards the failure to the final callback and destroys every other stream in the chain, so the destination is cleaned up (`close` is emitted) before the callback receives the error. This automatic cleanup is the main reason to prefer `pipeline` over `.pipe()`."
+    prompt: "Why is `pipeline(a, b, c, callback)` preferred over chaining `a.pipe(b).pipe(c)` in production code?"
+    explanation: "Both respect backpressure. The difference is failure handling: with `.pipe()`, an error in one stream does not close the others, so you can leak file handles or sockets and must attach error handlers to each stream. `pipeline` forwards any error to one place and destroys every stream in the chain."
     theoryUrl: https://nodejs.org/api/stream.html#streampipelinesource-transforms-destination-callback
     options:
-      - { text: "pipeline cb: source broke, and dst stays open", correct: false }
-      - { text: "dst closed, then pipeline cb: source broke", correct: true }
+      - { text: "Only `pipeline` respects backpressure; `.pipe()` ignores it", correct: false }
       - {
-          text: "pipeline cb: undefined, since the source was destroyed, not ended",
+          text: "`pipeline` runs each stage in a separate worker thread, so a slow transform no longer blocks the others",
           correct: false,
         }
-      - { text: "Nothing, as the error is unhandled and the process crashes", correct: false }
-  - type: single
-    prompt: "Same setup as a plain `src.pipe(dst)` (no `pipeline`), then `src.destroy(new Error('source broke'))` with an error listener on `src`. What happens to `dst`?"
-    code: |
-      const { Readable, Writable } = require('node:stream')
-
-      const src = new Readable({ read() {} })
-      const dst = new Writable({ write(c, e, cb) { cb() } })
-
-      src.pipe(dst)
-      src.on('error', (e) => console.log('src error:', e.message))
-      src.destroy(new Error('source broke'))
-
-      setTimeout(() => console.log('dst destroyed?', dst.destroyed), 50)
-    codeLanguage: javascript
-    explanation: "`.pipe()` handles backpressure but does not propagate errors or destroy the destination. After the source fails, `dst` is left open (a leaked file descriptor or socket in real code), and it prints `dst destroyed? false`. `pipeline` (or `stream/promises`) fixes that."
-    theoryUrl: https://nodejs.org/api/stream.html#readablepipedestination-options
-    options:
       - {
-          text: "It is destroyed too, since pipe forwards errors to the destination",
+          text: "It reports any stage's error in one place and tears down every stream",
+          correct: true,
+        }
+      - {
+          text: "`.pipe()` is deprecated and prints a warning on current Node versions",
           correct: false,
         }
-      - { text: "It is ended cleanly, so `finish` is emitted", correct: false }
-      - { text: "It is left open and not destroyed, so the app must clean it up", correct: true }
-      - { text: "The process exits with an uncaught error from `dst`", correct: false }
-  - type: single
-    prompt: "What does this script print?"
-    code: |
-      const { Readable } = require('node:stream')
-
-      const r = Readable.from(['a', 'b'])
-      r.on('end', () => console.log('end'))
-      console.log('flowing =', r.readableFlowing)
-      r.on('data', (c) => console.log('data', c))
-      console.log('flowing =', r.readableFlowing)
-    codeLanguage: javascript
-    explanation: "A new readable starts with `readableFlowing === null`: it is not flowing and not explicitly paused, and attaching only an `end` listener does not change that. Adding a `data` listener switches it to flowing mode, so the second log prints `true`. The chunks themselves arrive asynchronously, afterwards."
-    theoryUrl: https://nodejs.org/api/stream.html#three-states
-    options:
-      - { text: "flowing = false, flowing = true, data a, data b, end", correct: false }
-      - { text: "flowing = null, flowing = true, data a, data b, end", correct: true }
-      - { text: "data a, data b, end, flowing = true, flowing = true", correct: false }
-      - { text: "flowing = null, flowing = null, data a, data b, end", correct: false }
   - type: multi
-    prompt: "Which actions switch a Readable into flowing mode? Select all that apply."
-    explanation: "Attaching a `data` listener, calling `resume()` and calling `pipe()` all start flowing mode. Attaching a `readable` listener does the opposite: it switches to paused mode, where you pull chunks with `read()`. Listening to `end` alone has no effect on the mode."
+    prompt: "What does `pipeline` give you compared with wiring streams together by hand? Select all that apply."
+    explanation: "`pipeline` connects the stages with backpressure, routes an error from any stage to a single callback or rejected promise, and destroys all streams when one fails so handles are released. It does not retry failed chunks or move work off the main thread: a CPU-heavy transform still blocks the event loop."
+    theoryUrl: https://nodejs.org/api/stream.html#streampipelinesource-transforms-destination-callback
+    options:
+      - { text: "Backpressure handled between every pair of stages", correct: true }
+      - { text: "One place where an error from any stage is reported", correct: true }
+      - {
+          text: "Every stream destroyed and its resources released when one stage fails",
+          correct: true,
+        }
+      - { text: "Automatic retry of a chunk that a stage failed to process", correct: false }
+      - { text: "CPU-heavy transform stages moved to a worker thread", correct: false }
+  - type: single
+    prompt: "A download endpoint streams a 2 GB file from disk to the HTTP response with chained `.pipe()` calls. Users often cancel downloads halfway, and the server slowly runs out of file descriptors. What is the most likely cause and fix?"
+    explanation: "When the client disconnects, the response is destroyed, but `.pipe()` does not destroy the source, so the file stream stays open and its descriptor leaks. `pipeline` destroys every stream in the chain when any one closes early or fails. Timeouts or a larger descriptor limit only delay the leak."
+    theoryUrl: https://nodejs.org/api/stream.html#streampipelinesource-transforms-destination-callback
+    options:
+      - {
+          text: "The file streams stay open after the client leaves; use `pipeline` so they are destroyed",
+          correct: true,
+        }
+      - {
+          text: "The OS limit is too low; raise the file-descriptor limit for the process",
+          correct: false,
+        }
+      - {
+          text: "Disk reads are too slow; read each file fully into memory before sending it",
+          correct: false,
+        }
+      - { text: "Keep-alive holds sockets open; disable keep-alive on the server", correct: false }
+  - type: single
+    prompt: "What does object mode mean for a Node.js stream?"
+    explanation: "By default streams carry bytes (Buffers or strings). In object mode each chunk can be any JavaScript value, such as a parsed record, and buffering thresholds count objects instead of bytes. It is how you build pipelines of records, for example parse, validate, insert."
+    theoryUrl: https://nodejs.org/api/stream.html#object-mode
+    options:
+      - {
+          text: "Chunks are arbitrary JavaScript values, and buffering counts objects",
+          correct: true,
+        }
+      - {
+          text: "Chunks are serialised to JSON so they can be sent across processes",
+          correct: false,
+        }
+      - {
+          text: "The stream exposes an object-oriented class API instead of the event-based one",
+          correct: false,
+        }
+      - {
+          text: "Backpressure is turned off, since objects have no byte size to measure",
+          correct: false,
+        }
+  - type: single
+    prompt: "Users upload files of up to 5 GB through your Node API, and you store them in S3. Instances have 512 MB of RAM. Which design works?"
+    explanation: "Streaming the request body into an S3 multipart upload sends the file in parts as it arrives, so memory stays at a few parts per upload regardless of file size. Buffering the body or writing it all to memory first cannot fit 5 GB in 512 MB, and a local temp file doubles the disk I/O and needs scratch space for every concurrent upload."
+    theoryUrl: https://docs.aws.amazon.com/AmazonS3/latest/userguide/mpuoverview.html
+    options:
+      - {
+          text: "Read the whole body into a Buffer, then send it in one `PutObject` call",
+          correct: false,
+        }
+      - {
+          text: "Stream the request body into a multipart upload, sending parts as they arrive",
+          correct: true,
+        }
+      - {
+          text: "Raise the instance memory limit and the body-size limit of the JSON body parser to 5 GB",
+          correct: false,
+        }
+      - { text: "Base64-encode the file on the client and send it as a JSON field", correct: false }
+  - type: single
+    prompt: "A nightly job must count error lines per service in a 40 GB log file. How should it read the file?"
+    explanation: "Reading line by line from a stream and updating counters keeps memory proportional to the number of services, not the file size. `readFile` would try to load 40 GB into memory. Splitting the file first adds work without solving anything, and loading into a database is far heavier than the task requires."
+    theoryUrl: https://nodejs.org/api/readline.html#example-read-file-stream-line-by-line
+    options:
+      - { text: "`fs.readFile` the whole file, then `split('\\n')` and count", correct: false }
+      - { text: "Stream it line by line and update a small map of counters", correct: true }
+      - {
+          text: "Split the file into 40 smaller files on disk first, then `readFile` each of them in turn",
+          correct: false,
+        }
+      - {
+          text: "Import the whole file into a database table, then run a `GROUP BY`",
+          correct: false,
+        }
+  - type: single
+    prompt: "An admin endpoint exports 2 million orders as CSV. The current code loads all rows with one query, maps them to strings and sends the result. It crashes with out-of-memory errors. What is the best redesign?"
+    explanation: "Reading rows through a database cursor as a stream, converting each to a CSV line in a transform and piping into the response keeps only a small window of rows in memory, with backpressure from a slow client reaching back to the database read. Larger heaps or pagination by the client only move the problem."
+    theoryUrl: https://nodejs.org/en/learn/modules/how-to-use-streams
+    options:
+      - { text: "Raise `--max-old-space-size` so the full result fits in the heap", correct: false }
+      - {
+          text: "Stream rows from a database cursor through a CSV transform into the response",
+          correct: true,
+        }
+      - {
+          text: "Build the CSV in a worker thread, so the main thread's heap is not used",
+          correct: false,
+        }
+      - {
+          text: "Ask the client to call the endpoint 2,000 times with an offset and stitch the pages together",
+          correct: false,
+        }
+  - type: single
+    prompt: "This ES module uppercases a text file and gzips it. Why does the async generator stage not need any backpressure code of its own?"
+    code: |
+      import { createReadStream, createWriteStream } from 'node:fs'
+      import { createGzip } from 'node:zlib'
+      import { pipeline } from 'node:stream/promises'
+
+      async function* upperCase(source) {
+        for await (const chunk of source) {
+          yield chunk.toUpperCase()
+        }
+      }
+
+      await pipeline(
+        createReadStream('in.txt', { encoding: 'utf8' }),
+        upperCase,
+        createGzip(),
+        createWriteStream('out.txt.gz'),
+      )
+    explanation: "Async iteration is pull based: the generator asks for the next chunk only after its previous `yield` has been taken by the next stage, and `pipeline` only takes it when downstream has room. A slow destination therefore slows the reading automatically. Nothing here buffers the whole file or runs in another thread."
+    theoryUrl: https://nodejs.org/api/stream.html#streams-compatibility-with-async-generators-and-async-iterators
+    options:
+      - {
+          text: "Each chunk is pulled only when downstream has taken the previous one",
+          correct: true,
+        }
+      - {
+          text: "The generator reads the whole file first, so there is nothing to pace",
+          correct: false,
+        }
+      - {
+          text: "Async generators run in a separate worker thread, so they never slow the main loop",
+          correct: false,
+        }
+      - { text: "gzip is faster than disk, so a slow destination can never happen", correct: false }
+  - type: single
+    prompt: "A custom Writable inserts each row into a database. Its write function starts the insert and immediately signals that it is ready for the next row, without waiting for the insert to finish. The source is a fast file stream. What is the problem?"
+    explanation: "Signalling readiness early tells the pipeline the database has already caught up, so backpressure never reaches the file reader. Thousands of inserts pile up in flight, exhausting the connection pool and memory, and a failed insert can no longer stop the stream. Signal readiness when the insert finishes, or pass its error."
+    theoryUrl: https://nodejs.org/api/stream.html#implementing-a-writable-stream
+    options:
+      - {
+          text: "Rows are inserted in random order, because the inserts run in parallel",
+          correct: false,
+        }
+      - {
+          text: "Backpressure is lost, so unbounded inserts pile up and errors cannot stop the stream",
+          correct: true,
+        }
+      - {
+          text: "The stream stalls after the first row, waiting for a signal that never comes",
+          correct: false,
+        }
+      - {
+          text: "Nothing, because the database driver queues the inserts internally",
+          correct: false,
+        }
+  - type: single
+    prompt: "An import pipeline reads a CSV file, parses each line in a Transform and inserts records into a database. One line out of a million is malformed and the parser throws on it. With `pipeline`, what happens, and how do you keep going past bad lines?"
+    explanation: "An error in any stage fails the whole pipeline: every stream is destroyed and the error reaches the single callback or rejected promise. If bad lines should be skipped, the parser must handle them itself, for example by logging the line and not emitting a record. `pipeline` has no built-in skip or retry."
+    theoryUrl: https://nodejs.org/api/stream.html#streampipelinesource-transforms-destination-callback
+    options:
+      - {
+          text: "The whole pipeline fails; to skip bad lines, catch them inside the parser",
+          correct: true,
+        }
+      - { text: "`pipeline` drops the bad line and carries on with the next chunk", correct: false }
+      - {
+          text: "Only the parser stops; the reader and the database writer keep running and wait for it",
+          correct: false,
+        }
+      - {
+          text: "`pipeline` retries the failing chunk three times before giving up",
+          correct: false,
+        }
+  - type: boolean
+    prompt: "A Transform stream that does heavy synchronous CPU work on every chunk still blocks the event loop while it processes each chunk, even though it is part of a stream."
+    answer: true
+    explanation: "Streams split work into chunks, but each chunk's processing runs on the main thread like any other JavaScript. Heavy synchronous work per chunk delays every other request while it runs. Move it to a worker thread, or use a native implementation that works off the main thread, as zlib does."
+    theoryUrl: https://nodejs.org/en/learn/asynchronous-work/dont-block-the-event-loop
+  - type: single
+    prompt: "A pipeline downloads a report, decompresses it and writes it to `report.csv`. Halfway through, the download fails. Another job reads `report.csv` later and processes a truncated file without noticing. What is the cleanest way to prevent this?"
+    explanation: "Write to a temporary file and rename it to the final name only after the pipeline completes successfully. The rename is atomic on the same file system, so readers see either the old complete file or the new complete one, never a half-written one. Retries or size checks narrow the window but do not close it."
+    theoryUrl: https://nodejs.org/api/fs.html#fspromisesrenameoldpath-newpath
+    options:
+      - {
+          text: "Write to a temp file and rename it to `report.csv` only when the pipeline succeeds",
+          correct: true,
+        }
+      - {
+          text: "Retry the download on failure, so the job almost always finishes writing",
+          correct: false,
+        }
+      - { text: "Have the reader check that the file size is larger than zero", correct: false }
+      - { text: "Increase the highWaterMark so the download completes faster", correct: false }
+  - type: single
+    prompt: "A Readable can be consumed in a push style, where data is delivered to you as it arrives, or in a pull style, where you ask for the next chunk when you are ready. Why does Node offer the pull style at all?"
+    explanation: "In pull style the consumer controls the pace: it takes data only when it can process it, which makes flow control natural and is what `for await` over a stream does. Push style is convenient but easy to misuse, because data keeps arriving whether or not you can handle it. Both styles read the same data at the same speed when the consumer keeps up."
     theoryUrl: https://nodejs.org/api/stream.html#two-reading-modes
     options:
-      - { text: "Attaching a `data` event listener", correct: true }
-      - { text: "Attaching a `readable` event listener", correct: false }
-      - { text: "Calling `readable.resume()`", correct: true }
-      - { text: "Calling `readable.pipe(destination)`", correct: true }
-  - type: single
-    prompt: "What does this script print?"
-    code: |
-      const { Readable } = require('node:stream')
-
-      const r = new Readable({ read() {} })
-      r.push('hello')
-      r.push('world')
-      r.push(null)
-
-      r.on('readable', () => {
-        let chunk
-        while ((chunk = r.read()) !== null) console.log('read', chunk.toString())
-      })
-      r.on('end', () => console.log('end'))
-    codeLanguage: javascript
-    explanation: "In paused mode with no size argument, `read()` returns all the buffered data as one chunk, so the two pushes are concatenated: `read helloworld`. Chunk boundaries are not preserved for byte streams, which is why parsers must not rely on them. `end` fires after `read()` returns null and the stream is drained."
-    theoryUrl: https://nodejs.org/api/stream.html#readablereadsize
-    options:
-      - { text: "read hello, read world, end", correct: false }
-      - { text: "read helloworld, end", correct: true }
-      - { text: "end, read helloworld", correct: false }
-      - { text: "read hello, end", correct: false }
-  - type: single
-    prompt: "What does this script print?"
-    code: |
-      const { Readable } = require('node:stream')
-
-      async function main() {
-        const r = Readable.from(['a', 'b', 'c'])
-        for await (const chunk of r) {
-          console.log('chunk', chunk)
-          if (chunk === 'b') break
-        }
-        console.log('destroyed:', r.destroyed)
-      }
-      main()
-    codeLanguage: javascript
-    explanation: "Readable streams are async iterables, and leaving a `for await` loop early with `break` destroys the stream, which releases its resources (file handles, sockets). So `c` is never read and the final line prints `destroyed: true`."
-    theoryUrl: https://nodejs.org/api/stream.html#readable-symbolasynciterator
-    options:
-      - { text: "chunk a, chunk b, destroyed: false", correct: false }
-      - { text: "chunk a, chunk b, chunk c, destroyed: true", correct: false }
-      - { text: "chunk a, chunk b, destroyed: true", correct: true }
       - {
-          text: "chunk a, chunk b, and an error, since a for-await cannot be interrupted",
-          correct: false,
-        }
-  - type: single
-    prompt: "What does this script print?"
-    code: |
-      const { Readable, Writable } = require('node:stream')
-
-      const r = new Readable({ read() {} })
-      const w = new Writable({ write(c, e, cb) { cb() } })
-
-      r.on('end', () => console.log('readable: end'))
-      w.on('finish', () => console.log('writable: finish'))
-
-      r.pipe(w)
-      r.push('x')
-      r.push(null)
-    codeLanguage: javascript
-    explanation: "`end` belongs to the readable side: it is emitted once all data has been consumed. `pipe` then calls `w.end()` in response to that `end`, and the writable emits `finish` after flushing. So `finish` can only come after `end`. They are two different events on two different streams."
-    theoryUrl: https://nodejs.org/api/stream.html#event-finish
-    options:
-      - { text: "writable: finish, then readable: end", correct: false }
-      - { text: "readable: end, then writable: finish", correct: true }
-      - { text: "Only readable: end, since `finish` is for Transform streams only", correct: false }
-      - {
-          text: "Only writable: finish, since `end` fires only on streams with no destination",
-          correct: false,
-        }
-  - type: single
-    prompt: "What does this script print?"
-    code: |
-      const { Readable } = require('node:stream')
-      const { pipeline } = require('node:stream/promises')
-
-      async function* double(source) {
-        for await (const n of source) yield n * 2
-      }
-
-      async function main() {
-        const out = []
-        await pipeline(Readable.from([1, 2, 3]), double, async function (src) {
-          for await (const n of src) out.push(n)
-        })
-        console.log(out)
-      }
-      main()
-    codeLanguage: javascript
-    explanation: "`pipeline` from `stream/promises` accepts async generator functions as transform stages and an async function as the final sink, and it returns a promise that resolves when the whole chain finishes. The generator doubles each number, so the sink collects `[2, 4, 6]`. Backpressure still applies between the stages."
-    theoryUrl: https://nodejs.org/api/stream.html#streams-promises-api
-    options:
-      - { text: "[1, 2, 3]", correct: false }
-      - { text: "[2, 4, 6]", correct: true }
-      - { text: "[], since the promise resolves before the stages run", correct: false }
-      - { text: "It throws, as generator functions are not valid pipeline stages", correct: false }
-  - type: single
-    prompt: "What does this script print?"
-    code: |
-      const { Writable } = require('node:stream')
-
-      const w = new Writable({
-        objectMode: true,
-        highWaterMark: 2,
-        write(obj, enc, cb) { setTimeout(cb, 5) },
-      })
-
-      const results = []
-      for (const x of ['1', '2', '3']) results.push(w.write(x))
-      console.log(results)
-    codeLanguage: javascript
-    explanation: "In `objectMode`, `highWaterMark` counts objects, not bytes. After the first write 1 object is buffered (below 2, true), after the second 2 are pending (reaching the mark, false), and the third is accepted but also returns false."
-    theoryUrl: https://nodejs.org/api/stream.html#object-mode
-    options:
-      - { text: "[true, true, false]", correct: false }
-      - { text: "[true, false, false]", correct: true }
-      - { text: "[true, true, true]", correct: false }
-      - { text: "[false, false, false]", correct: false }
-  - type: single
-    prompt: "A report job must compute statistics over a 4 GB log file on a server with 1 GB of RAM. Which approach is appropriate?"
-    explanation: "Streaming processes the file in small chunks, so memory stays flat regardless of file size. `fs.createReadStream` with `readline` (or a line-splitting Transform) keeps only one line at a time. `readFile` would try to load 4 GB, and raising `--max-old-space-size` doesn't change that buffers are limited and the machine is out of RAM."
-    theoryUrl: https://nodejs.org/api/readline.html
-    options:
-      - {
-          text: "`fs.promises.readFile`, then split the content into lines in memory",
+          text: "Pull mode is the only one that works with files; push is for sockets",
           correct: false,
         }
       - {
-          text: "`fs.createReadStream` piped through a line parser, updating counters per line",
+          text: "The consumer sets the pace, so slow processing naturally limits reading",
           correct: true,
         }
-      - {
-          text: "Read the file with `readFileSync` in a worker thread so it doesn't block",
-          correct: false,
-        }
-      - {
-          text: "Raise `--max-old-space-size` to 4 GB so that the whole file fits in memory",
-          correct: false,
-        }
+      - { text: "Pull mode reads data in larger chunks, so it is always faster", correct: false }
+      - { text: "Push mode does not emit errors, so pull is needed to detect them", correct: false }
   - type: single
-    prompt: "An HTTP endpoint serves large video files from disk. Which implementation is the most robust and memory-friendly?"
-    explanation: "`pipeline(fs.createReadStream(path), res, cb)` streams in chunks, applies backpressure to slow clients and destroys the file stream if the client disconnects, so no file descriptors leak. `readFile` buffers the whole video per request, and a manual `data`/`write` loop without `drain` handling ignores backpressure."
-    theoryUrl: https://nodejs.org/en/learn/modules/backpressuring-in-streams
+    prompt: "A team writes a parsing library that must run in Node.js, browsers and edge runtimes. Why might it accept and return WHATWG web streams (`ReadableStream`) rather than Node.js streams?"
+    explanation: "Web streams are a cross-platform standard implemented by browsers, Node, Deno and edge runtimes, so one API works everywhere; `fetch` bodies are web streams too. Node streams exist only in Node (or via polyfills). Node offers adapters between the two, so Node users are not locked out."
+    theoryUrl: https://nodejs.org/api/webstreams.html
     options:
       - {
-          text: "`res.end(await fs.promises.readFile(path))`, which is simple and fast enough",
+          text: "Web streams are the only kind of stream that supports backpressure",
+          correct: false,
+        }
+      - { text: "They are a standard API available in all of those runtimes", correct: true }
+      - {
+          text: "Node streams are deprecated and will be removed in the next major version",
           correct: false,
         }
       - {
-          text: "`stream.on('data', (c) => res.write(c))`, which streams without any buffering",
-          correct: false,
-        }
-      - {
-          text: "`pipeline(fs.createReadStream(path), res, callback)`, so cleanup and backpressure are handled",
-          correct: true,
-        }
-      - {
-          text: "`fs.createReadStream(path).pipe(res)`, since pipe also destroys the file on client disconnect",
-          correct: false,
-        }
-  - type: single
-    prompt: "You must read a large file, gzip it and upload it to object storage, all with bounded memory. How do you compose this?"
-    explanation: "A chain `source -> Transform -> destination` through `pipeline` lets each stage process chunks as they arrive, with backpressure between every pair and cleanup on error. Gzipping first with `zlib.gzipSync` or reading everything into a buffer would load the whole file in memory."
-    theoryUrl: https://nodejs.org/api/zlib.html
-    options:
-      - {
-          text: "`pipeline(createReadStream(f), zlib.createGzip(), uploadStream, cb)`",
-          correct: true,
-        }
-      - {
-          text: "`zlib.gzipSync(fs.readFileSync(f))`, then upload the resulting buffer",
-          correct: false,
-        }
-      - {
-          text: "Gzip each chunk in `data` handlers and upload them in parallel, without ordering",
-          correct: false,
-        }
-      - {
-          text: "Read it with `readFile`, then stream the buffer through `zlib.createGzip()`",
-          correct: false,
-        }
-  - type: single
-    prompt: "You are building a Transform that parses CSV lines into JavaScript objects, which a downstream stage then validates and inserts into a database. Which mode do you use?"
-    explanation: "The readable side of the parser emits objects, so the stream must be created with `readableObjectMode: true` (or `objectMode: true`). Without it, only strings/Buffers are allowed and pushing an object throws. Plain `JSON.stringify` on each chunk would add a wasteful serialise/parse round trip."
-    theoryUrl: https://nodejs.org/api/stream.html#object-mode
-    options:
-      - { text: "Default byte mode, pushing each parsed object as is", correct: false }
-      - { text: "Object mode on the readable side, so each chunk is one row object", correct: true }
-      - {
-          text: "Byte mode, serialising every row with `JSON.stringify` and re-parsing it later",
-          correct: false,
-        }
-      - {
-          text: "A Duplex, because Transform streams cannot emit anything but Buffers",
-          correct: false,
-        }
-  - type: single
-    prompt: "A custom `Writable` inserts each incoming row into a database and calls the `write` callback immediately, without waiting for the insert to finish. The source is a fast file stream. What is the problem?"
-    explanation: "The stream calls `write` again as soon as you call the callback. Calling it right away tells the stream you are always ready, so backpressure never triggers and unfinished inserts pile up in memory and in the DB pool. The callback must be invoked only when the insert has completed (or failed)."
-    theoryUrl: https://nodejs.org/api/stream.html#writable_writechunk-encoding-callback
-    options:
-      - {
-          text: "Nothing, since the stream waits for the next tick before calling `write` again",
-          correct: false,
-        }
-      - {
-          text: "Backpressure is defeated, so pending inserts accumulate without any limit",
-          correct: true,
-        }
-      - {
-          text: "Node reorders the rows, so the database receives them in a random order",
-          correct: false,
-        }
-      - {
-          text: "The stream closes itself after the first row, because the callback was synchronous",
-          correct: false,
-        }
-  - type: boolean
-    prompt: "In a custom Transform, if `transform(chunk, enc, cb)` never calls `cb`, the stream stalls and no further chunks are processed."
-    answer: true
-    explanation: "The callback signals that the chunk has been handled; until it is called the Transform does not accept the next chunk, so the pipeline hangs without any error. Always call `cb`, with an error argument on failure."
-    theoryUrl: https://nodejs.org/api/stream.html#transform_transformchunk-encoding-callback
-  - type: boolean
-    prompt: "`Readable.from(iterable)` can turn an array or an async generator into a stream."
-    answer: true
-    explanation: "`Readable.from` accepts any iterable or async iterable and produces a Readable (in object mode by default). It is a convenient way to feed generators and in-memory data into a `pipeline`, and the stream respects backpressure by pulling from the iterator."
-    theoryUrl: https://nodejs.org/api/stream.html#streamreadablefromiterable-options
-  - type: single
-    prompt: "Why is `a.pipe(b).pipe(c).pipe(d)` considered a fragile way of composing a chain of streams?"
-    explanation: "Each `.pipe()` only wires data and backpressure. An error in any stage does not destroy the others, so file handles and sockets stay open, and there is no single place to observe completion or failure. `pipeline(a, b, c, d, cb)` gives one callback and destroys all streams on the first error."
-    theoryUrl: https://nodejs.org/api/stream.html#streampipelinesource-transforms-destination-callback
-    options:
-      - { text: "`pipe` disables backpressure after the second stage in the chain", correct: false }
-      - {
-          text: "`pipe` copies each chunk, so memory use doubles for every extra stage",
-          correct: false,
-        }
-      - {
-          text: "Errors are not propagated or cleaned up across stages, so streams can leak",
-          correct: true,
-        }
-      - {
-          text: "Chained `pipe` calls reorder chunks when one stage is slower than the others",
-          correct: false,
-        }
-  - type: single
-    prompt: "For a stream created with `objectMode: true` and no explicit `highWaterMark`, what does the default threshold of 16 refer to?"
-    explanation: "In object mode the high water mark counts buffered objects (16 by default), regardless of their size, while in byte mode it counts bytes. A consequence is that 16 huge objects can still use a lot of memory, so size the mark to the weight of your objects."
-    theoryUrl: https://nodejs.org/api/stream.html#object-mode
-    options:
-      - { text: "16 kilobytes of serialised data, as in byte mode", correct: false }
-      - { text: "16 objects buffered, whatever their individual size", correct: true }
-      - { text: "16 chunks per second before the stream starts throttling", correct: false }
-      - {
-          text: "16 concurrent write callbacks that may be pending at the same time",
+          text: "Web streams always move data between threads, so parsing never blocks the main thread",
           correct: false,
         }

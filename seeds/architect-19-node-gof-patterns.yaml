@@ -1,6 +1,6 @@
 version: 1
 title: "Architect Roadmap 19: GoF design patterns in Node.js"
-description: Factory, builder, revealing constructor, singleton, dependency injection, proxy, decorator, adapter, strategy, state, template, iterator, middleware and command in Node.js.
+description: The problems behind factory, builder, revealing constructor, singleton, dependency injection, proxy, decorator, adapter, strategy, state, template method, iterator, middleware chains, observer and command, how Node idioms map to them, and when a pattern is overkill.
 language: en
 tags: [architect-roadmap, nodejs, design-patterns, gof, dependency-injection]
 run:
@@ -9,555 +9,424 @@ run:
   timePerQuestionSec: 60
 questions:
   - type: single
-    prompt: "What does this script print?"
-    code: |
-      function createCounter() {
-        let count = 0
-        return {
-          increment() { return ++count },
-          get value() { return count },
-        }
-      }
-
-      const a = createCounter()
-      const b = createCounter()
-      a.increment()
-      a.increment()
-      b.increment()
-      console.log(a.value, b.value, a.count)
-    codeLanguage: javascript
-    explanation: "Each call to the factory creates a new closure with its own `count`, so `a` is at 2 and `b` at 1. `count` is not a property of the returned object, so `a.count` is `undefined`. This is the factory plus closure approach to encapsulation: private state without classes or `#private` fields."
-    theoryUrl: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Closures
-    options:
-      - { text: "2 1 undefined", correct: true }
-      - { text: "3 3 3", correct: false }
-      - { text: "2 1 2", correct: false }
-      - { text: "2 2 undefined", correct: false }
-  - type: single
-    prompt: "A function `createStorage(type)` returns a `FileStorage`, `S3Storage` or `MemoryStorage` object depending on the config, all exposing `read` and `write`. What is the main benefit of using a factory here instead of calling `new` in each caller?"
-    explanation: "A factory decouples the callers from the concrete class: they depend on the shared interface, and the choice (or later changes, like adding a new backend) lives in one place. A factory does not make instances share state, and it is not about speed or about caching."
+    prompt: "A function `createStorage(config)` returns a `FileStorage`, `S3Storage` or `MemoryStorage` object depending on the config, all exposing `read` and `write`. What is the main benefit of this factory over calling `new S3Storage(...)` in each caller?"
+    explanation: "The factory keeps the choice of concrete class in one place, so callers depend only on the shared `read`/`write` interface and a new backend means changing one function. It does not make objects faster or shared: each call can still return a fresh instance."
     theoryUrl: https://refactoring.guru/design-patterns/factory-method
     options:
       - {
-          text: "Callers depend only on the interface, and the choice of class lives in one place",
+          text: "Callers depend on the interface, and the choice of class lives in one place",
           correct: true,
         }
       - {
-          text: "All the instances share one state, so writes are visible across backends",
+          text: "Every caller receives the same shared instance, which saves memory",
           correct: false,
         }
-      - { text: "Object creation through a function is faster than `new` in V8", correct: false }
       - {
-          text: "It guarantees that only one storage object exists for the whole process",
+          text: "Objects built by a factory are faster, because V8 inlines the factory call",
+          correct: false,
+        }
+      - {
+          text: "It lets the three storage classes inherit from each other, so `read` and `write` are only written once",
           correct: false,
         }
   - type: single
-    prompt: "An `HttpRequest` needs 12 optional settings (headers, timeout, retries, auth, proxy, and so on), and some combinations are invalid. Which pattern helps most, and why?"
-    explanation: "A builder collects the settings step by step through readable, chainable methods and validates the combination in `build()`, producing a ready, possibly immutable object. A 12-argument constructor is unreadable and error-prone, and a factory or singleton solves different problems (which class, how many instances)."
+    prompt: "A module exports this factory function instead of a `RateLimiter` class. What do callers gain from this style?"
+    code: |
+      export function createRateLimiter({ limit }) {
+        const hits = new Map()
+        return {
+          allow(userId) {
+            const count = (hits.get(userId) ?? 0) + 1
+            hits.set(userId, count)
+            return count <= limit
+          },
+        }
+      }
+    explanation: "`hits` lives in a closure, so it is truly private: no caller can read or reset it. `allow` does not rely on `this`, so it can be passed around as a callback without binding. Each call returns a new, independent limiter, so it is not a singleton, and closures are not inherently faster than classes."
+    theoryUrl: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Closures
+    options:
+      - { text: "One limiter shared by every module that imports this function", correct: false }
+      - {
+          text: "Truly private state, and a method that works without binding `this`",
+          correct: true,
+        }
+      - {
+          text: "Better performance, because closures avoid the prototype chain lookup",
+          correct: false,
+        }
+      - {
+          text: "Automatic expiry of old entries, since the closure is garbage collected",
+          correct: false,
+        }
+  - type: single
+    prompt: "An `HttpRequest` has a dozen optional settings (headers, timeout, retries, auth, proxy...), it is assembled step by step in different parts of the code, and some combinations are invalid. Which pattern helps most?"
+    explanation: "A builder collects settings step by step and validates the combination once, in a final `build()` step, so an invalid request is never created. A singleton or adapter solves different problems, and subclasses per combination explode in number."
+    theoryUrl: https://refactoring.guru/design-patterns/builder
+    options:
+      - { text: "Builder, which collects settings and validates them in `build()`", correct: true }
+      - { text: "Singleton, so every caller shares one configured request object", correct: false }
+      - {
+          text: "One subclass per valid combination of settings, such as `AuthRetryRequest`",
+          correct: false,
+        }
+      - {
+          text: "Adapter, which converts the settings to the format of the HTTP library",
+          correct: false,
+        }
+  - type: single
+    prompt: "A teammate adds a fluent `UserBuilder` with `.withName().withEmail().withRole().build()` for a plain object with three fields, all set in one place. What is the most reasonable review comment?"
+    explanation: "In JavaScript an object literal or an options object with defaults already gives named, optional parameters, so a builder for three fields set together adds code without benefit. A builder pays off when construction is step-wise, spread out, or needs validation across fields."
     theoryUrl: https://refactoring.guru/design-patterns/builder
     options:
       - {
-          text: "Singleton, so that a single request configuration is reused everywhere",
+          text: "Fine as is: a builder is the standard way to create any object in Node.js",
           correct: false,
         }
       - {
-          text: "Builder, which sets options fluently and validates them once in `build()`",
+          text: "An options object with defaults is simpler here; the builder is overkill",
           correct: true,
         }
       - {
-          text: "Factory, as a function with 12 positional parameters is easy to remember",
+          text: "Replace it with a singleton so the user object is only built once",
           correct: false,
         }
       - {
-          text: "Observer, so that each option notifies the request when it changes",
+          text: "Make the builder an abstract class with one subclass per role, so roles are type-safe",
           correct: false,
         }
   - type: single
-    prompt: "What does this script print?"
-    code: |
-      class Resolver {
-        constructor(executor) {
-          const resolve = (v) => { this.value = v }
-          executor(resolve)
-        }
-      }
-
-      let leaked
-      const r = new Resolver((resolve) => {
-        leaked = resolve
-        console.log('executor runs')
-      })
-      console.log('after construct', r.value)
-      leaked(42)
-      console.log('after resolve', r.value)
-    codeLanguage: javascript
-    explanation: "The revealing constructor pattern (used by `Promise`) runs the executor synchronously inside the constructor and passes it the private mutators. Here the executor stores `resolve` outside, so it can be called later, after construction: the state is `undefined` first and `42` afterwards. The point of the pattern is that only the code that creates the object can change it."
+    prompt: "`new Promise((resolve, reject) => { ... })` gives `resolve` and `reject` only to the function you pass in. What problem does this revealing constructor design solve?"
+    explanation: "Only the code that creates the promise can settle it; consumers receive an object they can observe (`then`) but not resolve. Exposing the capabilities only at construction time protects the object's invariants. It has nothing to do with speed or memory."
     theoryUrl: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise/Promise
     options:
-      - { text: "after construct 42, after resolve 42", correct: false }
-      - { text: "executor runs, after construct undefined, after resolve 42", correct: true }
-      - { text: "after construct undefined, executor runs, after resolve 42", correct: false }
       - {
-          text: "executor runs, after construct undefined, after resolve undefined",
-          correct: false,
-        }
-  - type: single
-    prompt: "Why does a read-only event source like `ReadonlyEmitter` use the revealing constructor pattern, passing `emit` only to an executor function?"
-    explanation: "The consumers get an object they can listen to but cannot trigger or mutate, because the `emit` capability is only revealed to the code that constructs it. The pattern provides immutability by construction, not thread safety, and it does not stop the listeners from running."
-    theoryUrl: https://nodejs.org/api/events.html
-    options:
-      - {
-          text: "It makes `emit` run on a worker thread, so listeners cannot block the loop",
+          text: "It makes promises resolve faster, since no method lookup is needed",
           correct: false,
         }
       - {
-          text: "It prevents listeners from being garbage collected while the emitter lives",
+          text: "It lets any consumer settle the promise, so results can come from anywhere",
           correct: false,
         }
       - {
-          text: "Only the creator can fire events, so consumers hold a read-only object",
+          text: "Only the creator can settle it; consumers can only observe the result",
           correct: true,
         }
-      - {
-          text: "It makes events fire asynchronously, which avoids the Zalgo problem",
-          correct: false,
-        }
+      - { text: "It frees memory by discarding the executor after it runs", correct: false }
   - type: single
-    prompt: "What does this script print?"
-    code: |
-      // s/db.js
-      let created = 0
-      class Db { constructor() { this.id = ++created } }
-      module.exports = new Db()
-
-      // main.js
-      const a = require('./s/db')
-      const b = require('./s/db')
-      delete require.cache[require.resolve('./s/db')]
-      const c = require('./s/db')
-      console.log(a === b, a === c)
-    codeLanguage: javascript
-    explanation: "Modules are cached by resolved path, so the first two `require` calls return the same instance (`true`): that is the usual singleton in Node. Deleting the entry from `require.cache` forces the module to execute again and export a new object, so `a === c` is `false`. A duplicated package under another `node_modules` path would break the singleton the same way."
+    prompt: "A file `db.js` creates one connection pool and exports it. Thirty modules `require` or `import` it, yet only one pool is ever created. Why?"
+    explanation: "Node caches a module after its first load, so every later import receives the same exported object. That makes a module a natural singleton, without any `getInstance()` code. The pool is created once per process, not shared across processes."
     theoryUrl: https://nodejs.org/api/modules.html#caching
     options:
-      - { text: "true true", correct: false }
-      - { text: "false false", correct: false }
-      - { text: "true false", correct: true }
-      - { text: "false true", correct: false }
-  - type: single
-    prompt: "A team uses a module-level singleton for the database client, imported directly in 40 files. What is the main long-term cost of that choice?"
-    explanation: "Hard-wired imports of a singleton make the dependency implicit and global, so tests cannot easily replace it and the code is coupled to the concrete module. Passing the dependency in (dependency injection) keeps one instance in production but lets tests supply a fake. It is not a performance or memory problem."
-    theoryUrl: https://martinfowler.com/articles/injection.html
-    options:
       - {
-          text: "Each import creates a separate connection pool, so connections run out",
+          text: "The pool library detects duplicates and returns the existing pool",
           correct: false,
         }
-      - { text: "Node reloads the module on every request, which is slow", correct: false }
       - {
-          text: "The hidden global coupling makes isolation in tests and swapping implementations hard",
+          text: "Node evaluates a module once and hands every later import the cached exports",
           correct: true,
         }
       - {
-          text: "Singletons are not allowed in ES modules, so the code cannot be migrated",
+          text: "Node shares module state across all processes on the same machine",
+          correct: false,
+        }
+      - {
+          text: "Each import creates a new pool, but the database merges them into one connection",
           correct: false,
         }
   - type: single
-    prompt: "What does this script print?"
-    code: |
-      class Mailer {
-        constructor(transport) { this.transport = transport }
-        send(m) { return this.transport.send(m) }
-      }
-
-      const fake = {
-        sent: [],
-        send(m) { this.sent.push(m); return 'ok' },
-      }
-      const mailer = new Mailer(fake)
-      console.log(mailer.send('hi'), fake.sent)
-    codeLanguage: javascript
-    explanation: "With constructor injection, `Mailer` only knows the `send` contract, so a test can pass a fake and inspect it afterwards. `this.transport.send(m)` keeps `this` bound to `fake`, hence the push works and prints `ok [ 'hi' ]`. In production the same class receives an SMTP or API transport."
-    theoryUrl: https://martinfowler.com/articles/injection.html
-    options:
-      - { text: "ok []", correct: false }
-      - { text: "undefined [ 'hi' ]", correct: false }
-      - { text: "ok [ 'hi' ]", correct: true }
-      - { text: "It throws, because `this` is lost when `send` is called", correct: false }
-  - type: single
-    prompt: "In a service with 30 classes, where should the concrete dependencies be created and wired together?"
-    explanation: "The composition root, a single place near the entry point (e.g. `main.ts`), builds the object graph and injects it; business classes only declare what they need. Letting each class create or look up its own dependencies (new inside, or a global service locator) hides the dependencies again and brings back the coupling that DI removes."
+    prompt: "A team imports a module-level singleton database client directly in 40 files. What is the main long-term cost of that choice?"
+    explanation: "Every file is hard-wired to one concrete instance, so swapping it for a fake in tests or a second database means mocking the module system or editing all 40 files. The singleton itself is not slow, and module caching guarantees there is one per process."
     theoryUrl: https://martinfowler.com/articles/injection.html
     options:
       - {
-          text: "Inside each class constructor, with `new`, so that the class is self-contained",
-          correct: false,
-        }
-      - {
-          text: "In a global registry that every class queries when it needs something",
-          correct: false,
-        }
-      - {
-          text: "At the application entry point, then passed down through constructors",
+          text: "Tight coupling: replacing the client in tests or for a second database is hard",
           correct: true,
         }
       - {
-          text: "Lazily at the first call of each method, to avoid unused instances",
+          text: "Each import opens a new connection, so the pool is exhausted quickly",
           correct: false,
         }
+      - { text: "Module-level objects are garbage collected between requests", correct: false }
+      - {
+          text: "Queries become slower, because every module must look the client up through the module cache",
+          correct: false,
+        }
+  - type: boolean
+    prompt: "A module-level singleton (say, an in-memory cache) is shared between the main thread and all worker threads of the same Node.js process."
+    answer: false
+    explanation: "Each worker thread runs its own JavaScript environment with its own module cache, so importing the module in a worker creates a separate instance. A module singleton is one per JavaScript realm, not one per process or machine. Sharing state across threads needs explicit tools such as messages or `SharedArrayBuffer`."
+    theoryUrl: https://nodejs.org/api/worker_threads.html
+  - type: single
+    prompt: "In a service with 30 classes using constructor injection, where should the concrete dependencies be created and wired together?"
+    explanation: "A single composition root at the entry point (for example `main.js`) creates the concrete objects and passes them into the constructors. The rest of the code receives dependencies and never builds them, which is what makes it easy to replace them. Scattering `new` calls or a global lookup brings the coupling back."
+    theoryUrl: https://martinfowler.com/articles/injection.html
+    options:
+      - { text: "Inside each class's constructor, so classes stay self-contained", correct: false }
+      - { text: "In one composition root at the application's entry point", correct: true }
+      - {
+          text: "In a global registry that any class can query when it needs something",
+          correct: false,
+        }
+      - {
+          text: "In each route handler, building a fresh set of objects for each request",
+          correct: false,
+        }
+  - type: multi
+    prompt: "An `OrderService` receives its `paymentGateway` and `orderRepository` as constructor parameters instead of importing them. What does this give you? Select all that apply."
+    explanation: "Passing dependencies in lets tests hand over fakes without module mocking, makes the service's needs visible in its signature, and lets you swap implementations (say, a different gateway) without editing the service. It does not change runtime speed or remove the need to create the real objects somewhere."
+    theoryUrl: https://martinfowler.com/articles/injection.html
+    options:
+      - { text: "Tests can pass in fakes without mocking the module system", correct: true }
+      - {
+          text: "The service's dependencies are visible in its constructor signature",
+          correct: true,
+        }
+      - {
+          text: "Another payment gateway can be used without editing `OrderService`",
+          correct: true,
+        }
+      - { text: "The real dependencies no longer need to be created anywhere", correct: false }
+      - {
+          text: "Calls through injected objects are faster than calls to imported ones",
+          correct: false,
+        }
+  - type: single
+    prompt: "A small Node API has about ten modules. A teammate proposes adding a DI container library with decorators and automatic resolution. What is the most sensible view?"
+    explanation: "Dependency injection is a design idea, not a library: passing dependencies as constructor or function parameters, wired by hand in one composition root, is enough at this size. A container adds indirection and magic that pays off only when the object graph gets large. Dropping injection altogether loses testability."
+    theoryUrl: https://martinfowler.com/articles/injection.html
+    options:
+      - {
+          text: "A container is required, because Node.js cannot do dependency injection without one",
+          correct: false,
+        }
+      - { text: "Manual injection in one composition root is enough at this size", correct: true }
+      - {
+          text: "Avoid injection and import concrete modules directly; it is simpler",
+          correct: false,
+        }
+      - { text: "Use a container, but only for the modules that are never tested", correct: false }
   - type: single
     prompt: "Proxy, decorator and adapter all wrap another object. What distinguishes an adapter from the other two?"
-    explanation: "An adapter changes the interface so incompatible code can work together (a callback API exposed as promises). Proxy and decorator keep the same interface: a proxy controls access (lazy loading, caching, validation), while a decorator adds behaviour (logging, retries). Intent is the real difference, as the code shape looks similar."
+    explanation: "An adapter changes the interface, translating calls from the shape the client expects to the shape the wrapped object offers. Proxy and decorator keep the same interface: a proxy controls access (lazy loading, caching, permissions), a decorator adds behaviour. All three can be stacked."
     theoryUrl: https://refactoring.guru/design-patterns/adapter
     options:
       - {
-          text: "It exposes a different interface than the wrapped object, to make it compatible",
+          text: "An adapter changes the interface; proxy and decorator keep it the same",
           correct: true,
         }
       - {
-          text: "It must be created through `Proxy`, while the other two are written by hand",
+          text: "An adapter must use the ES `Proxy` object, the others use plain wrappers",
           correct: false,
         }
       - {
-          text: "It wraps the object's prototype, while the others wrap only plain instances",
+          text: "An adapter adds new behaviour, while proxy and decorator only forward calls",
           correct: false,
         }
       - {
-          text: "It adds behaviour before and after each call, while the others only forward calls",
+          text: "An adapter can only wrap classes, while proxy and decorator can also wrap plain functions",
           correct: false,
         }
   - type: single
-    prompt: "What does this script print?"
-    code: |
-      'use strict'
-
-      const target = { age: 3 }
-      const p = new Proxy(target, {
-        set(t, key, value) { return false },
-      })
-
-      try { p.age = 4 } catch (e) { console.log(e.constructor.name) }
-      console.log(target.age)
-    codeLanguage: javascript
-    explanation: "A `set` trap returning a falsy value signals that the assignment failed. In strict mode (modules, classes, or `'use strict'`) that makes the assignment throw a `TypeError`, while in sloppy mode it is silently ignored. The target is never touched, so it stays 3."
-    theoryUrl: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Proxy/Proxy/set
+    prompt: "A client for a reporting service is expensive to set up (it loads a large schema and opens connections), but most requests never use it. You want callers to use it as if it were always there, while it is only created on first use. Which pattern fits?"
+    explanation: "A virtual proxy has the same interface as the real object and creates the real one the first time a method is called. Callers do not change. A decorator adds behaviour rather than controlling creation, an adapter changes the interface, and creating it eagerly is what you wanted to avoid."
+    theoryUrl: https://refactoring.guru/design-patterns/proxy
     options:
-      - { text: "TypeError, then 3", correct: true }
-      - { text: "Nothing is thrown, then 4", correct: false }
-      - { text: "TypeError, then 4", correct: false }
-      - { text: "Nothing is thrown, then 3", correct: false }
-  - type: multi
-    prompt: "Which of these are good uses of an ES `Proxy` in a Node.js application? Select all that apply."
-    explanation: "Proxies are well suited to validating assignments, lazy initialisation of expensive objects, and logging or access control around an existing object, all without changing its callers. They are not a free way to speed up code: every trapped operation adds overhead, so they do not belong in hot loops."
-    theoryUrl: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Proxy
-    options:
-      - { text: "Validating values assigned to a configuration object", correct: true }
-      - { text: "Making property access faster in a hot loop", correct: false }
-      - { text: "Lazily creating an expensive object on first property access", correct: true }
+      - { text: "Adapter, which converts the service's API into a lighter one", correct: false }
       - {
-          text: "Logging and enforcing access rules around an existing service object",
-          correct: true,
-        }
-  - type: single
-    prompt: "What does this script print?"
-    code: |
-      function withLogging(fn) {
-        return function (...args) {
-          console.log('call', fn.name, args)
-          const r = fn.apply(this, args)
-          console.log('return', r)
-          return r
-        }
-      }
-
-      const add = (a, b) => a + b
-      const logged = withLogging(add)
-      console.log(logged(2, 3))
-      console.log(`[${logged.name}] [${add.name}]`)
-    codeLanguage: javascript
-    explanation: "The decorator calls the original and adds logging, so the first lines are `call add [ 2, 3 ]`, `return 5` and then the `5` from `console.log`. The wrapper is an anonymous function expression returned directly, so its `name` is an empty string, and the decorated function loses the original's metadata. Real decorators copy `name`/`length` or use a Proxy when this matters."
-    theoryUrl: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Function/name
-    options:
-      - { text: "call add [ 2, 3 ], return 5, 5, then [add] [add]", correct: false }
-      - { text: "call add [ 2, 3 ], return 5, 5, then [] [add]", correct: true }
-      - { text: "call logged [ 2, 3 ], return 5, 5, then [logged] [add]", correct: false }
-      - { text: "call add [ 2, 3 ], 5, return 5, then [] [add]", correct: false }
-  - type: single
-    prompt: "Your payment code calls `stripe.charges.create(...)` in 25 places. Product asks to support a second provider with a different SDK. What is the cleanest structural change?"
-    explanation: "Define the interface your domain needs (`charge(amount, customer)`), write one adapter per provider, and let the rest of the code depend on the interface. The 25 call sites stay untouched when a provider is added. Copy-pasting the code or sprinkling `if (provider === ...)` multiplies the coupling instead."
-    theoryUrl: https://refactoring.guru/design-patterns/adapter
-    options:
-      - {
-          text: "Duplicate the 25 call sites for the new provider and switch with a config flag",
-          correct: false,
-        }
-      - {
-          text: "Define a `PaymentGateway` interface with an adapter per provider SDK",
+          text: "Proxy, which has the same interface and creates the real client lazily",
           correct: true,
         }
       - {
-          text: "Wrap the Stripe SDK in a `Proxy` that rewrites method names for the new SDK",
+          text: "Observer, which notifies callers once the client has finished loading",
           correct: false,
         }
       - {
-          text: "Add `if (provider === 'new')` branches inside each of the 25 call sites",
+          text: "Singleton, created at startup so every request reuses one instance",
           correct: false,
         }
   - type: single
-    prompt: "What does this script print?"
+    prompt: "This helper wraps data-access functions. Which pattern is it, and what is its main advantage?"
     code: |
-      const strategies = {
-        asc: (a, b) => a - b,
-        desc: (a, b) => b - a,
-      }
-
-      const sorter = (strategy) => (arr) => [...arr].sort(strategies[strategy])
-
-      const data = [3, 1, 2]
-      console.log(sorter('asc')(data), sorter('desc')(data), data)
-    codeLanguage: javascript
-    explanation: "The strategy (the comparison function) is chosen by the caller and plugged into the same algorithm, so asc gives `[1, 2, 3]` and desc `[3, 2, 1]`. The spread copy `[...arr]` means `sort` does not mutate the input, which therefore stays `[3, 1, 2]`. Without the copy, `sort` would reorder `data` in place."
-    theoryUrl: https://refactoring.guru/design-patterns/strategy
-    options:
-      - { text: "[ 1, 2, 3 ] [ 3, 2, 1 ] [ 3, 2, 1 ]", correct: false }
-      - { text: "[ 1, 2, 3 ] [ 3, 2, 1 ] [ 1, 2, 3 ]", correct: false }
-      - { text: "[ 1, 2, 3 ] [ 1, 2, 3 ] [ 3, 1, 2 ]", correct: false }
-      - { text: "[ 1, 2, 3 ] [ 3, 2, 1 ] [ 3, 1, 2 ]", correct: true }
-  - type: single
-    prompt: "Strategy and State have almost the same structure: a context delegating to an interchangeable object. How do they differ?"
-    explanation: "In Strategy the client picks the algorithm and it usually stays until changed by the client. In State the object swaps its own state when events happen, and the states often know about their successors. Same structure, different intent: who drives the change and why."
-    theoryUrl: https://refactoring.guru/design-patterns/state
-    options:
-      - {
-          text: "State is used only with classes, while Strategy is used only with functions",
-          correct: false,
-        }
-      - {
-          text: "Strategy objects are stateless, while State objects must store the whole history",
-          correct: false,
-        }
-      - {
-          text: "In State the context itself changes the delegate as it transitions, in Strategy the client chooses",
-          correct: true,
-        }
-      - {
-          text: "Strategy can change at runtime, but a State is fixed when the context is created",
-          correct: false,
-        }
-  - type: single
-    prompt: "What does this script print?"
-    code: |
-      class Door {
-        constructor() { this.state = new Closed() }
-        press() { this.state = this.state.next() }
-      }
-      class Closed { next() { console.log('opening'); return new Open() } }
-      class Open { next() { console.log('closing'); return new Closed() } }
-
-      const d = new Door()
-      d.press(); d.press(); d.press()
-      console.log(d.state.constructor.name)
-    codeLanguage: javascript
-    explanation: "Each `press()` delegates to the current state, which logs and returns the next one: Closed to Open (opening), Open to Closed (closing), Closed to Open (opening). The door ends up in `Open`. The context has no `if`/`switch` on a status flag, which is the main benefit of the State pattern."
-    theoryUrl: https://refactoring.guru/design-patterns/state
-    options:
-      - { text: "opening, closing, opening, Closed", correct: false }
-      - { text: "opening, closing, closing, Open", correct: false }
-      - { text: "opening, closing, opening, Open", correct: true }
-      - { text: "closing, opening, closing, Closed", correct: false }
-  - type: single
-    prompt: "What does this script print?"
-    code: |
-      class Report {
-        generate() {
-          console.log(this.header())
-          console.log(this.body())
-          console.log(this.footer())
-        }
-        header() { return 'H:base' }
-        footer() { return 'F:base' }
-        body() { throw new Error('not implemented') }
-      }
-
-      class Sales extends Report {
-        body() { return 'B:sales' }
-        footer() { return 'F:' + super.footer() }
-      }
-
-      new Sales().generate()
-    codeLanguage: javascript
-    explanation: "Template method: the base class fixes the algorithm (`generate`: header, body, footer) and subclasses override the steps. `this.header()` is not overridden so it returns `H:base`, `body` is the subclass one, and `footer` calls the parent through `super`, giving `F:F:base`."
-    theoryUrl: https://refactoring.guru/design-patterns/template-method
-    options:
-      - { text: "H:base, B:sales, F:base", correct: false }
-      - { text: "H:base, B:sales, F:F:base", correct: true }
-      - { text: "H:base, then an Error 'not implemented'", correct: false }
-      - { text: "B:sales, H:base, F:F:base", correct: false }
-  - type: single
-    prompt: "What does this script print?"
-    code: |
-      class Range {
-        constructor(n) { this.n = n }
-        *[Symbol.iterator]() {
+      function withTiming(name, fn, metrics) {
+        return async (...args) => {
+          const start = performance.now()
           try {
-            for (let i = 1; i <= this.n; i++) yield i
+            return await fn(...args)
           } finally {
-            console.log('cleanup')
+            metrics.record(name, performance.now() - start)
           }
         }
       }
 
-      for (const x of new Range(5)) {
-        if (x === 2) break
-        console.log(x)
-      }
-      console.log([...new Range(2)])
-    codeLanguage: javascript
-    explanation: "`for...of` gets an iterator from `[Symbol.iterator]`. Breaking early calls its `return()`, which runs the generator's `finally`, so `cleanup` prints right after `1`. The spread consumes the generator to the end, so `finally` runs again (cleanup) before the array `[ 1, 2 ]` is logged."
-    theoryUrl: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Iteration_protocols
+      const findUser = withTiming('findUser', findUserInDb, metrics)
+    explanation: "It is a decorator: the wrapper has the same signature as the function it wraps and adds behaviour (timing) without changing the original. Wrappers compose, so retries or logging can be stacked the same way. An adapter would change the signature, and a strategy is chosen instead of something rather than wrapped around it."
+    theoryUrl: https://refactoring.guru/design-patterns/decorator
     options:
-      - { text: "1, cleanup, cleanup, [ 1, 2 ]", correct: true }
-      - { text: "1, 2, cleanup, [ 1, 2 ], cleanup", correct: false }
-      - { text: "1, cleanup, [ 1, 2 ]", correct: false }
-      - { text: "1, cleanup, [ 1, 2 ], cleanup", correct: false }
+      - { text: "Adapter: it converts `findUserInDb` into an async function", correct: false }
+      - {
+          text: "Decorator: it adds behaviour without changing the original, and wrappers compose",
+          correct: true,
+        }
+      - { text: "Strategy: it picks which data-access function runs at runtime", correct: false }
+      - { text: "Singleton: it guarantees `findUserInDb` is only called once", correct: false }
   - type: single
-    prompt: "An API returns data in pages of 100 items through a `nextCursor` token, and a caller wants to loop over all items as if they were one list, fetching pages lazily. What is the idiomatic Node.js approach?"
-    explanation: "An async generator (`async function*`) hides the pagination behind the async iterator protocol: callers use `for await (const item of listItems())`, and the next page is requested only when the loop needs it. Fetching everything up front wastes memory and time, and exposing cursors leaks the paging detail to every caller."
+    prompt: "Your payment code calls the Stripe SDK in 25 places. Product asks to support a second provider whose SDK has a different API. What is the cleanest structural change?"
+    explanation: "Define the payment interface your app needs, write one adapter per provider that translates it to that provider's SDK, and make the 25 call sites use the interface. Adding a third provider then means one new adapter. `if` branches at every call site spread the knowledge of every provider through the code."
+    theoryUrl: https://refactoring.guru/design-patterns/adapter
+    options:
+      - {
+          text: "Add an `if (provider === 'stripe')` branch at each of the 25 call sites",
+          correct: false,
+        }
+      - {
+          text: "Define your own payment interface and write one adapter per provider",
+          correct: true,
+        }
+      - {
+          text: "Subclass the Stripe SDK client and override its methods for the new provider",
+          correct: false,
+        }
+      - {
+          text: "Fork the second provider's SDK and rename its methods to match Stripe",
+          correct: false,
+        }
+  - type: boolean
+    prompt: "In JavaScript, the Strategy pattern often needs no class hierarchy: passing a function (for example a pricing rule) as a parameter is already a strategy."
+    answer: true
+    explanation: "Strategy means making an algorithm interchangeable behind a common contract. Functions are first-class values in JavaScript, so a function parameter fulfils that contract directly, as `array.sort(compareFn)` shows. Classes are still useful when a strategy carries state or several related methods."
+    theoryUrl: https://refactoring.guru/design-patterns/strategy
+  - type: single
+    prompt: "Strategy and State have almost the same structure: a context delegating to an interchangeable object. How do they differ?"
+    explanation: "With Strategy, the client picks the algorithm from outside and it usually stays fixed for that use. With State, the object changes its own behaviour as its internal state changes, and the states themselves often trigger the transitions. The structure is the same; the intent and who drives the change differ."
+    theoryUrl: https://refactoring.guru/design-patterns/state
+    options:
+      - { text: "Strategy uses classes, State uses plain functions", correct: false }
+      - {
+          text: "The client chooses a strategy; the object changes state itself over time",
+          correct: true,
+        }
+      - { text: "Strategy is for asynchronous code, State is for synchronous code", correct: false }
+      - { text: "State may only hold data, while Strategy may only hold behaviour", correct: false }
+  - type: single
+    prompt: "An `Order` has statuses (draft, paid, shipped, cancelled), and `cancel()`, `ship()` and `refund()` each contain a growing `switch (this.status)` that decides what is allowed. Every new status means editing every method. Which pattern addresses this?"
+    explanation: "With the State pattern, each status becomes an object that implements the allowed actions and the transitions to the next state, and the order delegates to its current state. Adding a status means adding one state object instead of editing every `switch`. Observers or singletons do not organise status-dependent behaviour."
+    theoryUrl: https://refactoring.guru/design-patterns/state
+    options:
+      - { text: "Observer, emitting an event on every status change", correct: false }
+      - {
+          text: "State, one object per status that handles the actions and transitions",
+          correct: true,
+        }
+      - { text: "Singleton, one shared `OrderStatus` object for the whole app", correct: false }
+      - {
+          text: "Builder, so that each order is assembled with its final status already set",
+          correct: false,
+        }
+  - type: single
+    prompt: "To write a custom Node.js Transform stream, you only provide the function that processes one chunk; the stream class owns buffering, backpressure and the overall flow. Which GoF pattern does this design follow?"
+    explanation: "Template method: a base class defines the fixed skeleton of the algorithm and calls hooks that subclasses or callers fill in. Here the stream machinery is the skeleton and your chunk function is the hook. Nothing is wrapped (decorator) or translated (adapter)."
+    theoryUrl: https://refactoring.guru/design-patterns/template-method
+    options:
+      - { text: "Template method: a fixed skeleton calls the step you provide", correct: true }
+      - {
+          text: "Adapter: your function converts chunks into the stream's own format",
+          correct: false,
+        }
+      - { text: "Decorator: your function wraps the stream to add new behaviour", correct: false }
+      - { text: "Command: each chunk is an object that can be queued and undone", correct: false }
+  - type: single
+    prompt: "An API returns items in pages, with a cursor for the next page. Callers want to loop over all items as if they were one list, with pages fetched lazily as the loop advances. What is the idiomatic Node.js approach?"
+    explanation: "An async generator that fetches a page and yields its items one by one implements the iterator pattern: callers write `for await (const item of allItems())` and the next page is only fetched when needed. Fetching everything up front wastes memory and time, and callbacks per page push the paging logic onto every caller."
     theoryUrl: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/for-await...of
     options:
+      - { text: "Fetch every page first and return one big array", correct: false }
       - {
-          text: "Return an array with all the pages, fetched in parallel with `Promise.all`",
-          correct: false,
-        }
-      - {
-          text: "Return the cursor to the caller, which must call the function again each time",
-          correct: false,
-        }
-      - {
-          text: "Expose an async generator that yields items and fetches the next page when needed",
+          text: "An async generator that yields items and fetches the next page on demand",
           correct: true,
         }
       - {
-          text: "Return an `EventEmitter` that emits one `page` event per request, in parallel",
+          text: "An EventEmitter that emits each page as soon as it arrives, even if the caller is busy",
+          correct: false,
+        }
+      - {
+          text: "A singleton cache that stores the full result set for every caller",
           correct: false,
         }
   - type: single
-    prompt: "What does this script print?"
-    code: |
-      const stack = []
-      function use(fn) { stack.push(fn) }
-      function run(ctx) {
-        let i = 0
-        async function next() {
-          const fn = stack[i++]
-          if (fn) await fn(ctx, next)
+    prompt: "An Express or Koa middleware stack passes a request through logging, authentication, rate limiting and finally the route handler; any middleware can respond and stop the chain. Which GoF pattern is this?"
+    explanation: "Chain of responsibility: a request travels along a chain of handlers, and each can process it, pass it on, or stop it. Middleware adds a twist (handlers usually all run), but the structure is the same. It is not an observer, where every listener is notified and none can stop the others."
+    theoryUrl: https://refactoring.guru/design-patterns/chain-of-responsibility
+    options:
+      - { text: "Observer, since every middleware listens for the request event", correct: false }
+      - {
+          text: "Chain of responsibility: each handler passes the request on or stops it",
+          correct: true,
         }
-        return next()
-      }
-
-      use(async (ctx, next) => { console.log('A before'); await next(); console.log('A after') })
-      use(async (ctx, next) => { console.log('B before'); await next(); console.log('B after') })
-      use(async () => { console.log('handler') })
-
-      run({}).then(() => console.log('done'))
-    codeLanguage: javascript
-    explanation: "Middleware forms an onion: each function runs its code before `next()`, the chain goes inward to the handler, then control returns outward in reverse order. The result is A before, B before, handler, B after, A after, and `done` once the first `next()` promise resolves."
+      - {
+          text: "Builder, since each middleware adds a piece of the final response",
+          correct: false,
+        }
+      - {
+          text: "Strategy, since one middleware is picked at random for each request",
+          correct: false,
+        }
+  - type: single
+    prompt: "In an Express app, the authentication middleware is registered after the route handlers instead of before them. What is the effect?"
+    explanation: "Middleware runs in registration order. A route handler that matches responds and ends the chain, so the authentication middleware registered after it never runs for that route: protected routes are open. Express does not reorder middleware or warn about it."
     theoryUrl: https://expressjs.com/en/guide/using-middleware.html
     options:
-      - { text: "A before, A after, B before, B after, handler, done", correct: false }
-      - { text: "A before, B before, handler, B after, A after, done", correct: true }
-      - { text: "A before, B before, handler, A after, B after, done", correct: false }
-      - { text: "handler, B before, A before, A after, B after, done", correct: false }
-  - type: single
-    prompt: "In an Express app, a logging middleware is registered after the route handlers instead of before them. What is the effect?"
-    explanation: "Express runs middleware and routes in registration order. If a route handler already sends the response and does not call `next()`, the later logging middleware is never reached for that request. Order is part of the middleware contract, so cross-cutting logic goes before the handlers it must wrap."
-    theoryUrl: https://expressjs.com/en/guide/writing-middleware.html
-    options:
+      - { text: "No effect: Express always runs authentication middleware first", correct: false }
       - {
-          text: "It still logs every request, as Express sorts middleware by type before running them",
+          text: "Protected routes respond before authentication runs, so they are open",
+          correct: true,
+        }
+      - { text: "Express throws an error at startup about the middleware order", correct: false }
+      - {
+          text: "Authentication runs twice per request, once before and once after the handler",
           correct: false,
         }
+  - type: multi
+    prompt: "An order module emits `orderPlaced` on an `EventEmitter`, and email, analytics and stock modules subscribe to it (the observer pattern). What are the real trade-offs? Select all that apply."
+    explanation: "The emitter does not know its subscribers, so new reactions are added without touching the order code. The price is indirection: the flow is harder to follow and test, and a missing or failing listener does not show up in the emitter's code. An in-process emitter gives no durability or retries; that takes a message broker."
+    theoryUrl: https://refactoring.guru/design-patterns/observer
+    options:
+      - { text: "New reactions can be added without changing the order module", correct: true }
       - {
-          text: "It is skipped for requests that a route handler answers without calling `next()`",
+          text: "The control flow is harder to follow, since callers do not see the listeners",
+          correct: true,
+        }
+      - { text: "Events survive a process crash and are redelivered to listeners", correct: false }
+      - { text: "Listeners are guaranteed to run on separate threads, in parallel", correct: false }
+  - type: single
+    prompt: "A web app lets users queue bulk operations (resize images, send emails) that must survive a crash, be retried, and appear in a job list. Which pattern is the natural base for the job model?"
+    explanation: "The command pattern turns a request into an object with its name and parameters, so it can be stored, queued, retried, logged and listed, then executed later by a worker. That is exactly what a persistent job needs. A direct function call cannot be stored, and an observer only notifies."
+    theoryUrl: https://refactoring.guru/design-patterns/command
+    options:
+      - {
+          text: "Command: each operation becomes a stored object that a worker can run or retry",
           correct: true,
         }
       - {
-          text: "Express throws at startup, because middleware must be registered first",
+          text: "Observer: each operation is an event that listeners react to once",
+          correct: false,
+        }
+      - { text: "Proxy: the job list controls access to the operations", correct: false }
+      - { text: "Decorator: each retry wraps the previous attempt", correct: false }
+  - type: single
+    prompt: "A codebase has an `IUserRepository` interface, an abstract `UserRepositoryFactory`, a `UserRepositoryFactoryImpl` and one `PostgresUserRepository`. There has only ever been one implementation, and tests use a plain object fake. What is the fairest assessment?"
+    explanation: "Layers of interfaces and factories for a single implementation add indirection without a payoff: a plain object fake already works in JavaScript because of duck typing. Patterns earn their cost when there is real variation to manage. Add the abstraction when a second implementation actually arrives."
+    theoryUrl: https://refactoring.guru/design-patterns/abstract-factory
+    options:
+      - {
+          text: "Good practice: every repository should have an abstract factory in case it changes",
           correct: false,
         }
       - {
-          text: "It runs twice for each request, once before and once after the route handler",
-          correct: false,
-        }
-  - type: single
-    prompt: "What does this script print?"
-    code: |
-      class Editor {
-        text = ''
-        history = []
-        execute(cmd) { cmd.do(this); this.history.push(cmd) }
-        undo() { this.history.pop()?.undo(this) }
-      }
-
-      const append = (s) => ({
-        do(e) { e.text += s },
-        undo(e) { e.text = e.text.slice(0, -s.length) },
-      })
-
-      const ed = new Editor()
-      ed.execute(append('ab'))
-      ed.execute(append('cd'))
-      ed.undo()
-      ed.execute(append('X'))
-      console.log(ed.text, ed.history.length)
-    codeLanguage: javascript
-    explanation: "Each action is an object with `do` and `undo`, and the editor keeps them in a history stack. After `ab` and `cd` the text is `abcd`, `undo()` pops `cd` and restores `ab`, and the next command appends `X`, so `abX`. The history holds `append('ab')` and `append('X')`, hence length 2."
-    theoryUrl: https://refactoring.guru/design-patterns/command
-    options:
-      - { text: "abcdX 3", correct: false }
-      - { text: "abX 3", correct: false }
-      - { text: "abX 2", correct: true }
-      - { text: "abcdX 2", correct: false }
-  - type: single
-    prompt: "A web app lets users queue bulk operations (resize images, send emails) that may be retried after a crash and shown in a job list. Which pattern is the natural base for the job model?"
-    explanation: "Command turns a request into an object holding everything needed to execute it, so it can be queued, persisted, retried, logged or undone. A singleton or strategy does not give you a serialisable unit of work, and a proxy only controls access to an existing object."
-    theoryUrl: https://refactoring.guru/design-patterns/command
-    options:
-      - { text: "Proxy, since it intercepts calls and can store them for later", correct: false }
-      - {
-          text: "Command, a serialisable object that describes the operation and its parameters",
+          text: "Overkill: with one implementation, a plain module or class is enough",
           correct: true,
         }
-      - { text: "Singleton, since one global queue must exist for the process", correct: false }
+      - { text: "Incomplete: it also needs a singleton so only one factory exists", correct: false }
       - {
-          text: "Template method, so that every job inherits the same retry loop from a base class",
-          correct: false,
-        }
-  - type: single
-    prompt: "What does this script print?"
-    code: |
-      const legacy = {
-        fetch(id, cb) { setImmediate(() => cb(null, { id, via: 'legacy' })) },
-      }
-
-      const adapter = {
-        get(id) {
-          return new Promise((res, rej) => legacy.fetch(id, (e, v) => e ? rej(e) : res(v)))
-        },
-      }
-
-      adapter.get(7).then(console.log)
-    codeLanguage: javascript
-    explanation: "The adapter exposes the interface the new code wants (a promise-returning `get`) on top of an old error-first callback API, so callers can use `await` or `.then`. The callback runs on `setImmediate` with `null` as error and resolves the promise, so it prints `{ id: 7, via: 'legacy' }`."
-    theoryUrl: https://nodejs.org/api/util.html#utilpromisifyoriginal
-    options:
-      - { text: "{ id: 7, via: 'legacy' }", correct: true }
-      - {
-          text: "undefined, because the adapter does not return the callback's value",
-          correct: false,
-        }
-      - { text: "null, since the first argument of the callback is printed", correct: false }
-      - {
-          text: "Nothing, as `.then` cannot be attached to a promise built from a callback",
+          text: "Required by Node.js, since tests cannot replace a class without an interface",
           correct: false,
         }
