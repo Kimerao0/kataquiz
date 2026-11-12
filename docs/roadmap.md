@@ -140,10 +140,11 @@ Spec: `specs/paths.md` (phase 1, KQ42, live in production since 2026-11-11; arch
   2026-11-11 — check: 9/9 implemented; 9 findings (0 blockers): 8 fixed, 1 accepted (user paths lose steps, decision 11)
   2026-11-11 — merged bc3cef9 (ff, rebase clean); pnpm check green: biome ok, tsc ok, 850/850 tests, portability ok
 - [ ] KQ48: Architect Roadmap v2 R2 — Next.js and React patterns 07–15
-  Spec: `specs/architect-roadmap-v2.md` R2 · status: proving
+  Spec: `specs/architect-roadmap-v2.md` R2 · status: merged ef0746d, not pushed
   Specs: R2.1 … R2.7 (the spec file holds the text; never copy it here)
   Verdicts: 6 proven · R2.7 owner-check — `.proofs/architect-roadmap-v2/`
   2026-11-12 — check: 7/7 implemented (R2.7 bounced once: ~10 edge-case questions replaced); 9 findings (0 blockers): 7 fixed, R2.4/R2.6 tightened + decision 13 via sync
+  2026-11-12 — merged ef0746d (ff, rebase clean onto origin/main); pnpm check green: biome ok, tsc ok, 855/855 tests, portability ok
 - [ ] KQ49: Architect Roadmap v2 R3 — Node.js 16–23
   Spec: `specs/architect-roadmap-v2.md` R3 · status: open
   Specs: R3.1 … R3.7 (the spec file holds the text; never copy it here)

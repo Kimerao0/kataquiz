@@ -2,7 +2,7 @@
 
 feature: architect-roadmap-v2
 title: Architect Roadmap v2
-phase: proving
+phase: approved
 ---
 
 # Architect Roadmap v2
@@ -156,3 +156,4 @@ Follow-up: Kill the old path, and the old quiz, i want a new quiz and new path. 
 - 2026-11-11 — R1 merged bc3cef9
 - 2026-11-12 — R2.4 and R2.6 reworded (new content, not just one row per title), decision 13 added (feature-check R2 triage)
 - 2026-11-12 — R2.7 reopened: edge-case questions left in 07, 09, 11, 13, 15 (feature-check R2)
+- 2026-11-12 — R2 merged ef0746d
