@@ -137,7 +137,7 @@ Spec: `specs/paths.md` (phase 1, KQ42, live in production since 2026-11-11; arch
   2026-11-11 — check: 9/9 implemented; 9 findings (0 blockers): 8 fixed, 1 accepted (user paths lose steps, decision 11)
   2026-11-11 — merged bc3cef9 (ff, rebase clean); pnpm check green: biome ok, tsc ok, 850/850 tests, portability ok
 - [ ] KQ48: Architect Roadmap v2 R2 — Next.js and React patterns 07–15
-  Spec: `specs/architect-roadmap-v2.md` R2 · status: open
+  Spec: `specs/architect-roadmap-v2.md` R2 · status: building on feat/architect-roadmap-v2-r2
   Specs: R2.1 … R2.7 (the spec file holds the text; never copy it here)
   Verdicts: <filled by feature-prove>
 - [ ] KQ49: Architect Roadmap v2 R3 — Node.js 16–23
