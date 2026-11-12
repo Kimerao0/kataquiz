@@ -127,24 +127,24 @@ Follow-up: Kill the old path, and the old quiz, i want a new quiz and new path. 
 
 ## Proofs
 
-| Spec | Verdict | Evidence                                                                |
-| ---- | ------- | ----------------------------------------------------------------------- |
-| R1.1 | proven  | .proofs/architect-roadmap-v2/R1.1-six-code-no-advanced-fails.txt        |
-| R1.2 | proven  | .proofs/architect-roadmap-v2/R1.2-six-code-advanced-ok.txt              |
-| R1.3 | proven  | .proofs/architect-roadmap-v2/R1.3-seeds-01-06-ok.txt                    |
-| R1.4 | proven  | .proofs/architect-roadmap-v2/R1.4-one-seed-quiz-per-title-rewritten.txt |
-| R1.5 | proven  | .proofs/architect-roadmap-v2/R1.5-other-user-quiz-survives.txt          |
-| R1.6 | proven  | .proofs/architect-roadmap-v2/R1.6-quiz-07-attempts-survive.txt          |
-| R1.7 | proven  | .proofs/architect-roadmap-v2/R1.7-fresh-release.txt                     |
-| R1.8 | proven  | .proofs/architect-roadmap-v2/R1.8-path-page.png                         |
-| R1.9 | proven  | .proofs/architect-roadmap-v2/R1.9-observation.md                        |
-| R2.1 | proven | .proofs/architect-roadmap-v2/R2.1-check-07-15-ok.txt |
-| R2.2 | proven | .proofs/architect-roadmap-v2/R2.2-migration-titles-match-changed-seeds.txt |
-| R2.3 | proven | .proofs/architect-roadmap-v2/R2.3-quiz-14-attempts-survive.txt |
-| R2.4 | proven | .proofs/architect-roadmap-v2/R2.4-one-quiz-per-title-r2-question-set.txt |
-| R2.5 | proven | .proofs/architect-roadmap-v2/R2.5-fresh-release.txt |
-| R2.6 | proven | .proofs/architect-roadmap-v2/R2.6-path-page.png |
-| R2.7 | owner-check | .proofs/architect-roadmap-v2/owner-check.md |
+| Spec | Verdict     | Evidence                                                                   |
+| ---- | ----------- | -------------------------------------------------------------------------- |
+| R1.1 | proven      | .proofs/architect-roadmap-v2/R1.1-six-code-no-advanced-fails.txt           |
+| R1.2 | proven      | .proofs/architect-roadmap-v2/R1.2-six-code-advanced-ok.txt                 |
+| R1.3 | proven      | .proofs/architect-roadmap-v2/R1.3-seeds-01-06-ok.txt                       |
+| R1.4 | proven      | .proofs/architect-roadmap-v2/R1.4-one-seed-quiz-per-title-rewritten.txt    |
+| R1.5 | proven      | .proofs/architect-roadmap-v2/R1.5-other-user-quiz-survives.txt             |
+| R1.6 | proven      | .proofs/architect-roadmap-v2/R1.6-quiz-07-attempts-survive.txt             |
+| R1.7 | proven      | .proofs/architect-roadmap-v2/R1.7-fresh-release.txt                        |
+| R1.8 | proven      | .proofs/architect-roadmap-v2/R1.8-path-page.png                            |
+| R1.9 | proven      | .proofs/architect-roadmap-v2/R1.9-observation.md                           |
+| R2.1 | proven      | .proofs/architect-roadmap-v2/R2.1-check-07-15-ok.txt                       |
+| R2.2 | proven      | .proofs/architect-roadmap-v2/R2.2-migration-titles-match-changed-seeds.txt |
+| R2.3 | proven      | .proofs/architect-roadmap-v2/R2.3-quiz-14-attempts-survive.txt             |
+| R2.4 | proven      | .proofs/architect-roadmap-v2/R2.4-one-quiz-per-title-r2-question-set.txt   |
+| R2.5 | proven      | .proofs/architect-roadmap-v2/R2.5-fresh-release.txt                        |
+| R2.6 | proven      | .proofs/architect-roadmap-v2/R2.6-path-page.png                            |
+| R2.7 | owner-check | .proofs/architect-roadmap-v2/owner-check.md                                |
 
 ## Changelog
 
