@@ -2,7 +2,7 @@
 
 feature: architect-roadmap-v2
 title: Architect Roadmap v2
-phase: checking
+phase: proving
 ---
 
 # Architect Roadmap v2
@@ -85,13 +85,13 @@ Follow-up: Kill the old path, and the old quiz, i want a new quiz and new path. 
 
 #### Specs
 
-1. [built] Running `check.mts` on `seeds/architect-0[7-9]-*.yaml seeds/architect-1[0-5]-*.yaml` prints ok for all nine files, each with at most 5 code questions, and none of them carries an `advanced` tag.
-2. [built] The title list in the R2 migration equals the set of quiz files changed in R2, as listed by `git diff --name-only` on `seeds/`.
-3. [built] On a database holding the R1 content, a quiz from 07–15 that R2 left unchanged keeps its attempts after `pnpm release`.
-4. [built] On a database holding the R1 content, `pnpm release` leaves exactly one seed quiz per title for 07–15, each changed one with the R2 question set.
-5. [built] On a fresh database, `pnpm release` runs the R1 and R2 migrations without error and imports every seed, the path included.
-6. [built] After `pnpm release` on a database holding the R1 content, the "Road to Software Architect" page lists 41 steps and step 7 opens the R2 version of quiz 07.
-7. [built] Reading quizzes 07–13 and 15, no question turns on an edge case or a trick output; quiz 14 may.
+1. [proven] Running `check.mts` on `seeds/architect-0[7-9]-*.yaml seeds/architect-1[0-5]-*.yaml` prints ok for all nine files, each with at most 5 code questions, and none of them carries an `advanced` tag.
+2. [proven] The title list in the R2 migration equals the set of quiz files changed in R2, as listed by `git diff --name-only` on `seeds/`.
+3. [proven] On a database holding the R1 content, a quiz from 07–15 that R2 left unchanged keeps its attempts after `pnpm release`.
+4. [proven] On a database holding the R1 content, `pnpm release` leaves exactly one seed quiz per title for 07–15, each changed one with the R2 question set.
+5. [proven] On a fresh database, `pnpm release` runs the R1 and R2 migrations without error and imports every seed, the path included.
+6. [proven] After `pnpm release` on a database holding the R1 content, the "Road to Software Architect" page lists 41 steps and step 7 opens the R2 version of quiz 07.
+7. [owner-check] Reading quizzes 07–13 and 15, no question turns on an edge case or a trick output; quiz 14 may.
 
 ### R3 — Node.js 16–23
 
@@ -138,6 +138,13 @@ Follow-up: Kill the old path, and the old quiz, i want a new quiz and new path. 
 | R1.7 | proven  | .proofs/architect-roadmap-v2/R1.7-fresh-release.txt                     |
 | R1.8 | proven  | .proofs/architect-roadmap-v2/R1.8-path-page.png                         |
 | R1.9 | proven  | .proofs/architect-roadmap-v2/R1.9-observation.md                        |
+| R2.1 | proven | .proofs/architect-roadmap-v2/R2.1-check-07-15-ok.txt |
+| R2.2 | proven | .proofs/architect-roadmap-v2/R2.2-migration-titles-match-changed-seeds.txt |
+| R2.3 | proven | .proofs/architect-roadmap-v2/R2.3-quiz-14-attempts-survive.txt |
+| R2.4 | proven | .proofs/architect-roadmap-v2/R2.4-one-quiz-per-title-r2-question-set.txt |
+| R2.5 | proven | .proofs/architect-roadmap-v2/R2.5-fresh-release.txt |
+| R2.6 | proven | .proofs/architect-roadmap-v2/R2.6-path-page.png |
+| R2.7 | owner-check | .proofs/architect-roadmap-v2/owner-check.md |
 
 ## Changelog
 
