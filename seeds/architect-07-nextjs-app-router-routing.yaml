@@ -281,36 +281,45 @@ questions:
       - { text: "Opting a subset of routes into a shared layout", correct: true }
       - { text: "Adding a URL prefix such as `/admin` to every route inside", correct: false }
   - type: single
-    prompt: "You have `app/(marketing)/about/page.tsx` and `app/(shop)/about/page.tsx`. What happens at build time?"
-    explanation: "Both pages resolve to `/about` because group names are not part of the URL. Routes in different groups must not resolve to the same path, so the build fails with a conflict. Next.js does not pick one by alphabetical order or merge them."
+    prompt: "`/account` and `/orders` must share a sidebar layout that `/` and `/login` must not get. The URLs cannot change. How do you structure the `app/` folder?"
+    explanation: "A layout wraps every page below its folder, so put `account` and `orders` inside a route group such as `(dashboard)` with its own `layout.tsx`. The group name never reaches the URL, so the paths stay `/account` and `/orders`. A plain `dashboard/` folder would add a URL segment, and a layout cannot reliably branch on the pathname because it does not re-render on navigation."
     theoryUrl: https://nextjs.org/docs/app/api-reference/file-conventions/route-groups
     options:
       - {
-          text: "The one in the first group alphabetically wins and the other is ignored",
-          correct: false,
-        }
-      - { text: "Both are served, one at /about and the other at /shop/about", correct: false }
-      - { text: "The build fails because both routes resolve to the same URL", correct: true }
-      - { text: "Next.js merges them, rendering both pages one after the other", correct: false }
-  - type: single
-    prompt: "You add `app/dashboard/route.ts` exporting `GET` next to the existing `app/dashboard/page.tsx`. What happens?"
-    explanation: "A `route` file and a `page` file cannot coexist in the same segment, because each takes over all HTTP verbs for that URL. The build reports a conflict. Put the handler under a different segment such as `app/api/dashboard/route.ts`."
-    theoryUrl: https://nextjs.org/docs/app/getting-started/route-handlers
-    options:
-      - {
-          text: "route.ts answers GET requests and page.tsx answers browser navigations",
-          correct: false,
-        }
-      - {
-          text: "It is a conflict, because a segment cannot have both page and route files",
+          text: "Put both pages in a route group like (dashboard) that has its own layout.tsx",
           correct: true,
         }
       - {
-          text: "page.tsx wins for GET requests and route.ts only handles the other HTTP verbs such as POST",
+          text: "Put both pages in a dashboard/ folder with a layout.tsx, since folders without a page are not part of the URL",
           correct: false,
         }
       - {
-          text: "route.ts is only used when the Accept header asks for application/json",
+          text: "Keep one root layout and show the sidebar only when the pathname is /account or /orders",
+          correct: false,
+        }
+      - {
+          text: "Add a @sidebar slot to the root layout and fill it only for those two pages",
+          correct: false,
+        }
+  - type: single
+    prompt: "Feed readers need `/rss.xml`, an XML document built from the latest posts in the database. Which App Router file fits, and why?"
+    explanation: "A `page` renders a React tree into an HTML document with the app's layouts, which is the wrong output for a feed. A `route` file (Route Handler) receives the raw request and returns any `Response`, so `app/rss.xml/route.ts` can build the XML and set its `Content-Type`. A Server Action is a POST endpoint for mutations called from your UI, and a file in `public/` is static, so it would not follow new posts."
+    theoryUrl: https://nextjs.org/docs/app/api-reference/file-conventions/route
+    options:
+      - {
+          text: "app/rss.xml/route.ts, which returns a Response with any body and content type",
+          correct: true,
+        }
+      - {
+          text: "app/rss.xml/page.tsx, which returns the XML elements as JSX so that the page renders the feed",
+          correct: false,
+        }
+      - {
+          text: "A Server Action that returns the XML string whenever a feed reader requests it",
+          correct: false,
+        }
+      - {
+          text: "public/rss.xml, which Next.js regenerates from the database on each request",
           correct: false,
         }
   - type: single
@@ -353,24 +362,24 @@ questions:
           correct: false,
         }
   - type: single
-    prompt: "A dashboard has `@team` and `@analytics` slots. Via client-side links the user goes from `/` to `/settings`, which exists only in `@team`. What does `@analytics` show right after the soft navigation, and after a browser refresh on `/settings`?"
-    explanation: "During soft navigation Next.js tracks the active state of every slot and keeps the previous subpage of `@analytics`. A refresh is a hard navigation, where that state cannot be recovered, so the unmatched slot renders its `default.tsx` (or errors if there is none)."
+    prompt: "A dashboard shows a team panel and an analytics panel side by side. Analytics is slow and its API sometimes fails, and the team panel must stay usable when that happens. Each panel should also have its own sub-pages. Which routing feature fits?"
+    explanation: "Parallel routes render several pages in one layout at the same time, one per `@slot`, and each slot is its own route segment. That gives each panel its own `loading.tsx` and `error.tsx`, so a slow or failing analytics slot shows its own fallback while the team slot keeps working. Route groups only organise files and still render one page per URL, and intercepting routes are for showing another route in the current layout, such as a modal."
     theoryUrl: https://nextjs.org/docs/app/api-reference/file-conventions/parallel-routes
     options:
       - {
-          text: "Its previous subpage after the soft navigation, default.tsx after the refresh",
+          text: "Parallel routes, with a @team and an @analytics slot that each have their own loading and error files",
           correct: true,
         }
       - {
-          text: "Its previous subpage in both cases, because slots persist their state in the URL",
+          text: "Route groups (team) and (analytics), each with its own layout and error file",
           correct: false,
         }
       - {
-          text: "default.tsx in both cases, because the URL no longer matches any analytics page",
+          text: "Intercepting routes, so the analytics page is loaded inside the team page",
           correct: false,
         }
       - {
-          text: "A 404 after the soft navigation, and its previous subpage after the refresh",
+          text: "A template.tsx around both panels, so a failure remounts only the panel that broke",
           correct: false,
         }
   - type: single

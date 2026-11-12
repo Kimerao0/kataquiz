@@ -127,53 +127,45 @@ questions:
           correct: false,
         }
   - type: single
-    prompt: "A function is cached with `cacheLife('hours')` (profile: stale 5m, revalidate 1h, expire 1d). A request arrives 90 minutes after the entry was filled, with no traffic in between. What is served?"
-    code: |
-      export async function getProducts() {
-        'use cache'
-        cacheLife('hours')
-        cacheTag('products')
-        return db.query('SELECT * FROM products')
-      }
-    codeLanguage: typescript
-    explanation: "After `revalidate` (1 hour) the entry is stale but not yet expired (1 day), so the request is served the stale value immediately and a background refresh is triggered, which is stale-while-revalidate. Only after `expire` with no requests does the next request wait for fresh data."
+    prompt: "Once a `cacheLife` revalidate period has passed, the next request gets the cached value immediately while a fresh one is computed in the background (stale-while-revalidate). What trade-off does that make?"
+    explanation: "Stale-while-revalidate puts speed first: no visitor waits for the recomputation, but the visitor who triggers the refresh, and anyone before it completes, sees the older value. If a reader must see a change at once, time-based revalidation is the wrong tool and on-demand invalidation is needed. It does not bound staleness to the revalidate period, since the refresh only starts when a request arrives."
     theoryUrl: https://nextjs.org/docs/app/api-reference/functions/cacheLife
     options:
       - {
-          text: "The stale value instantly, while a background refresh produces the new one",
+          text: "Responses stay fast, but some visitors briefly see the older value",
           correct: true,
         }
       - {
-          text: "A blocking fresh render, because the one hour lifetime has already passed",
+          text: "Every visitor gets fresh data, but the first one after the period waits for it",
           correct: false,
         }
       - {
-          text: "The stale value forever, until a tag is explicitly revalidated by hand later",
+          text: "No visitor ever sees data older than the revalidate period, at the cost of extra recomputation in the background",
           correct: false,
         }
       - {
-          text: "An error, because the entry expired and no fallback was configured",
+          text: "The data is never recomputed at runtime, only refreshed by the next deploy",
           correct: false,
         }
   - type: single
-    prompt: "A page is mostly static, but one stock-ticker widget must show near real-time prices. With Cache Components, what is the sensible design?"
-    explanation: "Keep the static parts in the prerendered shell and let only the fast-changing widget run per request: leave it uncached (or with a very short lifetime) inside its own `<Suspense>` boundary so it streams in. Reading cookies just to force the whole page dynamic throws the shell away, and a long-lived cache refreshed by a cron job still serves stale prices between runs."
+    prompt: "What do you gain by prerendering part of a route ahead of time instead of rendering it on every request, and what do you give up?"
+    explanation: "Prerendered output already exists when the request arrives, so it can be sent at once without running server code or querying data for each visitor. The price is freshness and individuality: it is only as current as its last render and is the same for everyone, so request-time or per-user content has to stream in separately. Search engines index server-rendered pages either way, and prerendered pages still hydrate their Client Components."
     theoryUrl: https://nextjs.org/docs/app/getting-started/caching
     options:
       - {
-          text: "Cache the whole page with cacheLife('max') and have a cron job revalidate its tag every second",
-          correct: false,
-        }
-      - {
-          text: "Read cookies() at the top of the page, so the entire route renders per request",
-          correct: false,
-        }
-      - {
-          text: "Keep the shell static and stream the uncached widget per request behind Suspense",
+          text: "It is served without per-request work, but is only as fresh as its last render",
           correct: true,
         }
       - {
-          text: "Render the widget at build time and rely on the browser's HTTP cache for freshness",
+          text: "It lets search engines index the page, which pages rendered per request do not allow",
+          correct: false,
+        }
+      - {
+          text: "It removes hydration, but the page can no longer contain any Client Components",
+          correct: false,
+        }
+      - {
+          text: "It personalises content for each visitor cheaply, but the build takes longer",
           correct: false,
         }
   - type: single
@@ -213,10 +205,10 @@ questions:
           correct: false,
         }
   - type: boolean
-    prompt: "`updateTag` can be called from a Route Handler, as well as from a Server Action."
-    answer: false
-    explanation: "`updateTag` is designed for read-your-own-writes and can only be used in Server Actions. From Route Handlers or other contexts use `revalidateTag` instead."
-    theoryUrl: https://nextjs.org/docs/app/api-reference/functions/updateTag
+    prompt: "Time-based revalidation suits data whose changes your app is not told about, while on-demand revalidation suits data whose changes your own code or a webhook knows about."
+    answer: true
+    explanation: "With no change signal, the only option is to refresh on a schedule and accept staleness up to that window. When your code performs the change, or a source such as a CMS can call a webhook, you can invalidate exactly when the data changes and keep a long cache lifetime in between. Many apps combine both: on-demand invalidation for known changes and a lifetime as a safety net."
+    theoryUrl: https://nextjs.org/docs/app/getting-started/revalidating
   - type: single
     prompt: "A product appears on its own page, in category listings, in search results and in a home-page carousel. After an admin edits it, every place must show the change. Which invalidation strategy scales best?"
     explanation: "Tag every cached read that includes the product (for example `cacheTag('product-42')`) and invalidate the tag after the edit, so all entries that depend on it refresh wherever they are rendered. Listing paths by hand breaks as soon as a new page shows the product, invalidating the whole site throws away unrelated cache, and short lifetimes trade freshness for constant recomputation."
@@ -378,38 +370,47 @@ questions:
           correct: true,
         }
   - type: single
-    prompt: "A client fires three Server Actions at once with `Promise.all([a(), b(), c()])` hoping to parallelise them. How does Next.js dispatch them?"
-    explanation: "The client dispatches Server Actions one at a time, so the second waits for the first to finish and so on; this keeps the re-rendered tree consistent with each action's result. For real parallelism, do the work inside one action, fetch in Server Components, or use a Route Handler for non-mutations."
-    theoryUrl: https://nextjs.org/docs/app/guides/server-actions
+    prompt: "A notifications page Server Component marks every notification as read in the database while it renders. Why is that a poor design, and where does the mutation belong?"
+    explanation: "Rendering should be free of side effects: a route can be rendered when the user did not ask for it (for example when a link to it is prefetched), rendered more than once, or served from a cache without rendering at all. A mutation tied to rendering therefore fires at the wrong times or not at all. Run it from an explicit user action through a Server Action."
+    theoryUrl: https://nextjs.org/docs/app/guides/data-security
     options:
       - {
-          text: "In parallel, as separate requests, using the browser's connection pool",
-          correct: false,
-        }
-      - {
-          text: "Parallel on the server, but the responses are merged in call order",
-          correct: false,
-        }
-      - {
-          text: "One after another from that client, so Promise.all does not parallelise them",
+          text: "Renders can happen without the user's intent or be skipped, so use a Server Action",
           correct: true,
         }
-      - { text: "Only the last one runs, and the earlier calls are cancelled", correct: false }
+      - {
+          text: "Server Components cannot write to the database, only read from it, so move the update into a Route Handler",
+          correct: false,
+        }
+      - {
+          text: "Nothing is wrong, since a Server Component renders exactly once per page visit",
+          correct: false,
+        }
+      - {
+          text: "It is too slow, so run the update from the browser straight against the database",
+          correct: false,
+        }
   - type: single
-    prompt: "A Server Action calls `updateTag('cart')` and the user is on a page that shows the cart. How many HTTP round trips are needed to show the updated cart?"
-    explanation: "When an action calls `updateTag`, `revalidatePath`, `refresh`, mutates cookies or redirects, Next.js re-renders the current route in the same request. The response carries both the action's return value and the new RSC payload, so one round trip updates the UI. `revalidateTag` with a stale-while-revalidate profile intentionally skips that re-render."
+    prompt: "A Server Action updates the cart and calls `updateTag('cart')`. A teammate also refetches the cart in a `useEffect` after the action resolves, 'so the page shows the change'. Is that needed?"
+    explanation: "Server Actions follow a server-driven model: after the mutation and invalidation, the server re-renders the current route and sends the new UI back with the action's response. The client does not have to know which data changed or fetch it again, so the extra fetch is redundant work. Invalidation does not push updates to other tabs; they see the change on their next request."
     theoryUrl: https://nextjs.org/docs/app/guides/server-actions
     options:
-      - { text: "Two, one for the action and a second one to refetch the page", correct: false }
       - {
-          text: "One, as the response carries both the result and the re-rendered route",
+          text: "No, the server re-renders the route and returns the new UI with the action's response",
           correct: true,
         }
       - {
-          text: "Zero, the client reads the invalidated entry directly from the server cache",
+          text: "Yes, actions only return their own value, so the client must reload the data it shows",
           correct: false,
         }
-      - { text: "Three, including a prefetch of the cart route in the background", correct: false }
+      - {
+          text: "Yes, because updateTag only affects requests that come from other users",
+          correct: false,
+        }
+      - {
+          text: "No, updateTag pushes the new cart to every open tab over a live connection",
+          correct: false,
+        }
   - type: single
     prompt: "A login Server Action receives an invalid email. How should it report the error?"
     explanation: "Expected errors such as validation failures should be modelled as return values and displayed with `useActionState`, rather than thrown. Throwing is for unexpected exceptions that error boundaries should catch. Returning a typed state keeps the form on screen with the user's input."
