@@ -64,6 +64,13 @@
       "when": 1794393262692,
       "tag": "0008_retire-architect-r1",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1794478069006,
+      "tag": "0009_retire-architect-r2",
+      "breakpoints": true
     }
   ]
 }
