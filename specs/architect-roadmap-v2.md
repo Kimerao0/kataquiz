@@ -103,11 +103,11 @@ Follow-up: Kill the old path, and the old quiz, i want a new quiz and new path. 
 
 1. [built] Running `check.mts` on `seeds/architect-1[6-9]-*.yaml seeds/architect-2[0-3]-*.yaml` prints ok for all eight files, each with at most 5 code questions, and none of them carries an `advanced` tag.
 2. [built] The title list in the R3 migration equals the set of quiz files changed in R3, as listed by `git diff --name-only` on `seeds/`.
-3. [built] On a database holding the R2 content, a quiz from 16–23 that R3 left unchanged keeps its attempts after `pnpm release`.
-4. [built] On a database holding the R2 content, `pnpm release` leaves exactly one seed quiz per title for 16–23.
+3. [built] On a database holding the R2 content, quiz 24, which R3 left unchanged, keeps its attempts after `pnpm release`.
+4. [built] On a database holding the R2 content, `pnpm release` leaves exactly one seed quiz per title for 16–23, each with the R3 question set.
 5. [built] On a fresh database, `pnpm release` runs the R1–R3 migrations without error and imports every seed, the path included.
-6. [built] After `pnpm release` on a database holding the R2 content, the "Road to Software Architect" page lists 41 steps.
-7. [built] Reading quizzes 16–20, 22 and 23, no question turns on an edge case or a trick output; quiz 21 may.
+6. [built] After `pnpm release` on a database holding the R2 content, the "Road to Software Architect" page lists 41 steps and step 16 opens the R3 version of quiz 16.
+7. [open] Reading quizzes 16–20, 22 and 23, no question turns on an edge case or a trick output; quiz 21 may.
 
 ### R4 — Architecture 24–41
 
@@ -157,3 +157,5 @@ Follow-up: Kill the old path, and the old quiz, i want a new quiz and new path. 
 - 2026-11-12 — R2.4 and R2.6 reworded (new content, not just one row per title), decision 13 added (feature-check R2 triage)
 - 2026-11-12 — R2.7 reopened: edge-case questions left in 07, 09, 11, 13, 15 (feature-check R2)
 - 2026-11-12 — R2 merged ef0746d
+- 2026-11-12 — R3.3 reworded (every quiz 16–23 changed, so the unchanged neighbour is 24), R3.4 and R3.6 tightened like R2 (feature-check R3 triage)
+- 2026-11-12 — R3.7 reopened: trivia questions left in 16, 17, 19, 22, 23 (feature-check R3)
