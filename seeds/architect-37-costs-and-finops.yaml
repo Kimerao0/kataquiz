@@ -197,10 +197,7 @@ questions:
           correct: false,
         }
       - { text: "Ignore it, since log ingestion is never a meaningful cost", correct: false }
-      - {
-          text: "Lower the log level, sample verbose logs and shorten retention",
-          correct: true,
-        }
+      - { text: "Lower the log level, sample verbose logs and shorten retention", correct: true }
       - { text: "Double the retention so logs are safe, since storage is cheap", correct: false }
   - type: single
     prompt: "A team runs an API on Lambda. Traffic used to be spiky, but it is now high and steady around the clock. A cost review suggests moving it to a few always-on containers. What is the reasoning behind that suggestion?"
@@ -294,7 +291,10 @@ questions:
     explanation: "Serving cacheable responses from a CDN or cache means most requests never reach the origin, and removing N+1 queries cuts database work per request. Synchronous fan-out with retries multiplies the work behind each request, and DEBUG logging on every request adds ingestion cost to each one."
     theoryUrl: https://docs.aws.amazon.com/wellarchitected/latest/cost-optimization-pillar/welcome.html
     options:
-      - { text: "Serve cacheable responses from a CDN or cache in front of the origin", correct: true }
+      - {
+          text: "Serve cacheable responses from a CDN or cache in front of the origin",
+          correct: true,
+        }
       - { text: "Replace N+1 database queries with batched queries", correct: true }
       - {
           text: "Fan out each request synchronously to more services, with retries on every call",

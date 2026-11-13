@@ -254,8 +254,14 @@ questions:
           text: "Changing the table's partition key in place, after which every old query keeps working as before",
           correct: false,
         }
-      - { text: "Adding an index for the pattern and backfilling its keys on old items", correct: true }
-      - { text: "Migrating to another database, since a design cannot gain new patterns", correct: false }
+      - {
+          text: "Adding an index for the pattern and backfilling its keys on old items",
+          correct: true,
+        }
+      - {
+          text: "Migrating to another database, since a design cannot gain new patterns",
+          correct: false,
+        }
   - type: single
     prompt: "An ad-hoc analytics team wants flexible queries (group by arbitrary dimensions) over the same orders data stored in DynamoDB. What is the recommended architecture?"
     explanation: "Operational NoSQL stores are optimised for known access patterns. For flexible analytics, stream or export the data to an analytical store (S3 plus Athena, Redshift or similar) instead of adding ever more indexes. Scans on the production table compete with live traffic."

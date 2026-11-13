@@ -121,7 +121,10 @@ questions:
           text: "RS256 tokens are readable by anyone, but HS256 tokens would keep the claims confidential",
           correct: false,
         }
-      - { text: "Large claims make the signature invalid once the token exceeds 4 KB", correct: false }
+      - {
+          text: "Large claims make the signature invalid once the token exceeds 4 KB",
+          correct: false,
+        }
   - type: single
     prompt: 'A user clicks "log out everywhere" after their laptop is stolen, but the stolen access JWT (1 hour lifetime, stateless validation) still works for 40 more minutes. What is the underlying limit, and the usual mitigation?'
     explanation: "Self-contained JWTs are valid until `exp` and the API does not consult any state, so they cannot be revoked immediately. Mitigate with short access-token lifetimes plus rotating refresh tokens that the server can revoke, or accept a small denylist or introspection check for high-risk APIs. Encrypting the JWT or rotating the key for everyone is a blunt tool."

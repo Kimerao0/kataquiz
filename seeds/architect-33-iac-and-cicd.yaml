@@ -297,7 +297,10 @@ questions:
           text: "Roll back once more to the version before the previous one, to be sure the effects are undone",
           correct: false,
         }
-      - { text: "Replay the affected orders through the old version to overwrite them", correct: false }
+      - {
+          text: "Replay the affected orders through the old version to overwrite them",
+          correct: false,
+        }
   - type: single
     prompt: "A bad change is in production and the fix is a one-line revert, but the full pipeline takes 40 minutes. The previous artifact is available. What is the usual first move?"
     explanation: "Restore service first: redeploy or re-point to the last known-good artifact (or flip a flag), then fix forward with calm. Waiting 40 minutes for the revert pipeline extends the outage. Rolling forward is right only when the fix is fast and safe, and skipping tests in the pipeline is the riskier habit."
@@ -326,7 +329,7 @@ questions:
         }
       - { text: "Apply with auto-approve so problems surface sooner", correct: false }
   - type: boolean
-    prompt: "Building staging and production from the same IaC modules, with only variables such as size and count differing, reduces the \"worked in staging, broke in production\" surprises."
+    prompt: 'Building staging and production from the same IaC modules, with only variables such as size and count differing, reduces the "worked in staging, broke in production" surprises.'
     answer: true
     explanation: "When both environments come from the same code, the only differences are the ones you declared on purpose, so staging tests the real topology. Hand-built or separately maintained environments drift apart in ways nobody notices until a release breaks. Sizes can still differ; the shape should not."
     theoryUrl: https://12factor.net/dev-prod-parity

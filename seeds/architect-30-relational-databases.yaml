@@ -34,7 +34,10 @@ questions:
           text: "Indexes only cost reads, so the slowdown must come from the network and the indexes can stay",
           correct: false,
         }
-      - { text: "Rebuild every index nightly so that inserts skip index maintenance", correct: false }
+      - {
+          text: "Rebuild every index nightly so that inserts skip index maintenance",
+          correct: false,
+        }
   - type: single
     prompt: "A query is slow. In PostgreSQL you run `EXPLAIN (ANALYZE, BUFFERS)` and see a `Seq Scan` over 5 million rows that returns 12 rows, with `Rows Removed by Filter: 4999988`. What is the most likely fix?"
     explanation: "Filtering out almost every row after scanning the entire table signals a missing, or unusable, index on the filter column. Adding a suitable index lets the planner use an index scan. More work_mem helps sorts and hashes, not filtering, and VACUUM FULL does not change the access path."
@@ -208,7 +211,10 @@ questions:
           text: "Run the single UPDATE, since PostgreSQL locks only the rows it changes and MVCC makes the size irrelevant",
           correct: false,
         }
-      - { text: "Drop the table's indexes first and run the single UPDATE afterwards", correct: false }
+      - {
+          text: "Drop the table's indexes first and run the single UPDATE afterwards",
+          correct: false,
+        }
   - type: single
     prompt: "An app runs its pending schema migrations automatically at startup. During a deploy, 20 pods start at the same time against the same database. What is the main risk, and the usual fix?"
     explanation: "Every pod tries to apply the same migrations concurrently, which can fail, deadlock or apply a step twice, and a slow migration also delays every pod's startup. Run migrations once as a separate deploy step (a pipeline job or a one-off task), or at least guard them with a single migration lock. Startup order across pods is not guaranteed, so relying on it does not help."
@@ -304,10 +310,7 @@ questions:
           text: "MVCC is switched off for the table while any schema change is pending on it",
           correct: false,
         }
-      - {
-          text: "New queries wait behind the queued exclusive lock request",
-          correct: true,
-        }
+      - { text: "New queries wait behind the queued exclusive lock request", correct: true }
       - {
           text: "The ALTER already rewrote half of the table and is holding every row lock while it finishes the rest",
           correct: false,

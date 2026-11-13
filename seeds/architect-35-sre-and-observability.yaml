@@ -96,10 +96,7 @@ questions:
           text: "No request ever slower than 1 second, measured as the maximum observed latency",
           correct: false,
         }
-      - {
-          text: "99% of valid requests complete in under 300 ms, over 30 days",
-          correct: true,
-        }
+      - { text: "99% of valid requests complete in under 300 ms, over 30 days", correct: true }
       - { text: "Server CPU below 70%, so requests are never queued", correct: false }
   - type: single
     prompt: 'A stakeholder asks for a 100% availability SLO "because users hate downtime". What is the best response?'

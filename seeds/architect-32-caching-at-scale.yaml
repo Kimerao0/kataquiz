@@ -140,7 +140,10 @@ questions:
           text: "It coalesces concurrent loads of a key across all 40 instances, since they share the same code",
           correct: false,
         }
-      - { text: "It rate-limits callers so the database never sees more than one query", correct: false }
+      - {
+          text: "It rate-limits callers so the database never sees more than one query",
+          correct: false,
+        }
   - type: single
     prompt: "A hot dashboard key takes 8 seconds to recompute. A lock lets one request rebuild it on expiry while the others wait, so the database is safe, but users see 8-second stalls at every expiry. What is the better design?"
     explanation: "Keep serving the old value while one request (or a background job) rebuilds it, so expiry no longer blocks anyone and the database still sees a single recomputation. Dropping the lock brings the stampede back, and a longer TTL only makes the stalls rarer. A short wait timeout followed by a direct database query turns a slow rebuild into many."
@@ -212,7 +215,10 @@ questions:
           text: "More edge locations, so each one serves fewer users and sends fewer requests to the origin",
           correct: false,
         }
-      - { text: "Disabling caching for popular pages so they never expire together", correct: false }
+      - {
+          text: "Disabling caching for popular pages so they never expire together",
+          correct: false,
+        }
   - type: single
     prompt: "A CDN is caching your HTML pages and a user's personalised greeting appears for other users. Which is the most likely cause?"
     explanation: "A personalised response was cached as if it were public, either because `Cache-Control` allowed shared caching or because the cache key ignores the cookie or header that varies the response. Use `private` or `no-store` for personalised responses, or include the varying input in the cache key (`Vary`)."
@@ -347,10 +353,7 @@ questions:
     theoryUrl: https://aws.amazon.com/caching/best-practices/
     options:
       - { text: "Recording payments that must never be lost once confirmed", correct: false }
-      - {
-          text: "Page view counters updated thousands of times per second",
-          correct: true,
-        }
+      - { text: "Page view counters updated thousands of times per second", correct: true }
       - {
           text: "Stock reservations that must be durable before the customer sees an order confirmation",
           correct: false,
