@@ -40,6 +40,26 @@ const R3_RETIRED_TITLES = [
   'Architect Roadmap 23: Reliability and security in Node.js',
 ]
 const R3_KEPT_TITLE = 'Architect Roadmap 24: Event-driven architecture fundamentals'
+const R4_MIGRATION = 'drizzle/0011_retire-architect-r4.sql'
+const R4_RETIRED_TITLES = [
+  'Architect Roadmap 24: Event-driven architecture fundamentals',
+  'Architect Roadmap 25: Event sourcing and CQRS',
+  'Architect Roadmap 27: Messaging platforms',
+  'Architect Roadmap 28: Architectural styles and DDD',
+  'Architect Roadmap 29: Distributed systems fundamentals',
+  'Architect Roadmap 30: Relational databases in depth',
+  'Architect Roadmap 31: NoSQL and data modeling',
+  'Architect Roadmap 32: Caching at scale',
+  'Architect Roadmap 33: Infrastructure as Code and CI/CD',
+  'Architect Roadmap 34: Containers and Kubernetes',
+  'Architect Roadmap 35: SRE and observability',
+  'Architect Roadmap 36: Security architecture',
+  'Architect Roadmap 37: Costs and FinOps',
+  'Architect Roadmap 38: Quality attributes',
+  'Architect Roadmap 39: Documenting the architecture',
+  'Architect Roadmap 41: System design case studies',
+]
+const R4_KEPT_TITLE = 'Architect Roadmap 40: Organization and teams'
 
 async function runMigration(tx: TestTx, file: string) {
   const text = readFileSync(join(process.cwd(), file), 'utf8')
@@ -323,6 +343,71 @@ describe('0010 retire architect R3', () => {
   it('runs cleanly when there is nothing to retire', async () => {
     await withTestDb(async (tx) => {
       await expect(runMigration(tx, R3_MIGRATION)).resolves.toBeUndefined()
+    })
+  })
+})
+
+describe('0011 retire architect R4', () => {
+  it('deletes the seed quizzes 24-39 and 41 (all but 26 and 40) with their questions and attempts, and the seed path with its steps', async () => {
+    await withTestDb(async (tx) => {
+      const { retired, pathId } = await arrange(tx, R4_RETIRED_TITLES, R4_KEPT_TITLE)
+      await runMigration(tx, R4_MIGRATION)
+
+      const quizIds = retired.map((quiz) => quiz.quizId)
+      const remaining = await tx
+        .select({ id: quizzes.id })
+        .from(quizzes)
+        .where(and(eq(quizzes.authorId, SEED_AUTHOR_ID), inArray(quizzes.title, R4_RETIRED_TITLES)))
+      expect(remaining).toEqual([])
+      expect(await tx.select().from(questions).where(inArray(questions.quizId, quizIds))).toEqual(
+        [],
+      )
+      expect(await tx.select().from(attempts).where(inArray(attempts.quizId, quizIds))).toEqual([])
+      const remainingPaths = await tx
+        .select({ id: paths.id })
+        .from(paths)
+        .where(and(eq(paths.authorId, SEED_AUTHOR_ID), eq(paths.title, PATH_TITLE)))
+      expect(remainingPaths).toEqual([])
+      expect(await tx.select().from(pathSteps).where(eq(pathSteps.pathId, pathId))).toEqual([])
+    })
+  })
+
+  it('keeps seed quiz 40 and its attempt', async () => {
+    await withTestDb(async (tx) => {
+      const { kept, keptAttemptId } = await arrange(tx, R4_RETIRED_TITLES, R4_KEPT_TITLE)
+      await runMigration(tx, R4_MIGRATION)
+
+      const [quiz] = await tx.select().from(quizzes).where(eq(quizzes.id, kept.quizId))
+      expect(quiz?.title).toBe(R4_KEPT_TITLE)
+      const [attempt] = await tx.select().from(attempts).where(eq(attempts.id, keptAttemptId))
+      expect(attempt?.quizId).toBe(kept.quizId)
+    })
+  })
+
+  it("keeps another user's quiz with a retired title", async () => {
+    await withTestDb(async (tx) => {
+      const { foreign } = await arrange(tx, R4_RETIRED_TITLES, R4_KEPT_TITLE)
+      await runMigration(tx, R4_MIGRATION)
+
+      const [quiz] = await tx.select().from(quizzes).where(eq(quizzes.id, foreign.quizId))
+      expect(quiz?.title).toBe(R4_RETIRED_TITLES[0])
+    })
+  })
+
+  it("keeps another user's path with the retired title", async () => {
+    await withTestDb(async (tx) => {
+      const { kept, otherUser } = await arrange(tx, R4_RETIRED_TITLES, R4_KEPT_TITLE)
+      const foreignPathId = await insertPath(tx, [kept.quizId], otherUser)
+      await runMigration(tx, R4_MIGRATION)
+
+      const [path] = await tx.select().from(paths).where(eq(paths.id, foreignPathId))
+      expect(path?.title).toBe(PATH_TITLE)
+    })
+  })
+
+  it('runs cleanly when there is nothing to retire', async () => {
+    await withTestDb(async (tx) => {
+      await expect(runMigration(tx, R4_MIGRATION)).resolves.toBeUndefined()
     })
   })
 })
