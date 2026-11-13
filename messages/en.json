@@ -12,7 +12,8 @@
     "signIn": "Sign in",
     "signOut": "Sign out",
     "signingOut": "Signing out…",
-    "signedInAs": "Signed in as {name}",
+    "signOutFailed": "Couldn't sign out. Try again.",
+    "account": "Account: {name}",
     "darkMode": "Dark mode"
   },
   "common": {

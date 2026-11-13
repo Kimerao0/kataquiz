@@ -1,10 +1,10 @@
-import { BookX, Compass, LogIn, Route, Upload } from 'lucide-react'
+import { Compass, LogIn, Route, Upload } from 'lucide-react'
 import Link from 'next/link'
 import { useTranslations } from 'next-intl'
 import type { ReactNode } from 'react'
 import { Suspense } from 'react'
+import { AccountMenu } from '@/components/account-menu'
 import { Seal } from '@/components/seal'
-import { SignOutButton } from '@/components/sign-out-button'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { getCurrentUser, type SessionUser } from '@/lib/session'
 
@@ -13,12 +13,13 @@ const navLink =
   'inline-flex size-10 whitespace-nowrap items-center justify-center gap-2 text-ink-quiet hover:text-ink sm:size-auto sm:py-1'
 
 // Below sm a nav entry is an icon; the label stays in the DOM as its
-// accessible name and returns as visible text from sm up.
+// accessible name and returns as visible text from sm up. not-sr-only resets
+// white-space to normal, so the label has to ask for nowrap again.
 function NavLabel({ icon, children }: { icon: ReactNode; children: ReactNode }) {
   return (
     <>
       {icon}
-      <span className="sr-only sm:not-sr-only">{children}</span>
+      <span className="sr-only whitespace-nowrap sm:not-sr-only">{children}</span>
     </>
   )
 }
@@ -58,7 +59,10 @@ export function HeaderShell({ children }: { children: ReactNode }) {
           <Seal glyph={name.charAt(0)} size="1.75rem" />
           <span className="font-reading font-extrabold text-lg tracking-tight">{name}</span>
         </Link>
-        <div className="flex min-w-0 items-center gap-x-1 sm:gap-x-6 lg:ps-[calc(3rem+var(--spine))]">
+        {/* One gap between every entry, the account trigger and the theme toggle
+            included; the session entry's ms-auto only matters from lg, where
+            this cluster fills its column and the account side moves right. */}
+        <div className="flex min-w-0 items-center gap-x-1 sm:gap-x-4 lg:ps-[calc(3rem+var(--spine))] xl:gap-x-6">
           <Link href="/" className={navLink}>
             <NavLabel icon={<Compass aria-hidden className="size-5 sm:hidden" />}>
               {t('browse')}
@@ -100,22 +104,5 @@ export function SessionNav({ user }: { user: SessionUser | null }) {
     )
   }
 
-  return (
-    <span className="ms-auto flex min-w-0 items-center gap-1 sm:gap-3">
-      {/* Always in the DOM so a screen reader gets the full name; sighted
-          users get it truncated from sm up, and not at all on a phone. */}
-      <span
-        title={user.name}
-        className="sr-only text-ink-quiet lg:not-sr-only lg:max-w-48 lg:truncate"
-      >
-        {t('signedInAs', { name: user.name })}
-      </span>
-      <Link href="/mistakes" className={navLink}>
-        <NavLabel icon={<BookX aria-hidden className="size-5 sm:hidden" />}>
-          {t('mistakes')}
-        </NavLabel>
-      </Link>
-      <SignOutButton />
-    </span>
-  )
+  return <AccountMenu name={user.name} image={user.image} />
 }
