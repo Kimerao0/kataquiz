@@ -280,7 +280,7 @@ questions:
       - { text: "Double the consumers of the single queue", correct: false }
   - type: single
     prompt: "A photo app sends a push for every like. A popular post collects 40 likes in an hour, and its author turns off notifications for the app altogether. What is the best design change?"
-    explanation: "Each like is a valid event, but a push per event turns into noise and costs you the channel. Buffering events per recipient and collapsing them into one notification per time window (\"Ana and 39 others liked your photo\") keeps the information and the user's attention. Restricting hours or moving to SMS keeps the volume, and dropping the excess loses information arbitrarily."
+    explanation: 'Each like is a valid event, but a push per event turns into noise and costs you the channel. Buffering events per recipient and collapsing them into one notification per time window ("Ana and 39 others liked your photo") keeps the information and the user''s attention. Restricting hours or moving to SMS keeps the volume, and dropping the excess loses information arbitrarily.'
     theoryUrl: https://developer.apple.com/design/human-interface-guidelines/managing-notifications
     options:
       - {
@@ -295,7 +295,10 @@ questions:
           text: "Rate-limit pushes per user and drop the likes that go over the limit",
           correct: false,
         }
-      - { text: "Move like notifications from push to SMS, which users read more carefully", correct: false }
+      - {
+          text: "Move like notifications from push to SMS, which users read more carefully",
+          correct: false,
+        }
   - type: single
     prompt: "Support cannot answer 'did this customer receive the SMS?' The notification service only logs that the provider accepted each request. What should the design add?"
     explanation: "Acceptance only means the provider queued the message; whether it reached the handset is reported later, through delivery callbacks keyed by the provider's message id. Storing a status per notification (queued, sent, delivered, failed) and updating it from those callbacks answers support and lets you alert or fall back on failures. Sending twice creates duplicates, and logging bodies with phone numbers adds a privacy risk without saying anything about delivery."

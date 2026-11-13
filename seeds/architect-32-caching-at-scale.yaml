@@ -173,10 +173,7 @@ questions:
     theoryUrl: https://redis.io/docs/latest/develop/reference/eviction/
     options:
       - { text: "Under memory pressure, eviction can silently delete active carts", correct: true }
-      - {
-          text: "A node restart or failure loses carts that exist nowhere else",
-          correct: true,
-        }
+      - { text: "A node restart or failure loses carts that exist nowhere else", correct: true }
       - {
           text: "Reading a cart becomes slower than reading it from the relational database would be",
           correct: false,
