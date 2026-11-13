@@ -228,20 +228,26 @@ questions:
           correct: false,
         }
   - type: single
-    prompt: "A CDN is caching your HTML pages and a user's personalised greeting appears for other users. Which is the most likely cause?"
-    explanation: "A personalised response was cached as if it were public, either because `Cache-Control` allowed shared caching or because the cache key ignores the cookie or header that varies the response. Use `private` or `no-store` for personalised responses, or include the varying input in the cache key (`Vary`)."
-    theoryUrl: https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Cache-Control
+    prompt: "A mobile app downloads a 2 MB product catalogue on every launch. The catalogue changes a few times a week, but the app must show a change within a few minutes. Which approach cuts most of the data the app downloads without serving stale data for long?"
+    explanation: "With a short freshness lifetime plus a validator such as a version tag, an expired copy is checked with a conditional request, and when nothing changed the server answers with a tiny not-modified response instead of the full body. Freshness stays within minutes while most launches transfer almost nothing. A CDN brings the 2 MB closer but still sends all of it, splitting into pages moves the same bytes, and a week-long device cache breaks the freshness requirement."
+    theoryUrl: https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Caching
     options:
       - {
-          text: "The CDN is too far from the origin, so it replays a cached response from another region",
+          text: "Keep a short freshness lifetime and revalidate with a version validator, getting a tiny reply when unchanged",
+          correct: true,
+        }
+      - {
+          text: "Put the catalogue behind a CDN, so each launch downloads it from a nearby edge instead of the origin",
           correct: false,
         }
       - {
-          text: "The response was cacheable by shared caches and the cache key ignored the user",
-          correct: true,
+          text: "Cache the catalogue on the device for a week, and let users pull to refresh when they expect a change",
+          correct: false,
         }
-      - { text: "HTTP/3 does not support cookies", correct: false }
-      - { text: "The origin returned a 304 response", correct: false }
+      - {
+          text: "Split the catalogue into pages and fetch them in parallel on launch, so the download finishes sooner",
+          correct: false,
+        }
   - type: single
     prompt: "You deploy a new version of `app.js` and users keep running the old file for hours because the CDN and browsers cached it. What is the standard long-term solution?"
     explanation: "Fingerprint static assets (a content hash in the filename such as `app.3f9a2c.js`) and serve them with long-lived immutable caching, while HTML references the new name. Purging the CDN on every deploy is slower and does not clear browser caches."

@@ -100,21 +100,24 @@ questions:
         }
       - { text: "The data can no longer be queried from the owning service at all", correct: false }
   - type: single
-    prompt: "A consumer maintains a local copy of customer data from `CustomerUpdated` events that carry the full state. Because of retries, an old event (version 4) sometimes arrives after a newer one (version 5) and overwrites the fresh data. What is the right defence?"
-    explanation: "Put a version or sequence number in each event and apply an update only if it is newer than what is stored, so late or duplicate events are ignored. Sorting by arrival time uses the wrong clock, and just disabling retries trades inconsistency for lost events."
-    theoryUrl: https://martinfowler.com/articles/201701-event-driven.html
+    prompt: "The Customer service publishes one generic `CustomerUpdated` event, carrying the full record, whenever any field changes. Shipping only cares about relocations and Marketing only about consent withdrawals, so each keeps the previous record and diffs it to guess what happened. What is the better event design?"
+    explanation: "Generic CRUD-style events expose the data model and force every consumer to reverse-engineer intent, for example a typo fix versus a real move. Events named after business facts carry that meaning and let each consumer subscribe only to what it cares about. Thin events that make consumers call back reintroduce runtime coupling, a shared database couples everyone to one schema, and direct calls make the publisher know its consumers."
+    theoryUrl: https://martinfowler.com/eaaDev/DomainEvent.html
     options:
       - {
-          text: "Always apply the most recently received event, since it was sent last",
-          correct: false,
-        }
-      - { text: "Apply an event only if its version is newer than the stored one", correct: true }
-      - {
-          text: "Disable retries on the broker, so that no event can be delivered twice",
-          correct: false,
+          text: "Publish events named after business changes, such as `CustomerRelocated` and `MarketingConsentWithdrawn`",
+          correct: true,
         }
       - {
-          text: "Delay processing of every event by 5 seconds so that they can be sorted",
+          text: "Keep `CustomerUpdated` but send only the customer id, so each consumer fetches what changed from the Customer API",
+          correct: false,
+        }
+      - {
+          text: "Give each consumer read access to the Customer database, so it can query the change history directly",
+          correct: false,
+        }
+      - {
+          text: "Have the Customer service call Shipping and Marketing directly when the fields they care about change",
           correct: false,
         }
   - type: single
@@ -217,24 +220,24 @@ questions:
           correct: false,
         }
   - type: single
-    prompt: "Service A calls service B over HTTP to record an audit entry before answering the user. B has a 30 minute outage, and A's endpoint fails for the whole period, although the audit entry could have been written later. What is the problem called, and how do you remove it?"
-    explanation: "This is temporal coupling: A can only succeed while B is up at the same moment. Publishing an `AuditEntryRecorded` or `OrderPlaced` event to a durable broker lets A finish now and B catch up when it returns. Longer timeouts keep the coupling, and a cache does not help a write path."
-    theoryUrl: https://martinfowler.com/articles/microservices.html
+    prompt: "Shipping keeps a local copy of customer addresses, built from Customer events that carry the full address. To save a round trip, Shipping's UI lets agents fix typos by editing that local copy directly. Some corrected addresses later revert to the old typo. Why, and what is the fix?"
+    explanation: "The Customer service owns the address, and the next event for that customer carries the address as Customer still has it, which overwrites the local edit. A replicated copy is read-only: changes go to the owner, for example as a command, and come back through its events. Rejecting the owner's later events makes the copies diverge for good, and publishing the owner's events from Shipping creates two writers for one fact."
+    theoryUrl: https://martinfowler.com/articles/201701-event-driven.html
     options:
       - {
-          text: "Temporal coupling, solved by publishing an event to a durable broker that B consumes later",
+          text: "Customer owns the address, so its next event overwrites the edit; send the change to Customer instead",
           correct: true,
         }
       - {
-          text: "Data coupling, solved by giving A and B a shared database for audit entries",
+          text: "The broker redelivered old events after a rebalance, so Shipping must deduplicate them by event id",
           correct: false,
         }
       - {
-          text: "Temporal coupling, solved by raising the HTTP timeout in A to longer than the 30 minute outage so A keeps waiting",
+          text: "Shipping should mark edited addresses and ignore later Customer events for them, so local fixes win",
           correct: false,
         }
       - {
-          text: "Semantic coupling, solved by renaming the audit endpoint in service B",
+          text: "Shipping should publish its edits as Customer events too, so that the Customer service picks them up",
           correct: false,
         }
   - type: single

@@ -18,19 +18,25 @@ questions:
       - { text: "Terraform, because HCL is more expressive than TypeScript", correct: false }
       - { text: "Shell scripts calling the AWS CLI", correct: false }
   - type: single
-    prompt: "What does `cdk deploy` actually hand to AWS?"
-    explanation: "CDK synthesizes your constructs into a CloudFormation template (plus assets) and CloudFormation performs the deployment, so CDK inherits CloudFormation's stack model, limits and rollback behaviour. CDK does not call each service API directly, and it has no state file of its own to manage."
-    theoryUrl: https://docs.aws.amazon.com/cdk/v2/guide/constructs.html
+    prompt: "Production was built by a shell script that runs cloud CLI create commands in order. Re-running it after a partial failure errors on resources that already exist, and nobody can tell how production now differs from the script. What does moving to a declarative IaC tool change?"
+    explanation: "A declarative tool takes the desired end state, compares it with what actually exists and applies only the difference, so re-running after a failure finishes the job and an unchanged configuration is a no-op. It does not replay a log of commands, and cloud APIs offer no transaction across resources, so a failed run can still leave partial changes; the next run converges them."
+    theoryUrl: https://developer.hashicorp.com/terraform/intro
     options:
-      - { text: "A sequence of direct service API calls issued by the CDK CLI", correct: false }
-      - { text: "A Terraform plan that is applied through a hidden backend", correct: false }
       - {
-          text: "A diff against a local state file kept in `cdk.out`, which the CLI then applies resource by resource",
+          text: "You describe the end state, and the tool compares it with what exists and applies only the difference",
+          correct: true,
+        }
+      - {
+          text: "The tool records every command it runs, so a failed run can be replayed from the step where it stopped",
           correct: false,
         }
       - {
-          text: "A synthesized CloudFormation template that CloudFormation then deploys",
-          correct: true,
+          text: "The tool wraps all creates in one transaction, so a partial failure rolls the environment back automatically",
+          correct: false,
+        }
+      - {
+          text: "The tool runs the same create commands as the script but in parallel, so a failure cannot leave production half-built",
+          correct: false,
         }
   - type: single
     prompt: "Your platform has to manage AWS accounts, Cloudflare DNS, Datadog monitors and a GitHub organisation from a single workflow. What is the strongest reason to choose Terraform here?"

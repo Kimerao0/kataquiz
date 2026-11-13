@@ -171,14 +171,26 @@ questions:
       - { text: "Unsigned tokens inside a private network", correct: false }
       - { text: "Each service signs its own tokens with a different HS256 secret", correct: false }
   - type: single
-    prompt: "An admin back-office needs instant session revocation when an employee leaves, plus the ability to see and kill active sessions. Which approach fits best?"
-    explanation: "Server-side sessions keep state the server controls, so deleting a session ends access immediately and active sessions can be listed. Pure stateless JWTs trade that control for scalability. For a small-audience, high-risk admin tool, the control is worth more than the stateless benefit."
-    theoryUrl: https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html
+    prompt: "All twelve services of a platform run under one shared cloud identity that may read and write every bucket, queue and database. An attacker exploits a bug in the low-value thumbnail service. Which change most directly limits what an attacker can reach after compromising any single service?"
+    explanation: "With one all-powerful identity, compromising any service means compromising everything; giving each service its own identity with only the permissions it needs shrinks the blast radius to that service's legitimate resources. Encryption at rest does not help, because the platform decrypts for any identity allowed to read. Rotating the shared credentials does not help either, since code running inside the service simply obtains each new credential."
+    theoryUrl: https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html
     options:
-      - { text: "Server-side sessions with an opaque identifier in a secure cookie", correct: true }
-      - { text: "Stateless JWTs with a 24-hour lifetime and no refresh", correct: false }
-      - { text: "Stateless JWTs signed with a long-lived key", correct: false }
-      - { text: "Basic authentication on every request", correct: false }
+      - {
+          text: "Give each service its own identity, allowed only the resources that service needs",
+          correct: true,
+        }
+      - {
+          text: "Encrypt every bucket and database at rest, so the stolen identity can read only ciphertext",
+          correct: false,
+        }
+      - {
+          text: "Rotate the shared identity's credentials every 24 hours, so stolen ones expire quickly",
+          correct: false,
+        }
+      - {
+          text: "Put the thumbnail service behind its own load balancer, so attackers cannot reach the others",
+          correct: false,
+        }
   - type: single
     prompt: "A reporting service, acting for logged-in users, fetches documents from a document store using its own service account, which may read every customer's documents. It forwards the requested document ID, and the store only checks that the caller is the reporting service. What is the architectural flaw?"
     explanation: "This is the confused deputy problem: a privileged intermediary uses its own broad authority on behalf of callers, so any user who can reach the reporting service can read any document. Carry the end user's identity downstream, for example by exchanging the user's token for a narrowly scoped one, and let the store authorize each read for that user. A stronger service secret, mutual TLS or unguessable IDs still identify only the service, not the user."

@@ -95,14 +95,26 @@ questions:
     theoryUrl: https://kafka.apache.org/documentation/#design_filesystem
     answer: false
   - type: single
-    prompt: "Which Kafka feature lets a topic keep only the latest value for each key, for example a changelog of current user profiles?"
-    explanation: "Log compaction retains at least the last record for each key and removes older ones (a null value acts as a tombstone). Time-based retention would drop even the latest value after the window, and replication factor is about durability."
-    theoryUrl: https://kafka.apache.org/documentation/#compaction
+    prompt: "To maximise throughput, a service publishes payment events to Kafka without waiting for any acknowledgement from the broker. After a broker node restarts, a few events are missing and the producer never logged an error. What is the accurate assessment?"
+    explanation: "A producer that does not wait for an acknowledgement has no signal that a write failed, so whatever was in flight when the node died is lost silently: at-most-once delivery. Waiting until the write is confirmed on the leader and its in-sync replicas, with retries, restores durability at the cost of latency. Retries need an acknowledgement to detect a failure, early offset commits lose messages on the consumer side rather than before they are stored, and compaction only removes older values of repeated keys."
+    theoryUrl: https://kafka.apache.org/documentation/#semantics
     options:
-      - { text: "Time-based retention with a very short window", correct: false }
-      - { text: "Increasing the replication factor", correct: false }
-      - { text: "Log compaction", correct: true }
-      - { text: "Consumer group rebalancing", correct: false }
+      - {
+          text: "Unacknowledged sends give at-most-once delivery: the producer cannot detect a lost write",
+          correct: true,
+        }
+      - {
+          text: "Producer retries alone would have recovered the events, even without waiting for any acknowledgement",
+          correct: false,
+        }
+      - {
+          text: "The consumers committed their offsets too early, since an event that left the producer is always stored",
+          correct: false,
+        }
+      - {
+          text: "Compaction removed the events during the restart, because the broker drops records whose key repeats",
+          correct: false,
+        }
   - type: single
     prompt: "A team wants a compacted topic keyed by product id to be the only record of every price change, because finance must later show what each price was on any past date. What is the problem with this design?"
     explanation: "Compaction only guarantees that the latest record for each key survives; older values are removed in the background, so a compacted topic holds current state, not history. A full history needs a topic with time-based or unlimited retention, or a separate store, possibly next to a compacted topic for current prices. Compaction keeps the order and offsets of the records it retains, and any number of groups can read it."
@@ -278,14 +290,26 @@ questions:
           correct: false,
         }
   - type: single
-    prompt: "Which design is most appropriate for a task queue where 20 workers should pick up jobs with at most one worker per job, and slow jobs must not block faster ones?"
-    explanation: "A competing-consumers queue (SQS, RabbitMQ) lets any free worker take the next job, so slow jobs don't hold up others. In Kafka, a slow message blocks the rest of its partition because consumption is sequential per partition, and a topic limited to few partitions caps the worker count."
-    theoryUrl: https://www.enterpriseintegrationpatterns.com/patterns/messaging/CompetingConsumers.html
+    prompt: "A ride-hailing app sends driver location updates through a queue to a matching service. After a two-hour consumer outage, the matching service spends half an hour working through stale positions before it sees current ones. What design fits this kind of message?"
+    explanation: "A location update is useful for seconds and is superseded by the next one, so processing an old backlog only delays current data. A short time-to-live lets the broker drop updates once they are useless. Longer retention makes the stale backlog bigger, a dead-letter queue handles messages that fail rather than messages that are old, and exactly-once processing says nothing about age."
+    theoryUrl: https://www.rabbitmq.com/docs/ttl
     options:
-      - { text: "A competing-consumers queue such as SQS or RabbitMQ", correct: true }
-      - { text: "A Kafka topic with 3 partitions and 20 consumers", correct: false }
-      - { text: "A Kafka topic with a single partition for strict ordering", correct: false }
-      - { text: "A compacted Kafka topic keyed by job id", correct: false }
+      - {
+          text: "Give the updates a short expiry so the broker discards them once they are too old to matter",
+          correct: true,
+        }
+      - {
+          text: "Raise the queue's retention so that no location update can be lost during a consumer outage",
+          correct: false,
+        }
+      - {
+          text: "Route updates that fail processing three times to a dead-letter queue to keep the backlog moving",
+          correct: false,
+        }
+      - {
+          text: "Switch to exactly-once processing, so each update is applied to the matching state a single time",
+          correct: false,
+        }
   - type: single
     prompt: "You increase a keyed Kafka topic from 6 to 12 partitions in production. What is a significant side effect for consumers relying on per-key order?"
     explanation: "The partition is computed from hash(key) mod partitionCount, so changing the count remaps keys to different partitions. New events for a key may go to another partition than its old events, breaking per-key ordering during the transition. Plan partition counts upfront or migrate to a new topic."

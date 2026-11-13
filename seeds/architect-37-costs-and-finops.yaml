@@ -122,20 +122,26 @@ questions:
     explanation: "A commitment is billed for every hour of the term whether or not you use it, while on-demand is billed only for hours used. It pays off only when the committed capacity is busy most of the time; for a workload that runs a few hours a day, on-demand or spot is cheaper despite the higher hourly price."
     theoryUrl: https://docs.aws.amazon.com/savingsplans/latest/userguide/what-is-savings-plans.html
   - type: single
-    prompt: "A data-processing job in a private subnet reads tens of terabytes per month from S3 in the same Region. The largest line on the network bill is NAT gateway data processing. What is the best fix?"
-    explanation: "The job's S3 traffic goes through the NAT gateway, which charges per GB processed. An S3 gateway VPC endpoint routes that traffic privately with no per-GB charge, so the cost disappears without changing the job. A second NAT gateway does not change per-GB pricing, and moving the job to a public subnet weakens security for no reason."
-    theoryUrl: https://docs.aws.amazon.com/vpc/latest/privatelink/vpce-gateway.html
+    prompt: "A nightly analytics job runs in a US Region and reads about 20 TB of raw events each night from object storage in a European Region, where the events are produced. It writes a few gigabytes of aggregates. Cross-Region data transfer is now the largest line on the bill. Which change addresses the cause?"
+    explanation: "Transfer is billed per GB that crosses the Region boundary, and here the bulky input crosses while the small output could cross instead. Running the job next to the data shrinks the transfer to the aggregates. Copying the raw data first moves the same bytes, a compute commitment discounts compute rather than transfer, and faster storage changes speed, not volume."
+    theoryUrl: https://aws.amazon.com/blogs/architecture/overview-of-data-transfer-costs-for-common-architectures/
     options:
       - {
-          text: "Add a second NAT gateway in another AZ so the processing charges are spread across two gateways",
+          text: "Run the job in the European Region and send only its aggregates to the US",
+          correct: true,
+        }
+      - {
+          text: "Copy the full raw dataset to the US Region each evening, so the job itself always reads locally",
           correct: false,
         }
       - {
-          text: "Move the job to a public subnet with a public IP so it reaches S3 without the NAT gateway",
+          text: "Buy a compute savings plan for the job, so the overall bill falls despite the transfer charges",
           correct: false,
         }
-      - { text: "Replace S3 with an on-premises file store", correct: false }
-      - { text: "Add an S3 gateway VPC endpoint for the subnet", correct: true }
+      - {
+          text: "Move the raw events to a higher-throughput storage class so the nightly reads finish sooner",
+          correct: false,
+        }
   - type: single
     prompt: "Your video platform serves tens of terabytes per month directly from EC2 instances to the public internet, and data transfer out is now a larger line than compute. A colleague proposes a CDN in front. What is the most accurate evaluation?"
     explanation: "A CDN caches popular content near viewers, so most bytes never leave the origin, and CDN transfer is usually cheaper per GB at volume, with better latency as a bonus. The real trade-off is CDN fees and cache-invalidation complexity, not that CDNs make egress free. Same-Region transfer rules do not apply to traffic leaving for the internet."

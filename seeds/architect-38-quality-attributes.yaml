@@ -377,14 +377,26 @@ questions:
           correct: false,
         }
   - type: single
-    prompt: "A background worker pool processes a queue that gets huge spikes at random times. Autoscaling on average CPU reacts too late and messages wait for minutes. Which scaling signal fits best?"
-    explanation: "For queue consumers, queue depth or the age of the oldest message (backlog per worker) leads the load, while CPU only rises after workers are already saturated. Memory and network metrics have the same lag problem."
-    theoryUrl: https://docs.aws.amazon.com/autoscaling/ec2/userguide/as-using-sqs-queue.html
+    prompt: "To minimise cost, a capacity plan sizes a service so that each instance runs at about 95% CPU at peak. In load tests, latency is fine at 70% utilisation, but near 95% the p99 explodes, although no single request needs more CPU time than before. What explains this?"
+    explanation: "Requests arrive in random bursts, so when an instance is almost always busy, new requests increasingly wait in a queue, and that waiting grows sharply, not linearly, as utilisation approaches 100%. That is why capacity plans keep headroom. CPU accounting does not become wrong at high load, and nothing makes garbage collection or latency scale in a straight line with utilisation."
+    theoryUrl: https://brooker.co.za/blog/2021/08/05/utilization.html
     options:
-      - { text: "Memory utilisation of the worker hosts", correct: false }
-      - { text: "Backlog per worker, from queue depth or oldest message age", correct: true }
-      - { text: "Network throughput of the load balancer", correct: false }
-      - { text: "A fixed schedule based on last month's busiest hour", correct: false }
+      - {
+          text: "Queueing delay grows sharply as utilisation nears 100%, so the instances need headroom",
+          correct: true,
+        }
+      - {
+          text: "CPU accounting is unreliable above about 80%, so the instances are really at 100% and dropping work",
+          correct: false,
+        }
+      - {
+          text: "Garbage collection runs whenever CPU passes 90%, pausing every in-flight request on the instance",
+          correct: false,
+        }
+      - {
+          text: "Latency grows linearly with load, so the jump points to a code regression that only shows at peak",
+          correct: false,
+        }
   - type: single
     prompt: "A team cannot prevent every failure but wants better availability. Availability is MTBF / (MTBF + MTTR). Which investment is typically the most effective?"
     explanation: "Reducing MTTR (fast detection, automated rollback, runbooks, tested failover) improves availability even when failures keep happening, and it is far cheaper than making failures rarer. Longer MTBF alone does not help once a failure occurs and takes hours to fix."
