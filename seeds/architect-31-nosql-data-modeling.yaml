@@ -105,14 +105,23 @@ questions:
         }
       - { text: "It is eventually consistent only", correct: false }
   - type: single
-    prompt: "A team needs transactions across two items in DynamoDB: debit one account item and credit another, atomically. What should they use?"
-    explanation: "`TransactWriteItems` provides all-or-nothing writes across multiple items (and tables) with ACID semantics, at roughly double the capacity cost. Two independent PutItem calls can fail halfway, and conditional writes alone protect a single item."
+    prompt: "A wallet app on DynamoDB debits one account item and credits another. Money must never be created or lost, even if the client crashes between the two writes. What do you rely on?"
+    explanation: "A multi-item transaction commits both writes or neither, and a condition check on the balance rejects an overdraft inside the same transaction. Two conditional updates are each atomic on their own item, but a crash between them leaves the transfer half done. Batching groups requests for efficiency without making them all-or-nothing."
     theoryUrl: https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/transactions.html
     options:
-      - { text: "Two sequential `UpdateItem` calls with retries", correct: false }
-      - { text: "`TransactWriteItems` with condition checks", correct: true }
-      - { text: "`BatchWriteItem`, which is atomic across items", correct: false }
-      - { text: "A Scan followed by a PutItem", correct: false }
+      - {
+          text: "Two sequential conditional updates, since each is atomic on its own item and so the pair is atomic as well",
+          correct: false,
+        }
+      - {
+          text: "A multi-item transaction with a condition check on the debited balance",
+          correct: true,
+        }
+      - {
+          text: "A batch write, which sends both writes in one request and therefore applies them all-or-nothing",
+          correct: false,
+        }
+      - { text: "Strongly consistent reads of both items before the two writes", correct: false }
   - type: single
     prompt: "Two clients read the same DynamoDB item (version 7), modify it and write it back. The second write overwrites the first's changes. What prevents this lost update?"
     explanation: "Optimistic locking with a conditional write: store a version attribute and write with `ConditionExpression: version = :expected`, so the stale writer fails and retries. Strongly consistent reads alone do not prevent the lost update."
@@ -210,34 +219,43 @@ questions:
         }
       - { text: "Duplicate the post in every comment document", correct: false }
   - type: single
-    prompt: "A DynamoDB table with on-demand capacity throttles intermittently, even though its overall traffic is far below the account limits. CloudWatch shows throttles concentrated on a single partition key value. What is the most likely cause?"
-    explanation: "Per-partition throughput limits (around 1,000 WCU / 3,000 RCU per partition key) apply regardless of the table's total capacity, so a hot key throttles. Fix the access pattern with write sharding, caching or a more uniform key design."
-    theoryUrl: https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/bp-partition-key-design.html
+    prompt: "During a flash sale, one product item in DynamoDB is read about 100,000 times per second and throttles, while writes to it are rare. What is the most fitting fix?"
+    explanation: "The bottleneck is reads on one key, and the data barely changes, so an in-memory cache in front of the table absorbs them. Strongly consistent reads cost twice the read capacity and do nothing to relieve a hot key. More table capacity does not lift the per-partition limit, and splitting attributes under the same partition key keeps the traffic on the same partition."
+    theoryUrl: https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/DAX.html
     options:
-      - { text: "The table has too many attributes per item", correct: false }
-      - { text: "On-demand tables cannot be used for more than ten partition keys", correct: false }
-      - { text: "A hot key exceeding per-partition throughput limits", correct: true }
-      - { text: "Strongly consistent reads are disabled", correct: false }
+      - {
+          text: "Switch to strongly consistent reads, which are served by every replica at once and so spread the load",
+          correct: false,
+        }
+      - { text: "Serve the hot item from an in-memory cache in front of the table", correct: true }
+      - {
+          text: "Raise the table's read capacity, since one item can use all of the capacity the table has",
+          correct: false,
+        }
+      - {
+          text: "Split the item's attributes into several items under the same partition key",
+          correct: false,
+        }
   - type: boolean
     prompt: "True or false: DynamoDB single-table design means you should never create a second table in the same application."
     explanation: "False. Single-table is a technique for co-locating items that are accessed together, not a rule. Separate tables are reasonable for unrelated domains, different lifecycles, or different capacity and backup needs. Misapplying it can make the design rigid and hard to evolve."
     theoryUrl: https://aws.amazon.com/blogs/database/single-table-vs-multi-table-design-in-amazon-dynamodb/
     answer: false
   - type: single
-    prompt: "A team ports a relational schema with 25 tables to DynamoDB with one table per entity and does joins in the application. Reads need 5 sequential GetItem calls per page. What does the single-table approach offer for this page?"
-    explanation: "By placing items needed together under one partition key, a single Query can fetch the customer, orders and items in one round trip, cutting latency and cost. The trade-off is that the key design must be planned around known access patterns."
-    theoryUrl: https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/data-modeling-foundations.html
+    prompt: "A year after launching a single-table DynamoDB design, product asks for 'all orders above 500 euros in a region, newest first'. No existing key or index serves it. What does supporting it typically involve?"
+    explanation: "Single-table designs are tuned to the access patterns known up front, so a new pattern usually means a new GSI (or an overloaded one) plus a backfill that writes the new key attributes onto existing items. That is the flexibility cost of the approach. DynamoDB has no in-place key change and no efficient query on non-key attributes, and the design does not forbid new patterns."
+    theoryUrl: https://aws.amazon.com/blogs/database/single-table-vs-multi-table-design-in-amazon-dynamodb/
     options:
       - {
-          text: "Fewer round trips, since co-located items are returned by one Query",
-          correct: true,
-        }
-      - {
-          text: "Joins executed by DynamoDB across tables to match relational semantics, with no extra reads",
+          text: "Nothing: DynamoDB queries any attribute as efficiently as the keys once the table is single-table",
           correct: false,
         }
-      - { text: "Automatic referential integrity between entities", correct: false }
-      - { text: "Unlimited item sizes for aggregated data", correct: false }
+      - {
+          text: "Changing the table's partition key in place, after which every old query keeps working as before",
+          correct: false,
+        }
+      - { text: "Adding an index for the pattern and backfilling its keys on old items", correct: true }
+      - { text: "Migrating to another database, since a design cannot gain new patterns", correct: false }
   - type: single
     prompt: "An ad-hoc analytics team wants flexible queries (group by arbitrary dimensions) over the same orders data stored in DynamoDB. What is the recommended architecture?"
     explanation: "Operational NoSQL stores are optimised for known access patterns. For flexible analytics, stream or export the data to an analytical store (S3 plus Athena, Redshift or similar) instead of adding ever more indexes. Scans on the production table compete with live traffic."
@@ -269,20 +287,26 @@ questions:
       - { text: "A Scan before every insert to check for duplicates", correct: false }
       - { text: "A Local Secondary Index on email", correct: false }
   - type: single
-    prompt: "The team stores each user's activity feed as items with PK = `USER#<id>` and SK = `ACTIVITY#<timestamp>`. A power user's partition grows to 50 GB. What do you want to verify first?"
-    explanation: "A table with an LSI limits an item collection to 10 GB per partition key. Without an LSI, collections can grow, though a single large partition key can still become a throughput bottleneck. Check for LSIs and the access distribution, and consider bucketing by time."
-    theoryUrl: https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/LSI.html#LSI.ItemCollections
+    prompt: "Activity feeds are stored with PK = `USER#<id>` and SK = `ACTIVITY#<timestamp>`. A few power users write constantly, their partitions grow without bound and throttle, and the app only shows recent activity. How do you reshape the key?"
+    explanation: "Adding a time bucket to the partition key (for example `USER#<id>#2025-03`) spreads one user's writes and data over many partitions, and the feed reads the newest bucket first, then older ones as needed. A random suffix also spreads writes but forces every feed read to query all shards and merge them. Capacity mode does not remove per-partition limits, and one growing list attribute runs into item size limits."
+    theoryUrl: https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/bp-time-series.html
     options:
       - {
-          text: "Whether the table has an LSI, which caps an item collection at 10 GB",
+          text: "Add a time bucket to the partition key and read the newest bucket first",
           correct: true,
         }
-      - { text: "Whether item names are shorter than 255 characters", correct: false }
       - {
-          text: "Whether the table uses on-demand capacity, which prevents partitions above 10 GB",
+          text: "Add a random suffix to the partition key and query every suffix, merging the results, on each feed read",
           correct: false,
         }
-      - { text: "Whether the table has a TTL attribute defined", correct: false }
+      - {
+          text: "Switch to on-demand capacity, which removes the throughput limits of a single partition",
+          correct: false,
+        }
+      - {
+          text: "Store all activity as one growing list attribute on the user item",
+          correct: false,
+        }
   - type: single
     prompt: "You must pick a database for a product with strict relational integrity, ad-hoc reporting joins and moderate scale (500 writes/sec). A teammate suggests DynamoDB 'because it scales'. What is the best advice?"
     explanation: "At moderate scale with relational integrity and ad-hoc joins, a relational database such as PostgreSQL is the better fit. DynamoDB's scalability is valuable when access patterns are known and scale demands it, but it makes flexible querying and integrity harder."
@@ -308,14 +332,23 @@ questions:
       - { text: "It is used in the most common queries so they target one key", correct: true }
       - { text: "It is the current date, so recent data is in one place", correct: false }
   - type: single
-    prompt: "A recommendation feature must answer 'friends of friends who like the same bands as me' for 20 million users with sub-100 ms latency. The team currently runs it as recursive SQL joins that take seconds. What is the best change?"
-    explanation: "This is a deep relationship traversal, which graph databases execute by following edges from the starting node without scanning join tables. Adding more indexes to the SQL joins helps only up to a point, and a key-value store or document store would need the application to perform the traversal."
-    theoryUrl: https://neo4j.com/docs/getting-started/get-started-with-neo4j/graph-database/
+    prompt: "On Cassandra, a store needs 'orders of a customer, newest first' and 'orders containing a given product'. A developer designs one normalised `orders` table partitioned by order id. What is the idiomatic model?"
+    explanation: "Wide-column stores are modelled query-first: one table per query, each partitioned by that query's lookup key and clustered by its sort order, with each order written to both tables. There are no joins, and filtering across all partitions turns every read into a cluster-wide scan. A single partition for everything creates one hot, unbounded partition."
+    theoryUrl: https://cassandra.apache.org/doc/latest/cassandra/developing/data-modeling/intro.html
     options:
-      - { text: "Move the relationship data to a graph database and traverse edges", correct: true }
       - {
-          text: "Move to a key-value store and fetch each friend list in a loop in the app",
+          text: "Keep the one table and filter by customer or product at query time across all partitions",
           correct: false,
         }
-      - { text: "Store each user's full network as one large document", correct: false }
-      - { text: "Increase the connection pool size of the SQL database", correct: false }
+      - {
+          text: "One table per query, each keyed by its lookup value, with every order written to both",
+          correct: true,
+        }
+      - {
+          text: "Join an orders table to customer and product tables at query time, as in a relational schema",
+          correct: false,
+        }
+      - {
+          text: "Store every order in a single partition so both queries are served by one node",
+          correct: false,
+        }

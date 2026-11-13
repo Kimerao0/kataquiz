@@ -160,34 +160,23 @@ questions:
         }
       - { text: "Images should be rebuilt per environment to bake in secrets", correct: false }
   - type: single
-    prompt: "This GitHub Actions job deploys to AWS without any stored access keys. What is the purpose of `id-token: write`?"
-    code: |
-      permissions:
-        id-token: write
-        contents: read
-      jobs:
-        deploy:
-          runs-on: ubuntu-latest
-          steps:
-            - uses: aws-actions/configure-aws-credentials@v4
-              with:
-                role-to-assume: arn:aws:iam::123456789012:role/deploy
-                aws-region: eu-west-1
-            - run: npx cdk deploy --require-approval never
-    codeLanguage: yaml
-    explanation: "It lets the job request a short-lived OIDC token from GitHub, which AWS exchanges for temporary credentials by trusting the identity provider on the role. That removes long-lived keys from repository secrets. It does not grant write access to the repo or to AWS by itself."
+    prompt: "A deploy pipeline authenticates to the cloud with a long-lived access key stored as a CI secret. Security asks you to switch to OIDC federation. What is the main gain?"
+    explanation: "With federation the CI provider issues a signed identity token per job, and the cloud exchanges it for short-lived credentials scoped to a role that trusts only that repository or branch. There is no standing key to leak, rotate or forget in a log. It does not remove the need for least-privilege roles, and it does not make the pipeline faster."
     theoryUrl: https://docs.github.com/en/actions/concepts/security/openid-connect
     options:
-      - { text: "It allows the job to push an image tag to the repository", correct: false }
       - {
-          text: "It lets the job request an OIDC token, exchanged for temporary AWS credentials",
+          text: "Each job gets short-lived credentials, so there is no standing key to leak",
           correct: true,
         }
       - {
-          text: "It stores the AWS access key in the runner's identity file so later steps can sign requests with it",
+          text: "The pipeline gets administrator rights automatically, so no role or permission set has to be maintained",
           correct: false,
         }
-      - { text: "It gives the job administrator rights in the AWS account", correct: false }
+      - {
+          text: "The access key is encrypted at rest in the CI secret store, which a plain secret is not",
+          correct: false,
+        }
+      - { text: "Deploys run faster because authentication is skipped", correct: false }
   - type: single
     prompt: "Your pipeline runs `terraform plan` on pull requests and `terraform apply` after merge. A reviewer approved a plan, but the apply after merge changed different resources. Which practice closes this gap?"
     explanation: "Save the reviewed plan with `-out` and apply exactly that file, or re-plan and require approval of the new diff before apply. Otherwise the world (or main) can change between review and apply. Running apply with `-auto-approve` makes the gap worse, and locking only prevents concurrent runs."
@@ -292,17 +281,23 @@ questions:
       - { text: "The legacy path must be deleted before the flag can work", correct: false }
       - { text: "Flag clients only work inside React components", correct: false }
   - type: single
-    prompt: "A release dropped a table column in a migration, then the app release was found faulty. The team redeploys the previous app version and it crashes. What does this show about rollback?"
-    explanation: "Rolling back code does not roll back data or schema: the old version expects the column that is gone. Safe rollback needs migrations that stay compatible with the previous version, which is why destructive changes are deferred. Artifacts being immutable does not help when the data changed."
-    theoryUrl: https://martinfowler.com/bliki/ParallelChange.html
+    prompt: "A faulty release ran for 20 minutes and sent duplicate invoice emails and double-charged some customers. The team rolled back to the previous version and new requests are fine. What is still left to do?"
+    explanation: "A rollback restores the code, not the effects the bad version already had on data and on external systems. The double charges need refunds or compensating actions, and customers who got wrong emails need a correction. Re-running the old version against those orders does not undo anything, and a second rollback has nothing left to revert."
+    theoryUrl: https://sre.google/workbook/postmortem-culture/
     options:
-      - { text: "The previous artifact was corrupted by the new deployment", correct: false }
       - {
-          text: "Application rollback is only possible with blue/green deployments",
+          text: "Nothing, since the rollback reverted every change the faulty version made to data and external systems",
           correct: false,
         }
-      - { text: "Code rollback is unsafe when the schema moved ahead incompatibly", correct: true }
-      - { text: "Container registries delete the previous tag after a deploy", correct: false }
+      - {
+          text: "Repair the side effects: refund the double charges and correct the affected customers",
+          correct: true,
+        }
+      - {
+          text: "Roll back once more to the version before the previous one, to be sure the effects are undone",
+          correct: false,
+        }
+      - { text: "Replay the affected orders through the old version to overwrite them", correct: false }
   - type: single
     prompt: "A bad change is in production and the fix is a one-line revert, but the full pipeline takes 40 minutes. The previous artifact is available. What is the usual first move?"
     explanation: "Restore service first: redeploy or re-point to the last known-good artifact (or flip a flag), then fix forward with calm. Waiting 40 minutes for the revert pipeline extends the outage. Rolling forward is right only when the fix is fast and safe, and skipping tests in the pipeline is the riskier habit."
@@ -313,33 +308,28 @@ questions:
       - { text: "Redeploy the last known-good artifact now, then fix forward", correct: true }
       - { text: "Keep the faulty version until the root cause is fully understood", correct: false }
   - type: single
-    prompt: "What does `create_before_destroy` change for this resource when a replacement is needed?"
-    code: |
-      resource "aws_launch_template" "web" {
-        name_prefix   = "web-"
-        image_id      = var.ami_id
-        instance_type = "t3.medium"
-
-        lifecycle {
-          create_before_destroy = true
-        }
-      }
-    codeLanguage: hcl
-    explanation: "By default Terraform destroys the old object and then creates the new one. With `create_before_destroy` it creates the replacement first and removes the old one afterwards, which avoids downtime when dependents need something to point to. It does not skip replacement and does not protect against destroy; that is `prevent_destroy`."
-    theoryUrl: https://developer.hashicorp.com/terraform/language/meta-arguments/lifecycle
+    prompt: "A pull request changes an attribute that forces Terraform to replace the production database. The plan said so, but the line was buried in a 300-line diff and the reviewer approved it. Which pipeline practice prevents a repeat?"
+    explanation: "An automated policy check on the plan can fail the pipeline, or demand an explicit extra approval, whenever a protected resource would be destroyed or replaced. That makes the dangerous change impossible to miss instead of relying on a human scanning the diff. State locking only serialises runs, and the state file holds metadata, not the database's data."
+    theoryUrl: https://developer.hashicorp.com/terraform/tutorials/policy/policy-quickstart
     options:
-      - { text: "It blocks any plan that would destroy the resource", correct: false }
       - {
-          text: "It creates the replacement first and destroys the old one afterwards",
+          text: "Rely on the state lock, which refuses any apply that would destroy a resource it is tracking",
+          correct: false,
+        }
+      - {
+          text: "A policy check that blocks plans destroying or replacing protected resources",
           correct: true,
         }
-      - { text: "It turns every replacement into an in-place update", correct: false }
-      - { text: "It snapshots the old resource before it is destroyed", correct: false }
+      - {
+          text: "Enable versioning on the state bucket, so the database's data can be restored from an older state",
+          correct: false,
+        }
+      - { text: "Apply with auto-approve so problems surface sooner", correct: false }
   - type: boolean
-    prompt: "If a CloudFormation stack update fails, CloudFormation by default rolls the stack back to its last known-good state."
+    prompt: "Building staging and production from the same IaC modules, with only variables such as size and count differing, reduces the \"worked in staging, broke in production\" surprises."
     answer: true
-    explanation: "On a failed update CloudFormation automatically reverts to the previous template and parameters, ending in UPDATE_ROLLBACK_COMPLETE, unless you disable rollback for debugging. This is a safety net for infrastructure, not for data changes your application made."
-    theoryUrl: https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/using-cfn-rollback-triggers.html
+    explanation: "When both environments come from the same code, the only differences are the ones you declared on purpose, so staging tests the real topology. Hand-built or separately maintained environments drift apart in ways nobody notices until a release breaks. Sizes can still differ; the shape should not."
+    theoryUrl: https://12factor.net/dev-prod-parity
   - type: single
     prompt: "You run `cdk diff` in the pipeline before deploy. What is its role?"
     explanation: "`cdk diff` compares the synthesized template with the deployed stack and shows what would change, including IAM and security-group changes, so a reviewer can catch destructive or risky changes before deployment. It deploys nothing and is not a drift detector for manual console edits."

@@ -18,22 +18,23 @@ questions:
       - { text: "WHERE customer_id = 42", correct: true }
       - { text: "WHERE status = 'paid' ORDER BY created_at", correct: false }
   - type: single
-    prompt: "What do these queries return on tables `a(id)` = {1,2,3} and `b(id)` = {1, NULL}?"
-    code: |
-      -- Q1
-      SELECT id FROM a WHERE id NOT IN (SELECT id FROM b);
-      -- Q2
-      SELECT id FROM a WHERE NOT EXISTS (
-        SELECT 1 FROM b WHERE b.id = a.id
-      );
-    codeLanguage: sql
-    explanation: "`NOT IN` against a set containing NULL yields UNKNOWN for every non-matching row, so Q1 returns no rows. `NOT EXISTS` compares row by row and ignores the NULL, so Q2 returns 2 and 3. Prefer `NOT EXISTS` for anti-joins."
-    theoryUrl: https://www.postgresql.org/docs/current/functions-subquery.html
+    prompt: "A write-heavy `events` table has 14 indexes, many added over the years 'just in case'. Inserts keep getting slower while reads are fine. What is the most likely cause and the first step?"
+    explanation: "Every index must be updated on each insert and on updates of its columns, so unused indexes cost write time, I/O and storage while giving nothing back. Check index usage statistics and drop the ones no query uses. Indexes do not slow writes only when the table is large, and more indexes never make inserts faster."
+    theoryUrl: https://www.postgresql.org/docs/current/indexes-intro.html
     options:
-      - { text: "Q1 returns 2 and 3, Q2 returns 2 and 3", correct: false }
-      - { text: "Q1 returns 2 and 3, Q2 returns nothing", correct: false }
-      - { text: "Q1 returns nothing, Q2 returns 2 and 3", correct: true }
-      - { text: "Both return nothing", correct: false }
+      - {
+          text: "Each index is maintained on every write, so find and drop the unused ones",
+          correct: true,
+        }
+      - {
+          text: "Too few indexes: add one on every remaining column so each insert can locate its page faster",
+          correct: false,
+        }
+      - {
+          text: "Indexes only cost reads, so the slowdown must come from the network and the indexes can stay",
+          correct: false,
+        }
+      - { text: "Rebuild every index nightly so that inserts skip index maintenance", correct: false }
   - type: single
     prompt: "A query is slow. In PostgreSQL you run `EXPLAIN (ANALYZE, BUFFERS)` and see a `Seq Scan` over 5 million rows that returns 12 rows, with `Rows Removed by Filter: 4999988`. What is the most likely fix?"
     explanation: "Filtering out almost every row after scanning the entire table signals a missing, or unusable, index on the filter column. Adding a suitable index lets the planner use an index scan. More work_mem helps sorts and hashes, not filtering, and VACUUM FULL does not change the access path."
@@ -146,21 +147,23 @@ questions:
       - { text: "SELECT ... FOR UPDATE SKIP LOCKED LIMIT 1", correct: true }
       - { text: "LOCK TABLE tasks IN ACCESS EXCLUSIVE MODE for each pick", correct: false }
   - type: single
-    prompt: "What does this query return?"
-    code: |
-      CREATE TABLE u (g int, v int);
-      INSERT INTO u VALUES (1, 10), (1, NULL), (2, NULL);
-
-      SELECT g, count(*) AS n, count(v) AS nv, sum(v) AS s
-      FROM u GROUP BY g ORDER BY g;
-    codeLanguage: sql
-    explanation: "`count(*)` counts rows, `count(v)` ignores NULLs, and `sum` ignores NULLs but returns NULL when no non-null value exists. Group 1 gives n=2, nv=1, s=10 and group 2 gives n=1, nv=0, s=NULL."
-    theoryUrl: https://www.postgresql.org/docs/current/functions-aggregate.html
+    prompt: "`order_lines` stores `unit_price` for each line, although `products` already has a `price` column. A reviewer calls this a normalization violation. Is it?"
+    explanation: "No: the line's price is the price agreed at purchase time, a different fact from the product's current price, so it belongs on the order line. Joining to `products.price` would silently rewrite past invoices when the price changes. Normalization removes duplicated facts, not columns that merely share a name."
+    theoryUrl: https://en.wikipedia.org/wiki/Third_normal_form
     options:
-      - { text: "(1, 2, 2, 10) and (2, 1, 1, 0)", correct: false }
-      - { text: "(1, 2, 1, 10) and (2, 1, 0, NULL)", correct: true }
-      - { text: "(1, 1, 1, 10) and (2, 0, 0, NULL)", correct: false }
-      - { text: "(1, 2, 1, 10) and (2, 1, 0, 0)", correct: false }
+      - {
+          text: "Yes, every price must live in one place, so order lines should join to products",
+          correct: false,
+        }
+      - {
+          text: "No, the line records the price at purchase time, which is a different fact",
+          correct: true,
+        }
+      - {
+          text: "Yes, but it is acceptable only because joins on large tables are always too slow to run",
+          correct: false,
+        }
+      - { text: "No, because normalization rules do not apply to numeric columns", correct: false }
   - type: single
     prompt: "An `orders` table stores `customer_name` and `customer_address` in every row, and a customer moved house. Which normalization problem does this show?"
     explanation: "Repeating customer facts across many rows creates update anomalies: changing the address means updating many rows, and partial updates leave inconsistent data. Moving customers to their own table (3NF) and referencing it removes the redundancy."
@@ -189,32 +192,41 @@ questions:
           correct: false,
         }
   - type: single
-    prompt: "You need to add `NOT NULL` column `plan` with a default to a 300M-row table in PostgreSQL 16, with zero downtime. What is the best-known behaviour?"
-    explanation: "Since PostgreSQL 11, adding a column with a constant default is a metadata-only change and does not rewrite the table, so it is fast. Volatile defaults (such as `random()`) still rewrite. Older versions rewrote the table under an ACCESS EXCLUSIVE lock."
-    theoryUrl: https://www.postgresql.org/docs/current/sql-altertable.html
+    prompt: "A new column on a 300M-row table must be filled from existing data. A teammate proposes a single `UPDATE` over the whole table during business hours. What is the safer approach?"
+    explanation: "One huge UPDATE is one long transaction: it holds row locks on every touched row until commit, produces a burst of dead tuples and WAL that bloats the table and lags replicas, and loses all progress if it fails. Backfilling in small batches, each in its own short transaction, keeps locks brief and lets the job pause and resume. A higher isolation level or a disabled index does not address the transaction's size."
+    theoryUrl: https://www.postgresql.org/docs/current/routine-vacuuming.html
     options:
-      - { text: "It always rewrites the table, so schedule downtime", correct: false }
       - {
-          text: "A fast metadata change with a constant default; a volatile default rewrites the table",
+          text: "Backfill in small batches, each committed in its own short transaction",
           correct: true,
         }
       - {
-          text: "It is impossible online, because adding a NOT NULL column requires dropping and recreating the table",
+          text: "Run the single UPDATE at SERIALIZABLE so concurrent writers cannot interfere with it while it runs",
           correct: false,
         }
-      - { text: "It locks the table only for reads, never for writes", correct: false }
-  - type: single
-    prompt: "You rename a column `fullname` to `name` in one migration and deploy the app in the next step. Old app instances still run during the rollout. What breaks?"
-    explanation: "While old instances are still running, they reference the old column name and fail. Zero-downtime migrations use expand and contract: add the new column, write to both, backfill, switch reads, then drop the old column in a later release."
-    theoryUrl: https://martinfowler.com/bliki/ParallelChange.html
-    options:
-      - { text: "Nothing, since renames are applied lazily by the database", correct: false }
-      - { text: "Old instances fail because they still query the old column name", correct: true }
       - {
-          text: "Only the new instances fail, because they cache the old schema and cannot see the renamed column",
+          text: "Run the single UPDATE, since PostgreSQL locks only the rows it changes and MVCC makes the size irrelevant",
           correct: false,
         }
-      - { text: "The database rolls back the rename automatically", correct: false }
+      - { text: "Drop the table's indexes first and run the single UPDATE afterwards", correct: false }
+  - type: single
+    prompt: "An app runs its pending schema migrations automatically at startup. During a deploy, 20 pods start at the same time against the same database. What is the main risk, and the usual fix?"
+    explanation: "Every pod tries to apply the same migrations concurrently, which can fail, deadlock or apply a step twice, and a slow migration also delays every pod's startup. Run migrations once as a separate deploy step (a pipeline job or a one-off task), or at least guard them with a single migration lock. Startup order across pods is not guaranteed, so relying on it does not help."
+    theoryUrl: https://12factor.net/admin-processes
+    options:
+      - {
+          text: "No risk, since the database queues identical DDL statements and runs each only once whatever the client",
+          correct: false,
+        }
+      - {
+          text: "Pods race to apply the same migrations; run them once as a separate deploy step",
+          correct: true,
+        }
+      - {
+          text: "Only the first pod's migrations run, so the other pods start with an outdated schema",
+          correct: false,
+        }
+      - { text: "Pods start too fast; add a random sleep before migrating", correct: false }
   - type: single
     prompt: "Which sequence follows the expand and contract (parallel change) pattern for replacing a column's meaning?"
     explanation: "Expand first (add the new column and write to both), migrate data, move readers, then contract (remove the old column) once nothing uses it. Each step is deployable on its own and reversible, which is what keeps the rollout safe."
@@ -284,20 +296,23 @@ questions:
         }
       - { text: "Add the constraint on the replicas only", correct: false }
   - type: single
-    prompt: "A team wants to avoid migrations that hold long locks in production. Which setting protects the rest of the traffic if a migration has to wait for a lock?"
-    explanation: "Setting a short `lock_timeout` makes the migration fail fast instead of queueing behind a long transaction while blocking all later queries on the table behind its pending lock request. The migration can then be retried."
-    theoryUrl: https://www.postgresql.org/docs/current/runtime-config-client.html#GUC-LOCK-TIMEOUT
+    prompt: "A quick `ALTER TABLE` needs an exclusive lock on `orders`, but a 10-minute analytics query is reading the table. Within seconds, every normal query on `orders` hangs too. Why?"
+    explanation: "Lock requests queue in order: the pending exclusive request waits for the analytics query, and every later request that conflicts with it, even a plain read, waits behind it. The usual guard is to make the migration give up quickly if it cannot get the lock and retry later. The ALTER has not started its work, so neither its own speed nor MVCC is the issue."
+    theoryUrl: https://www.postgresql.org/docs/current/explicit-locking.html
     options:
-      - { text: "A high `statement_timeout` for the migration role", correct: false }
       - {
-          text: "A short `lock_timeout` so the migration fails fast and can be retried",
-          correct: true,
-        }
-      - { text: "Turning off autovacuum during the migration", correct: false }
-      - {
-          text: "Running the migration with `synchronous_commit = off` so commits never wait for lock holders",
+          text: "MVCC is switched off for the table while any schema change is pending on it",
           correct: false,
         }
+      - {
+          text: "New queries wait behind the queued exclusive lock request",
+          correct: true,
+        }
+      - {
+          text: "The ALTER already rewrote half of the table and is holding every row lock while it finishes the rest",
+          correct: false,
+        }
+      - { text: "The analytics query escalated its row locks to a table lock", correct: false }
   - type: single
     prompt: "When is it justified to denormalise a relational schema?"
     explanation: "Denormalise when measurements show read patterns that joins cannot serve fast enough and the write-side complexity of keeping copies in sync is acceptable. Doing it upfront for imagined performance sacrifices integrity for no proven gain."

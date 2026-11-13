@@ -69,36 +69,26 @@ questions:
           correct: true,
         }
   - type: single
-    prompt: "What does this print after a reader and a writer interleave as shown?"
-    code: |
-      const db = { k: 'v1' };
-      const cache = new Map();
-      const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-
-      async function read() {
-        if (cache.has('k')) return cache.get('k');
-        const v = db.k;          // load
-        await sleep(20);         // slow network
-        cache.set('k', v);       // populate
-        return v;
-      }
-      async function write(v) { db.k = v; cache.delete('k'); }
-
-      (async () => {
-        const p = read();
-        await sleep(5);
-        await write('v2');
-        await p;
-        console.log(await read());
-      })();
-    codeLanguage: javascript
-    explanation: "The reader loaded v1 before the write, then populated the cache after the writer had invalidated it, so the cache holds stale v1 until the TTL expires. This race is why cache-aside invalidations need a TTL as a safety net and sometimes versioned keys or delayed double deletes."
+    prompt: "With cache-aside, a reader misses, loads v1 from the database and then stalls on a GC pause. Meanwhile a writer stores v2 and deletes the cache key. The reader resumes and writes v1 into the cache. What is the state, and what limits the damage?"
+    explanation: "The reader populated the cache after the writer's invalidation, so the cache serves stale v1 while the database holds v2. Nothing will invalidate it again, so the TTL is what bounds how long the stale value lives; versioned writes or a delayed second delete narrow the window further. Deleting before the write does not close this race, because the reader can still repopulate afterwards."
     theoryUrl: https://learn.microsoft.com/en-us/azure/architecture/patterns/cache-aside
     options:
-      - { text: "v2", correct: false }
-      - { text: "undefined", correct: false }
-      - { text: "v1", correct: true }
-      - { text: "It throws because the Map was deleted", correct: false }
+      - {
+          text: "The cache holds stale v1 until it expires, so a TTL bounds the damage",
+          correct: true,
+        }
+      - {
+          text: "The cache holds v2, because a delete issued by a writer always takes precedence over a later read's populate",
+          correct: false,
+        }
+      - {
+          text: "The cache is empty, because the writer's delete ran last, so the next read loads v2",
+          correct: false,
+        }
+      - {
+          text: "The cache holds stale v1, and deleting the key before writing the database would fully prevent it",
+          correct: false,
+        }
   - type: single
     prompt: "Why is 'update the DB, then delete the cache key' usually preferred over 'update the cache, then update the DB' in cache-aside?"
     explanation: "Deleting makes the next reader reload the latest value, so the cache cannot hold a value that never made it to the database if the DB write fails. Updating the cache first risks a cache value that the database does not have, and concurrent writers can also leave cache and DB in different orders."
@@ -124,52 +114,54 @@ questions:
       - { text: "Cache stampede (thundering herd)", correct: true }
       - { text: "Write skew", correct: false }
   - type: single
-    prompt: "How many times is `load` called in this snippet?"
+    prompt: "This wrapper sits in front of the database loader in a service that runs on 40 instances. What does it protect against, and what is its limit?"
     code: |
       const inflight = new Map();
-      let loads = 0;
-      const load = async (k) => {
-        loads++;
-        await new Promise((r) => setTimeout(r, 10));
-        return k + '!';
-      };
-      function get(k) {
-        if (!inflight.has(k)) {
-          inflight.set(k, load(k).finally(() => inflight.delete(k)));
+
+      function get(key) {
+        if (!inflight.has(key)) {
+          inflight.set(key, loadFromDb(key).finally(() => inflight.delete(key)));
         }
-        return inflight.get(k);
+        return inflight.get(key);
       }
-      Promise.all([get('a'), get('a'), get('a'), get('b')])
-        .then((r) => console.log(r.join(','), loads));
     codeLanguage: javascript
-    explanation: "The three concurrent get('a') calls share one in-flight promise, and get('b') starts another, so load runs twice and the output is 'a!,a!,a!,b! 2'. This is single-flight (request coalescing), a stampede protection."
+    explanation: "Concurrent misses for the same key inside one process share a single in-flight load (single-flight), so a hot key costs one database call per instance instead of one per request. The map is per process, so 40 instances can still issue 40 loads at once; a distributed lock or serving stale values covers that. It holds no values after the load settles, so it is not a cache, and it never rejects requests."
     theoryUrl: https://pkg.go.dev/golang.org/x/sync/singleflight
     options:
-      - { text: "4", correct: false }
-      - { text: "1", correct: false }
-      - { text: "3", correct: false }
-      - { text: "2", correct: true }
+      - {
+          text: "It caches every loaded value for the life of the process, so the database is read only once per key",
+          correct: false,
+        }
+      - {
+          text: "It coalesces concurrent loads of a key, but only within one instance",
+          correct: true,
+        }
+      - {
+          text: "It coalesces concurrent loads of a key across all 40 instances, since they share the same code",
+          correct: false,
+        }
+      - { text: "It rate-limits callers so the database never sees more than one query", correct: false }
   - type: single
-    prompt: "How many times does the loader run here?"
-    code: |
-      let loads = 0;
-      const cache = new Map();
-      async function get(k) {
-        if (cache.has(k)) return cache.get(k);
-        loads++;
-        await new Promise((r) => setTimeout(r, 10));
-        cache.set(k, k);
-        return k;
-      }
-      Promise.all([get('a'), get('a'), get('a')]).then(() => console.log(loads));
-    codeLanguage: javascript
-    explanation: "All three calls check the cache before any of them has finished loading, so all miss and loads is 3. A cache alone does not prevent a stampede, it needs in-flight request coalescing or a lock."
+    prompt: "A hot dashboard key takes 8 seconds to recompute. A lock lets one request rebuild it on expiry while the others wait, so the database is safe, but users see 8-second stalls at every expiry. What is the better design?"
+    explanation: "Keep serving the old value while one request (or a background job) rebuilds it, so expiry no longer blocks anyone and the database still sees a single recomputation. Dropping the lock brings the stampede back, and a longer TTL only makes the stalls rarer. A short wait timeout followed by a direct database query turns a slow rebuild into many."
     theoryUrl: https://en.wikipedia.org/wiki/Cache_stampede
     options:
-      - { text: "3", correct: true }
-      - { text: "1", correct: false }
-      - { text: "2", correct: false }
-      - { text: "0", correct: false }
+      - {
+          text: "Serve the stale value while a single refresh runs in the background",
+          correct: true,
+        }
+      - {
+          text: "Remove the lock so every waiting request recomputes the value itself and nobody waits on others",
+          correct: false,
+        }
+      - {
+          text: "Raise the TTL from one hour to one day so that the stalls happen less often",
+          correct: false,
+        }
+      - {
+          text: "Let waiting requests time out after one second and then query the database directly instead",
+          correct: false,
+        }
   - type: multi
     prompt: "Which techniques reduce the risk of a cache stampede on a hot key? Select all that apply."
     explanation: "Request coalescing (single-flight) or a lock lets one request recompute, probabilistic or early refresh recomputes before expiry, and serving stale while revalidating avoids misses. Setting the same TTL on every key makes expiries align and does not help."
@@ -204,23 +196,23 @@ questions:
       - { text: "Write-through latency, solved by write-behind", correct: false }
       - { text: "Replication lag, solved by reading from the primary", correct: false }
   - type: single
-    prompt: "What does `Cache-Control: s-maxage=300, stale-while-revalidate=60` tell a shared cache such as a CDN?"
-    explanation: "`s-maxage` is the freshness lifetime for shared caches (5 minutes), and `stale-while-revalidate` lets the cache serve a stale copy for up to 60 more seconds while it refetches in the background. It does not control the browser's private cache, which follows `max-age`."
-    theoryUrl: https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Cache-Control
+    prompt: "A CDN has about 200 edge locations, each with its own cache. When a popular page expires, the origin receives a burst of near-identical requests, roughly one per location. What reduces this?"
+    explanation: "A shield or tiered cache puts a regional layer between the edges and the origin, so edges that miss fetch from that tier and the origin sees about one request per object instead of one per location. A shorter TTL makes the bursts more frequent, and more edge locations make them larger. Turning caching off sends every request to the origin."
+    theoryUrl: https://developers.cloudflare.com/cache/how-to/tiered-cache/
     options:
       - {
-          text: "Fresh for 5 minutes, then stale for up to 60 seconds while revalidating in the background",
+          text: "A shorter TTL, so each location refreshes more often and the requests to the origin get smaller",
+          correct: false,
+        }
+      - {
+          text: "A shield or tiered cache layer that edges fetch from instead of the origin",
           correct: true,
         }
       - {
-          text: "Cache for 60 seconds in shared caches, then for 300 seconds in browsers only, revalidating each time",
+          text: "More edge locations, so each one serves fewer users and sends fewer requests to the origin",
           correct: false,
         }
-      - { text: "Never cache the response in any shared cache", correct: false }
-      - {
-          text: "Serve stale content for 5 minutes and revalidate after 60 seconds in the browser",
-          correct: false,
-        }
+      - { text: "Disabling caching for popular pages so they never expire together", correct: false }
   - type: single
     prompt: "A CDN is caching your HTML pages and a user's personalised greeting appears for other users. Which is the most likely cause?"
     explanation: "A personalised response was cached as if it were public, either because `Cache-Control` allowed shared caching or because the cache key ignores the cookie or header that varies the response. Use `private` or `no-store` for personalised responses, or include the varying input in the cache key (`Vary`)."
@@ -264,33 +256,38 @@ questions:
         }
       - { text: "Ask readers to refresh with Ctrl+Shift+R", correct: false }
   - type: single
-    prompt: "What does this print?"
-    code: |
-      const ttl = new Map();
-      const set = (k, v, t, now) => ttl.set(k, { v, exp: now + t });
-      const get = (k, now) => {
-        const e = ttl.get(k);
-        return e && e.exp > now ? e.v : undefined;
-      };
-      set('x', 1, 10, 0);
-      console.log(get('x', 9), get('x', 10));
-    codeLanguage: javascript
-    explanation: "The entry expires at time 10 and the check is `exp > now`, so at 9 it is still valid (1) and at 10 it is expired (undefined). Off-by-one boundaries like this one matter for TTL tests."
-    theoryUrl: https://redis.io/docs/latest/commands/expire/
+    prompt: "A release changes the shape of the `User` object stored in a shared Redis cache. Right after the deploy, new instances crash reading entries written by old instances, and old instances still running choke on the new ones. What prevents this?"
+    explanation: "Put a schema version in the cache key (for example `user:v2:42`), so each code version reads and writes only entries of its own shape and the old ones simply age out. Flushing the whole cache causes a cold-start load spike and does not stop old instances from writing old entries during the rollout. A longer TTL keeps the incompatible entries around for longer."
+    theoryUrl: https://aws.amazon.com/builders-library/caching-challenges-and-strategies/
     options:
-      - { text: "1 1", correct: false }
-      - { text: "undefined undefined", correct: false }
-      - { text: "undefined 1", correct: false }
-      - { text: "1 undefined", correct: true }
+      - {
+          text: "Flush the entire cache at deploy time, which also stops old instances from writing old-shaped entries",
+          correct: false,
+        }
+      - { text: "Include a schema version in the cache key", correct: true }
+      - {
+          text: "Raise the TTL so the entries written by the old version stay valid for the whole rollout",
+          correct: false,
+        }
+      - { text: "Store the objects as strings instead of JSON", correct: false }
   - type: single
-    prompt: "A Redis cache is full and you must choose an eviction policy for a cache-only instance where the hot set matters. Which is the best default?"
-    explanation: "`allkeys-lru` (or `allkeys-lfu`) evicts the least recently or frequently used keys among all keys, keeping the hot set, which suits a pure cache. `noeviction` makes writes fail when memory is full, and `volatile-*` policies only consider keys with a TTL."
+    prompt: "An LRU-evicted cache holds a stable hot set and has a high hit rate. Every night a report job reads each of the 10 million products once through the same cache, and every morning the hit rate collapses. Why, and what helps?"
+    explanation: "LRU treats every recent access as a reason to keep a key, so a one-pass scan fills the cache with entries that will never be read again and evicts the hot set. Frequency-based eviction (LFU) keeps keys that are read often, and bypassing the cache for the batch job avoids the pollution altogether. A larger TTL or warming after the job only treats the symptom."
     theoryUrl: https://redis.io/docs/latest/develop/reference/eviction/
     options:
-      - { text: "noeviction", correct: false }
-      - { text: "allkeys-lru or allkeys-lfu", correct: true }
-      - { text: "volatile-ttl for keys without expiry", correct: false }
-      - { text: "Random deletion of the oldest database file", correct: false }
+      - {
+          text: "The scan evicts the hot set under LRU; use frequency-based eviction or bypass the cache",
+          correct: true,
+        }
+      - {
+          text: "The job's reads expire the hot keys' TTLs, so give the hot keys a much longer TTL than the rest",
+          correct: false,
+        }
+      - {
+          text: "LRU evicts the most frequently used keys first, so switch to evicting at random",
+          correct: false,
+        }
+      - { text: "The cache restarts at night; enable persistence to disk", correct: false }
   - type: single
     prompt: "A product price change must be visible immediately across a fleet of 50 app servers that each hold a local in-process cache of prices (TTL 10 minutes), in addition to a shared Redis. What is the problem?"
     explanation: "Each process caches independently, so invalidating the shared cache does not reach the local copies, which stay stale for up to the TTL. Options are shorter local TTLs, pub/sub invalidation messages to every instance, or dropping the local layer for this data."
@@ -312,20 +309,23 @@ questions:
     theoryUrl: https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Cache-Control
     answer: true
   - type: single
-    prompt: "A Next.js page is statically cached at the edge. After a content update, you want the page refreshed on the next request without redeploying. Which approach does Next.js 16 documentation support for on-demand invalidation of cached data?"
-    explanation: "With Cache Components, cached data is tagged with `cacheTag` and invalidated on demand via `revalidateTag` or `updateTag` (for read-your-own-writes in Server Actions). Redeploying is unnecessary, and `no-store` disables caching altogether."
-    theoryUrl: https://nextjs.org/docs/app/api-reference/functions/revalidateTag
+    prompt: "Four services and two batch jobs write to the `products` table. Each is supposed to delete the matching cache key after writing, but one job forgot, and stale products stay cached for hours. Which design makes invalidation reliable?"
+    explanation: "Drive invalidation from the database's own change stream (change data capture, or an outbox written in the same transaction), so every committed change triggers it whoever the writer is. Code reviews and shared helpers still depend on every writer remembering. Disabling the cache for one job's data or shortening every TTL trades away hit rate without fixing the gap."
+    theoryUrl: https://debezium.io/documentation/reference/stable/architecture.html
     options:
       - {
-          text: "Tag the data with `cacheTag` and call `revalidateTag` or `updateTag` on update",
-          correct: true,
-        }
-      - { text: "Always redeploy the site to flush the cache", correct: false }
-      - { text: "Set `cache-control: no-store` on the page forever", correct: false }
-      - {
-          text: "Delete the `.next` directory on the production server and restart the process on every update",
+          text: "A shared invalidation helper that every writer must call, enforced by code review on each service and job",
           correct: false,
         }
+      - {
+          text: "Invalidate from the database's change stream, so every committed write triggers it",
+          correct: true,
+        }
+      - {
+          text: "Cut every product TTL to a few seconds, so missed invalidations no longer matter",
+          correct: false,
+        }
+      - { text: "Let the batch jobs bypass the cache when they write", correct: false }
   - type: single
     prompt: "Your read-heavy API has a 95% cache hit rate with 100,000 requests per second. A cache cluster failure drops the hit rate to 0%. What protects the database from the sudden 20x load?"
     explanation: "Load-shedding and rate limiting at the origin, request coalescing, a replicated or multi-AZ cache so the whole cache cannot disappear, and a graceful degradation path protect the database. Simply relying on the database to cope assumes headroom it was not sized for."
@@ -342,14 +342,20 @@ questions:
           correct: false,
         }
   - type: single
-    prompt: "Which data is the weakest candidate for caching in front of a database?"
-    explanation: "Data that changes constantly and must be strictly current (for example account balances at the moment of a transfer) pairs poorly with caching, since it requires immediate invalidation and risks wrong decisions. Static reference data and expensive aggregates are good candidates."
+    prompt: "Which workload is the best fit for write-behind caching?"
+    explanation: "Write-behind acknowledges writes from the cache and flushes them later, often batched, so it suits very frequent writes where losing the last few seconds after a cache failure is acceptable, such as view counters. Payments and inventory need durable writes before acknowledging. Rarely written data gains nothing from batching."
     theoryUrl: https://aws.amazon.com/caching/best-practices/
     options:
-      - { text: "A list of countries and currencies", correct: false }
-      - { text: "A computed top-10 products list refreshed every minute", correct: false }
-      - { text: "Account balances read during the transfer that debits them", correct: true }
-      - { text: "Rendered public blog posts", correct: false }
+      - { text: "Recording payments that must never be lost once confirmed", correct: false }
+      - {
+          text: "Page view counters updated thousands of times per second",
+          correct: true,
+        }
+      - {
+          text: "Stock reservations that must be durable before the customer sees an order confirmation",
+          correct: false,
+        }
+      - { text: "A user's profile, edited a few times a year", correct: false }
   - type: single
     prompt: "A CDN cache key currently includes the full query string, including tracking parameters like `utm_source`, so the hit rate is 20%. What do you change?"
     explanation: "Exclude parameters that do not change the response (tracking params) from the cache key, or normalise them, so identical content shares one cache entry. Keep those that change the response in the key."
