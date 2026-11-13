@@ -117,13 +117,13 @@ Follow-up: Kill the old path, and the old quiz, i want a new quiz and new path. 
 
 #### Specs
 
-1. [open] Running `check.mts` on `seeds/architect-2[4-9]-*.yaml seeds/architect-3*.yaml seeds/architect-4*.yaml` prints ok for all eighteen files, each with at most a fifth of its questions carrying code, and none of them carries an `advanced` tag.
-2. [open] The title list in the R4 migration equals the set of quiz files changed in R4, as listed by `git diff --name-only` on `seeds/`.
-3. [open] On a database holding the R3 content, a quiz from 24–41 that R4 left unchanged keeps its attempts after `pnpm release`.
-4. [open] On a database holding the R3 content, `pnpm release` leaves exactly one seed quiz per title for 24–41.
-5. [open] On a fresh database, `pnpm release` runs the R1–R4 migrations without error and imports every seed, the path included.
-6. [open] After `pnpm release` on a database holding the R3 content, the "Road to Software Architect" page lists 41 steps.
-7. [open] Reading quizzes 24, 25 and 27–41, no question turns on an edge case or a trick output; quiz 26 may.
+1. [built] Running `check.mts` on `seeds/architect-2[4-9]-*.yaml seeds/architect-3*.yaml seeds/architect-4*.yaml` prints ok for all eighteen files, each with at most a fifth of its questions carrying code, and none of them carries an `advanced` tag.
+2. [built] The title list in the R4 migration equals the set of quiz files changed in R4, as listed by `git diff --name-only` on `seeds/`.
+3. [built] On a database holding the R3 content, a quiz from 24–41 that R4 left unchanged keeps its attempts after `pnpm release`.
+4. [built] On a database holding the R3 content, `pnpm release` leaves exactly one seed quiz per title for 24–41.
+5. [built] On a fresh database, `pnpm release` runs the R1–R4 migrations without error and imports every seed, the path included.
+6. [built] After `pnpm release` on a database holding the R3 content, the "Road to Software Architect" page lists 41 steps.
+7. [built] Reading quizzes 24, 25 and 27–41, no question turns on an edge case or a trick output; quiz 26 may.
 
 ## Proofs
 
