@@ -90,20 +90,26 @@ questions:
           correct: false,
         }
   - type: single
-    prompt: "Which statement about DynamoDB Local Secondary Indexes (LSI) is correct?"
-    explanation: "An LSI shares the table's partition key and offers an alternate sort key, must be created with the table, and limits the item collection size to 10 GB per partition key value. A GSI can use a different partition key and be added later."
-    theoryUrl: https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/LSI.html
+    prompt: "An orders table holds 500 million items, and about 0.1% of them are flagged for manual review. Reviewers need to list the flagged orders, newest first. Which design serves this efficiently?"
+    explanation: "A secondary index only contains items that carry its key attributes, so setting a review attribute only on flagged orders (and removing it when cleared) gives a small, sparse index that lists exactly those orders. A Scan with a filter still reads all 500 million items. An index on a true/false flag that every order carries holds the whole table, and its two key values become hot partitions."
+    theoryUrl: https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/bp-indexes-general-sparse-indexes.html
     options:
       - {
-          text: "It can use a different partition key from the table and be added at any time",
-          correct: false,
-        }
-      - { text: "It has no size limits because it is stored separately", correct: false }
-      - {
-          text: "It must be created with the table and shares the table's partition key",
+          text: "A secondary index keyed on an attribute that only flagged orders carry",
           correct: true,
         }
-      - { text: "It is eventually consistent only", correct: false }
+      - {
+          text: "A Scan with a filter on the flag, paginated so that each page returns quickly to reviewers",
+          correct: false,
+        }
+      - {
+          text: "A secondary index keyed on an `is_flagged` attribute set to true or false on every order",
+          correct: false,
+        }
+      - {
+          text: "A nightly copy of all orders into a second table, filtered by the review tool",
+          correct: false,
+        }
   - type: single
     prompt: "A wallet app on DynamoDB debits one account item and credits another. Money must never be created or lost, even if the client crashes between the two writes. What do you rely on?"
     explanation: "A multi-item transaction commits both writes or neither, and a condition check on the balance rejects an overdraft inside the same transaction. Two conditional updates are each atomic on their own item, but a crash between them leaves the transfer half done. Batching groups requests for efficiency without making them all-or-nothing."
@@ -278,20 +284,26 @@ questions:
           correct: true,
         }
   - type: single
-    prompt: "A new feature needs to query a DynamoDB table by `email`. The existing items hold the email in an attribute, but not in a key. Which design is correct for a uniqueness lookup?"
-    explanation: "A GSI keyed by email supports lookup, but GSIs do not enforce uniqueness. To guarantee unique emails use a transaction that writes a separate item with PK `EMAIL#<email>` with `attribute_not_exists`. A GSI alone would allow duplicates."
-    theoryUrl: https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/transaction-apis.html
+    prompt: "Users can join many groups, and groups have many members. The app needs both 'groups of a user' and 'members of a group'. In a DynamoDB single-table design, how do you model the membership?"
+    explanation: "Store one item per membership, keyed by group and user, and add a secondary index that swaps the two key attributes (an inverted index). The table answers 'members of a group' and the index answers 'groups of a user', each with a single Query. A list attribute on one side cannot be queried from the other side and grows without bound, and DynamoDB has no joins."
+    theoryUrl: https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/bp-adjacency-graphs.html
     options:
       - {
-          text: "A GSI on email, which also enforces uniqueness because a GSI key must be unique per item across the table",
+          text: "One item per membership, plus an index that swaps its partition and sort keys",
+          correct: true,
+        }
+      - {
+          text: "A list of group ids on each user item, filtered in the app to find the members of a group",
           correct: false,
         }
       - {
-          text: "A uniqueness item with PK `EMAIL#<email>` in a transaction with a not-exists condition",
-          correct: true,
+          text: "Separate users and groups tables, joined on the group id at query time",
+          correct: false,
         }
-      - { text: "A Scan before every insert to check for duplicates", correct: false }
-      - { text: "A Local Secondary Index on email", correct: false }
+      - {
+          text: "One item per group holding all member ids, scanned to find the groups of a given user",
+          correct: false,
+        }
   - type: single
     prompt: "Activity feeds are stored with PK = `USER#<id>` and SK = `ACTIVITY#<timestamp>`. A few power users write constantly, their partitions grow without bound and throttle, and the app only shows recent activity. How do you reshape the key?"
     explanation: "Adding a time bucket to the partition key (for example `USER#<id>#2025-03`) spreads one user's writes and data over many partitions, and the feed reads the newest bucket first, then older ones as needed. A random suffix also spreads writes but forces every feed read to query all shards and merge them. Capacity mode does not remove per-partition limits, and one growing list attribute runs into item size limits."

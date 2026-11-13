@@ -19,7 +19,7 @@ questions:
       - { text: "WHERE status = 'paid' ORDER BY created_at", correct: false }
   - type: single
     prompt: "A write-heavy `events` table has 14 indexes, many added over the years 'just in case'. Inserts keep getting slower while reads are fine. What is the most likely cause and the first step?"
-    explanation: "Every index must be updated on each insert and on updates of its columns, so unused indexes cost write time, I/O and storage while giving nothing back. Check index usage statistics and drop the ones no query uses. Indexes do not slow writes only when the table is large, and more indexes never make inserts faster."
+    explanation: "Every index must be updated on each insert and on updates of its columns, so unused indexes cost write time, I/O and storage while giving nothing back. Check index usage statistics and drop the ones no query uses. Adding more indexes only adds maintenance to every insert, and a nightly rebuild compacts indexes but cannot spare any insert from updating them."
     theoryUrl: https://www.postgresql.org/docs/current/indexes-intro.html
     options:
       - {
@@ -66,19 +66,25 @@ questions:
           correct: true,
         }
   - type: single
-    prompt: "A covering index lets PostgreSQL answer a query with an index-only scan. What does it require?"
-    explanation: "All columns the query needs must be present in the index (for example with `INCLUDE`), and the visibility map must show the pages as all-visible, which VACUUM maintains. Otherwise the executor still visits the heap."
+    prompt: "A hot query runs `SELECT status, total FROM orders WHERE customer_id = $1`. The plan uses the index on `customer_id`, then fetches every matching row from the table, and those table reads dominate the time. Which index change addresses this?"
+    explanation: "If the index also carries `status` and `total`, the database can answer the query from the index alone and skip the table reads. The cost is a larger index that every write must maintain, so it pays off for hot queries only. A separate index on `status` cannot find a customer's rows, and changing the sort direction does not remove the table reads."
     theoryUrl: https://www.postgresql.org/docs/current/indexes-index-only-scans.html
     options:
-      - { text: "The index must be unique", correct: false }
       - {
-          text: "The query must have an ORDER BY clause matching the index order, otherwise the planner never uses the index alone",
+          text: "Extend the index so it also holds `status` and `total`, making it covering",
+          correct: true,
+        }
+      - {
+          text: "Add a separate index on `status`, so the planner can combine it with the customer index",
           correct: false,
         }
-      - { text: "The table must be partitioned", correct: false }
       - {
-          text: "The index must hold every column the query reads, and pages must be all-visible",
-          correct: true,
+          text: "Rebuild the `customer_id` index in descending order, which keeps a customer's rows together on disk",
+          correct: false,
+        }
+      - {
+          text: "Partition the table by `status`, so each query reads a smaller table",
+          correct: false,
         }
   - type: single
     prompt: "In PostgreSQL's default READ COMMITTED level, a transaction runs `SELECT balance FROM accounts WHERE id = 1` twice. Between the two reads another transaction commits an update to that row. What does the first transaction see?"
@@ -135,20 +141,26 @@ questions:
       - { text: "Update rows in a consistent order and keep transactions short", correct: true }
       - { text: "Disable autovacuum during peak hours", correct: false }
   - type: single
-    prompt: "A job needs to pick the next pending task and mark it as running. Ten workers do this concurrently. Which query pattern avoids workers blocking each other or taking the same task?"
-    explanation: "`SELECT ... FOR UPDATE SKIP LOCKED` lets each worker lock a different pending row, skipping rows locked by others, which is the standard way to build a queue in PostgreSQL. Plain `FOR UPDATE` makes workers queue behind one row, and an unlocked SELECT then UPDATE lets two workers pick the same task."
+    prompt: "Ten workers poll a `tasks` table for the next pending task and mark it as running. Which claiming strategy lets them work in parallel without two workers taking the same task?"
+    explanation: "Each worker locks the row it claims and skips rows other workers have already locked, so every worker gets a different task without waiting (PostgreSQL offers this as a locking option on SELECT). Reading without a lock and updating afterwards lets two workers claim the same row. Locking and waiting on the first pending row makes the workers queue behind one another, and a table lock serialises them completely."
     theoryUrl: https://www.postgresql.org/docs/current/sql-select.html#SQL-FOR-UPDATE-SHARE
     options:
       - {
-          text: "SELECT the first pending row, then UPDATE it by id in a separate statement",
+          text: "Lock the claimed row and skip rows already locked by other workers",
+          correct: true,
+        }
+      - {
+          text: "Read the first pending row without a lock, then update it by id in a second statement",
           correct: false,
         }
       - {
-          text: "SELECT the first pending row FOR UPDATE, without any other options",
+          text: "Lock the first pending row, and wait whenever another worker already holds it",
           correct: false,
         }
-      - { text: "SELECT ... FOR UPDATE SKIP LOCKED LIMIT 1", correct: true }
-      - { text: "LOCK TABLE tasks IN ACCESS EXCLUSIVE MODE for each pick", correct: false }
+      - {
+          text: "Lock the whole table for each pick and release it right after the update",
+          correct: false,
+        }
   - type: single
     prompt: "`order_lines` stores `unit_price` for each line, although `products` already has a `price` column. A reviewer calls this a normalization violation. Is it?"
     explanation: "No: the line's price is the price agreed at purchase time, a different fact from the product's current price, so it belongs on the order line. Joining to `products.price` would silently rewrite past invoices when the price changes. Normalization removes duplicated facts, not columns that merely share a name."
@@ -249,14 +261,26 @@ questions:
         }
       - { text: "Add the new column and drop the old one in the same migration", correct: false }
   - type: single
-    prompt: "In PostgreSQL, creating an index on a busy 200M-row table with a plain `CREATE INDEX` causes write traffic to stall. What do you use instead?"
-    explanation: "`CREATE INDEX CONCURRENTLY` builds the index without blocking writes (taking longer and not allowed inside a transaction block). A failed concurrent build leaves an invalid index that must be dropped."
-    theoryUrl: https://www.postgresql.org/docs/current/sql-createindex.html#SQL-CREATEINDEX-CONCURRENTLY
+    prompt: "A migration that adds an index ran in 0.3 seconds on staging, where the table has 10,000 rows. Production has 200 million rows and constant writes. What should the team do before running it there?"
+    explanation: "How long a schema change holds its locks grows with the data it must scan or build, so a run on a tiny staging table says nothing about production. Rehearse on a production-sized copy, check which lock the step takes and for how long, and switch to an online variant that does not block writes if needed. A bigger pool only gives blocked writes more room to pile up."
+    theoryUrl: https://www.postgresql.org/docs/current/explicit-locking.html#LOCKING-TABLES
     options:
-      - { text: "CREATE UNLOGGED INDEX", correct: false }
-      - { text: "CREATE INDEX CONCURRENTLY", correct: true }
-      - { text: "CREATE INDEX inside a SERIALIZABLE transaction", correct: false }
-      - { text: "CREATE INDEX ... WITH (fillfactor = 100)", correct: false }
+      - {
+          text: "Rehearse it on a production-sized copy and check which locks it holds and for how long",
+          correct: true,
+        }
+      - {
+          text: "Run it unchanged during the day, since staging already proved that the step is fast",
+          correct: false,
+        }
+      - {
+          text: "Run it unchanged, since an index build takes about the same time whatever the table size",
+          correct: false,
+        }
+      - {
+          text: "Enlarge the connection pool so that writes queued behind the migration have somewhere to wait",
+          correct: false,
+        }
   - type: multi
     prompt: "Which of these can cause an index to be ignored by the PostgreSQL planner even though it exists? Select all that apply."
     explanation: "A function or cast applied to the indexed column, a leading wildcard in LIKE, and a predicate that matches most of the table (so a sequential scan is cheaper) all make the planner skip a B-tree index. An index being unique does not prevent its use."
@@ -282,40 +306,52 @@ questions:
       - { text: "Deleted rows are removed instantly with no cleanup", correct: false }
       - { text: "All transactions run one at a time", correct: false }
   - type: boolean
-    prompt: "True or false: a long-running idle-in-transaction session in PostgreSQL can prevent VACUUM from removing dead rows and cause table bloat."
-    explanation: "True. VACUUM cannot remove row versions that might still be visible to an open snapshot, so a transaction left open for hours holds back cleanup and bloat grows. Set `idle_in_transaction_session_timeout` and monitor long transactions."
-    theoryUrl: https://www.postgresql.org/docs/current/routine-vacuuming.html
-    answer: true
+    prompt: "True or false: with row-level locking, two transactions that update different rows of the same table must wait for each other until one of them commits."
+    explanation: "False. Row-level locks cover the rows a transaction changes, so writers conflict only when they touch the same row, and updates to different rows proceed in parallel. That is why write contention usually comes from a few hot rows rather than from a busy table as such."
+    theoryUrl: https://www.postgresql.org/docs/current/explicit-locking.html#LOCKING-ROWS
+    answer: false
   - type: single
-    prompt: "A migration adds a foreign key to a large table with `ALTER TABLE ... ADD CONSTRAINT ... FOREIGN KEY`. It validates all existing rows while blocking writes. How do you limit the lock time in PostgreSQL?"
-    explanation: "Add the constraint as `NOT VALID` (only checks new writes and takes a short lock), then run `VALIDATE CONSTRAINT`, which scans existing rows with a weaker lock that does not block normal reads and writes."
+    prompt: "A migration adds a foreign key to a 300M-row table. Checking every existing row takes 20 minutes, and the step blocks writes while it runs. Why do teams split such a change into 'enforce the rule for new writes' and then 'check the existing rows'?"
+    explanation: "The slow part is scanning the existing rows, not guarding new writes. Enforcing the rule for new writes needs only a short lock, and the later check of old rows can run without blocking normal traffic. The old rows are still checked, so integrity is not given up, and the split does not make the scan itself any faster."
     theoryUrl: https://www.postgresql.org/docs/current/sql-altertable.html
     options:
       - {
-          text: "Add it as NOT VALID first and then run VALIDATE CONSTRAINT separately",
+          text: "So the long scan of old rows no longer runs inside the step that blocks writes",
           correct: true,
         }
-      - { text: "Run it inside a SERIALIZABLE transaction", correct: false }
       - {
-          text: "Drop all indexes on the table first so the validation scan runs faster, then recreate them",
+          text: "So the existing rows never need checking, since a constraint applies only to new data",
           correct: false,
         }
-      - { text: "Add the constraint on the replicas only", correct: false }
+      - {
+          text: "So the scan of the existing rows gets faster, because it is split into batches that run in parallel",
+          correct: false,
+        }
+      - {
+          text: "So the constraint can be added on the replicas first and copied to the primary afterwards",
+          correct: false,
+        }
   - type: single
-    prompt: "A quick `ALTER TABLE` needs an exclusive lock on `orders`, but a 10-minute analytics query is reading the table. Within seconds, every normal query on `orders` hangs too. Why?"
-    explanation: "Lock requests queue in order: the pending exclusive request waits for the analytics query, and every later request that conflicts with it, even a plain read, waits behind it. The usual guard is to make the migration give up quickly if it cannot get the lock and retry later. The ALTER has not started its work, so neither its own speed nor MVCC is the issue."
-    theoryUrl: https://www.postgresql.org/docs/current/explicit-locking.html
+    prompt: "Every checkout transaction increments one shared `shop_stats.total_orders` row near its start, then does 200 ms of other work before committing. At peak, checkouts queue up and throughput stops growing while database CPU stays low. What is happening?"
+    explanation: "A row lock is held until the transaction ends, so each checkout holds the counter row for its whole 200 ms and all checkouts serialise on it. Derive the total from the orders table, update it asynchronously, or at least move the increment to the very end of the transaction. More connections only add waiters, and stricter isolation adds aborts rather than throughput."
+    theoryUrl: https://www.postgresql.org/docs/current/explicit-locking.html#LOCKING-ROWS
     options:
       - {
-          text: "MVCC is switched off for the table while any schema change is pending on it",
-          correct: false,
+          text: "Each checkout holds the counter row's lock until commit, so checkouts run one at a time",
+          correct: true,
         }
-      - { text: "New queries wait behind the queued exclusive lock request", correct: true }
       - {
-          text: "The ALTER already rewrote half of the table and is holding every row lock while it finishes the rest",
+          text: "The connection pool is too small, and more connections would let the checkouts run in parallel again",
           correct: false,
         }
-      - { text: "The analytics query escalated its row locks to a table lock", correct: false }
+      - {
+          text: "The counter row needs an index, since every increment searches the whole stats table first",
+          correct: false,
+        }
+      - {
+          text: "Checkouts need SERIALIZABLE isolation, which lets concurrent increments of one row proceed without waiting",
+          correct: false,
+        }
   - type: single
     prompt: "When is it justified to denormalise a relational schema?"
     explanation: "Denormalise when measurements show read patterns that joins cannot serve fast enough and the write-side complexity of keeping copies in sync is acceptable. Doing it upfront for imagined performance sacrifices integrity for no proven gain."

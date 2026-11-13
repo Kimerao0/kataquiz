@@ -242,29 +242,47 @@ questions:
         }
       - { text: "So that clients notice a failed leader before the followers do", correct: false }
   - type: single
-    prompt: "A request passes through an API gateway, three services and a database. Latency is high but each service's own logs look fine. Which tool answers 'where did the time go for this request'?"
-    explanation: "Distributed tracing propagates a trace context across service calls and records spans with timing, so you see the whole request path and where the time is spent. Metrics show aggregates and logs show events, but neither links one request across services by themselves."
-    theoryUrl: https://opentelemetry.io/docs/concepts/signals/traces/
+    prompt: "Investigating a latency complaint, an engineer opens one slow checkout trace, sees 1.2 s spent in the Inventory call, and proposes rewriting Inventory. What should come before that decision?"
+    explanation: "A trace is one request: it shows where that request spent its time, not whether that is typical. Latency metrics for the Inventory call (percentiles or a histogram) and a sample of other slow traces show whether Inventory is slow for many requests or only for this one. Debug logs or one manual rerun still describe a single case."
+    theoryUrl: https://opentelemetry.io/docs/concepts/signals/metrics/
     options:
-      - { text: "Distributed tracing with context propagation across services", correct: true }
-      - { text: "CPU metrics of each service", correct: false }
-      - { text: "Increasing the log level to debug in all services", correct: false }
-      - { text: "A load test against only the database", correct: false }
-  - type: single
-    prompt: "Traces for a request show disconnected spans: the gateway and the Orders service appear as separate traces. What is the most likely cause?"
-    explanation: "Trace context (such as the W3C `traceparent` header) is not being propagated on the outgoing call, so the downstream service starts a new trace. Sampling affects whether traces exist, not whether they join."
-    theoryUrl: https://www.w3.org/TR/trace-context/
-    options:
-      - { text: "The database is too slow to record spans", correct: false }
       - {
-          text: "The `traceparent` header is not forwarded on the outgoing HTTP call",
+          text: "Check latency metrics and other slow traces to see if Inventory is slow for most requests",
           correct: true,
         }
       - {
-          text: "Spans can only be linked when both services use the same language",
+          text: "Nothing: the trace measured a real request, so it already proves that Inventory is the bottleneck for every user",
           correct: false,
         }
-      - { text: "The sampling rate is above 50%", correct: false }
+      - {
+          text: "Turn on debug logging in Inventory and wait for the same request to happen again",
+          correct: false,
+        }
+      - {
+          text: "Rerun the same checkout once by hand and trust the second trace if it agrees with the first",
+          correct: false,
+        }
+  - type: single
+    prompt: "In a trace, the Orders span lasts 900 ms. Its child spans, a database query and a call to Pricing, add up to 120 ms, and nothing else appears under it. Where is the rest of the time most likely spent?"
+    explanation: "Time in a span that no child span covers is spent inside the service itself: CPU work, waiting for a lock or a pooled connection, or a call nobody instrumented. The next step is to profile Orders or add spans around its internal steps. Child spans exist only for instrumented operations, so their absence does not point at the network, the database or the tracer."
+    theoryUrl: https://opentelemetry.io/docs/concepts/signals/traces/
+    options:
+      - {
+          text: "Inside Orders itself, in its own work or in calls that are not instrumented",
+          correct: true,
+        }
+      - {
+          text: "In the network between the services, which a trace never attributes to any span",
+          correct: false,
+        }
+      - {
+          text: "In the tracing library, since exporting spans usually takes most of a request's time",
+          correct: false,
+        }
+      - {
+          text: "In the database, because database time is always hidden from traces and shows only in metrics",
+          correct: false,
+        }
   - type: single
     prompt: "A trace of a slow page shows the Orders span followed by 40 short, back-to-back calls to the Pricing service, one per order line. What does this point to, and what is the usual fix?"
     explanation: "Each call is short, but 40 sequential network round trips add up, and the trace waterfall makes the pattern obvious. Batching (one call for all lines) or at least running the calls concurrently removes most of the latency. Sampling changes what is stored, not how long requests take, and since each call is short the database is not the bottleneck."
