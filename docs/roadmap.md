@@ -121,6 +121,10 @@ Spec: `specs/paths.md` (phase 1, KQ42, live in production since 2026-11-11; arch
 - [ ] KQ51: The header nav is messy at desktop widths, replace the account cluster with a menu
   Labels wrap onto two lines ("Browse / quizzes", "My / mistakes"): the `<Link>` has `whitespace-nowrap`, but the label span's `sm:not-sr-only` resets `white-space: normal`. The truncated "Signed in as Alessand…" takes the room, the gaps differ (`gap-6` vs `gap-3`), and "Sign out" is a boxed button among quiet links. Decided 2026-11-12: one account button (name/avatar) opening a dropdown with My mistakes and Sign out, plus the wrap fix and even spacing. Build it through the UI agents (`ts-fullstack:frontend-expert` + `ts-fullstack:css-expert`, `frontend-design` skill) and check it with `pnpm shots` against `pnpm build`.
   _`src/components/site-header.tsx`, `src/components/sign-out-button.tsx`_
+  2026-11-13 — built 23e828d, not pushed: account menu (name row, My mistakes, Sign out with failure message), round neutral initial, nowrap labels, one gap scale; reviewed (code + UX), shots on a production build at 375/768/1440 light+dark; pnpm check green 873/873
+- [ ] KQ52: "My mistakes" has no entry point besides the account menu
+  KQ51 moved My mistakes into the account menu, and nothing else in the app links to `/mistakes`, so a new player never meets it by scanning the bar. Add a contextual "Review in My mistakes" link where mistakes are made: the run summary, when the run had wrong answers and the player is signed in. Done when a signed-in player who got something wrong sees the link on the summary (check with `pnpm shots --play summary`).
+  _run summary in `src/components/run/`_
 
 ## Tooling — each of these has already cost a wasted cycle
 
