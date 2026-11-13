@@ -18,30 +18,38 @@ questions:
       - { text: "About 52 minutes", correct: false }
       - { text: "About 5 minutes", correct: false }
   - type: single
-    prompt: "Your contract promises 99.95% monthly availability and a month has 30 days. About how many minutes of downtime fit in the error budget?"
-    explanation: "A 30-day month has 43,200 minutes, and 0.05% of that is 21.6 minutes. The 43 minutes figure is the budget for 99.9%, and 4.3 minutes is the one for 99.99%."
-    theoryUrl: https://sre.google/sre-book/embracing-risk/
+    prompt: "An object store advertises far higher durability than availability. What is the difference between the two?"
+    explanation: "Durability is the probability that stored data is not lost over time; availability is the probability that you can read or write it right now. A service can be briefly unreachable without losing anything, which is why durability targets are usually much higher. Neither is about latency, and the two are measured independently."
+    theoryUrl: https://docs.aws.amazon.com/AmazonS3/latest/userguide/DataDurability.html
     options:
-      - { text: "About 43 minutes", correct: false }
-      - { text: "About 4.3 minutes", correct: false }
-      - { text: "About 21.6 minutes", correct: true }
-      - { text: "About 2.2 hours", correct: false }
+      - {
+          text: "Durability is not losing stored data; availability is being able to access it now",
+          correct: true,
+        }
+      - {
+          text: "Durability measures write latency, availability measures read latency",
+          correct: false,
+        }
+      - {
+          text: "Durability is about the hardware, availability is about the network between regions",
+          correct: false,
+        }
+      - { text: "They are the same metric, quoted over different time windows", correct: false }
   - type: single
-    prompt: "What does this script print?"
-    code: |
-      // each dependency is 99.9% available
-      const serial = 0.999 * 0.999 * 0.999;
-      // two independent replicas, each 99% available
-      const redundant = 1 - (1 - 0.99) ** 2;
-      console.log(serial.toFixed(4), redundant.toFixed(4));
-    codeLanguage: javascript
-    explanation: "A request that needs all three dependencies in series is only up when all are up, so the availabilities multiply: 0.9970. With two independent replicas the system is down only if both are down: 1 - 0.01^2 = 0.9999. Chaining hard dependencies lowers availability, redundancy raises it."
-    theoryUrl: https://docs.aws.amazon.com/wellarchitected/latest/reliability-pillar/availability.html
+    prompt: "Placing an order calls the email service synchronously to send the confirmation. When the email service is down, customers cannot place orders. Which change best protects the ordering flow?"
+    explanation: "The confirmation email is not needed to accept the order, so it should not be a hard dependency. Saving the order and publishing a message that an email worker consumes later lets orders succeed while email is down, and the backlog drains when it recovers. Retrying inline or adding email replicas keeps the email service on the critical path."
+    theoryUrl: https://learn.microsoft.com/en-us/azure/architecture/patterns/queue-based-load-leveling
     options:
-      - { text: "0.9990 0.9900", correct: false }
-      - { text: "0.9970 0.9999", correct: true }
-      - { text: "0.9997 0.9999", correct: false }
-      - { text: "0.9970 0.9800", correct: false }
+      - { text: "Publish a message to a queue and send the email asynchronously", correct: true }
+      - { text: "Retry the email call inline before failing the order", correct: false }
+      - {
+          text: "Add more email service replicas so it is less likely to be down when an order arrives",
+          correct: false,
+        }
+      - {
+          text: "Send the email first, and only save the order once the email is confirmed",
+          correct: false,
+        }
   - type: single
     prompt: "A team computes that two replicas at 99% each give 99.99% availability. In production they still see outages about as often as with one replica. What is the most likely flaw in the calculation?"
     explanation: "The formula assumes independent failures. Replicas that share an AZ, a deployment pipeline, a config store or a bad release fail together, so the real availability is capped by the shared component. Replica count, nines in the SLA and load balancer cost are not the cause."
@@ -103,20 +111,20 @@ questions:
           correct: false,
         }
   - type: single
-    prompt: "A back-office system must be back within 1 hour (RTO) and may lose a few minutes of data (RPO). It is used rarely and the budget is tight. Which DR strategy fits best?"
-    explanation: "Pilot light keeps data replicated and the minimal core ready in the second region, then scales out on failover: recovery in tens of minutes at low cost. Backup and restore usually takes hours. Warm standby and active-active meet the targets but cost much more than the requirement justifies."
-    theoryUrl: https://docs.aws.amazon.com/whitepapers/latest/disaster-recovery-workloads-on-aws/disaster-recovery-options-in-the-cloud.html
+    prompt: "A team runs its database with a synchronous standby in a second AZ and argues that backups are no longer needed. Which failure shows they are wrong?"
+    explanation: "Replication copies every change, including bad ones: a faulty migration or an accidental DELETE reaches the standby within milliseconds. Only point-in-time backups let you restore to a moment before the mistake. A lost AZ or a crashed primary are exactly what the standby protects against."
+    theoryUrl: https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_PIT.html
     options:
-      - { text: "Multi-site active-active in two regions", correct: false }
-      - { text: "Backup and restore from weekly snapshots", correct: false }
       - {
-          text: "Warm standby running at full production capacity, with continuous cross-region replication",
-          correct: false,
-        }
-      - {
-          text: "Pilot light with replicated data and a minimal core, scaled out on failover",
+          text: "A faulty migration deletes rows, and the deletion is replicated at once",
           correct: true,
         }
+      - { text: "The primary's AZ loses power for several hours", correct: false }
+      - {
+          text: "The primary instance crashes because of a hardware fault on its host machine",
+          correct: false,
+        }
+      - { text: "A spike in reads saturates the primary's CPU during a sale", correct: false }
   - type: multi
     prompt: "A zone outage must not take your service down. Which measures help? Select all that apply."
     explanation: "Spreading instances and data across AZs, and pre-provisioning enough capacity so a zone loss needs no scale-up (static stability) both remove the dependency on control-plane actions during the failure. Buying a bigger instance in the same AZ does nothing for an AZ outage."
@@ -213,21 +221,21 @@ questions:
       - { text: "Add read replicas and a cache, accepting replication lag", correct: true }
       - { text: "Move the product catalog to a multi-region active-active store", correct: false }
   - type: single
-    prompt: "A downstream service is slow. Every client retries immediately up to 5 times on timeout, and the slow service goes from degraded to completely down. What is happening and how do you mitigate it?"
-    explanation: "Immediate retries multiply the load on an already struggling dependency (retry storm), turning a partial failure into a cascading one. Use capped exponential backoff with jitter, a retry budget, and a circuit breaker. More retries or a longer timeout make it worse."
-    theoryUrl: https://aws.amazon.com/builders-library/timeouts-retries-and-backoff-with-jitter/
+    prompt: "A bad configuration push took down the service for every customer at once. Which architectural approach most directly limits how many customers one such failure can affect?"
+    explanation: "A cell-based architecture splits the service into independent copies (cells), each serving a subset of customers, and changes roll out one cell at a time. A bad change or a poison request then hits only one cell. More replicas sharing one config, or bigger instances, still fail together."
+    theoryUrl: https://docs.aws.amazon.com/wellarchitected/latest/reducing-scope-of-impact-with-cell-based-architecture/reducing-scope-of-impact-with-cell-based-architecture.html
     options:
       - {
-          text: "A retry storm amplifies load, use backoff with jitter, retry budgets and a breaker",
+          text: "Split the service into independent cells and roll changes out cell by cell",
           correct: true,
         }
-      - { text: "A memory leak in the client, upgrade the HTTP library", correct: false }
       - {
-          text: "Too few retries, raise the count to 10 so requests eventually succeed after recovery",
+          text: "Add more replicas behind the same load balancer, all reading the same config",
           correct: false,
         }
+      - { text: "Move to larger instances so each one has more headroom", correct: false }
       - {
-          text: "The timeout is too short, raise it to 60 seconds and retry less often",
+          text: "Store the configuration in a highly available, replicated key-value store shared by all instances",
           correct: false,
         }
   - type: multi
@@ -255,35 +263,38 @@ questions:
         }
       - { text: "Pick the attribute that is easiest to test and ignore the others", correct: false }
   - type: single
-    prompt: "A load balancer health check calls /health, which queries the database. The database has a 30-second hiccup and the whole fleet is marked unhealthy, causing a full outage. What is the better design?"
-    explanation: "A deep health check that depends on a shared component makes every instance fail together, so the LB removes them all. Keep the load balancer check shallow (the process can serve) and surface dependency state through separate monitoring and graceful degradation."
-    theoryUrl: https://aws.amazon.com/builders-library/implementing-health-checks/
+    prompt: "Going from 8 to 16 instances raises a service's throughput by only 10%, and going to 32 actually lowers it. CPU on each instance is low. What is the most likely cause?"
+    explanation: "Throughput that flattens and then falls as nodes are added is the signature of contention and coordination costs: instances wait on a shared resource such as a hot database row, a lock or a single-writer queue, and more instances mean more waiting. The Universal Scalability Law describes this. The fix is to remove or partition the shared bottleneck, not to add instances or bigger machines."
+    theoryUrl: https://en.wikipedia.org/wiki/Neil_J._Gunther
     options:
-      - { text: "Increase the check frequency so recovery is detected faster", correct: false }
       - {
-          text: "Add a second database query to the check for better coverage of every dependency's health",
-          correct: false,
-        }
-      - {
-          text: "Make the LB check shallow; handle dependency failures with degradation and alerts",
+          text: "The instances contend for a shared resource, such as a lock or a hot row",
           correct: true,
         }
-      - { text: "Disable health checks entirely and rely on client retries", correct: false }
+      - {
+          text: "The instances are too small; a larger instance type would make throughput scale linearly",
+          correct: false,
+        }
+      - { text: "The load balancer uses round robin instead of least connections", correct: false }
+      - { text: "Autoscaling is too slow to add instances", correct: false }
   - type: single
-    prompt: "The recommendation service behind your product page is down. What should the page do to protect availability?"
-    explanation: "Graceful degradation keeps the core function (showing and buying the product) working by dropping the non-critical dependency, with a short timeout and a fallback such as cached or generic items. Failing the whole page makes a soft dependency behave like a hard one."
-    theoryUrl: https://martinfowler.com/bliki/CircuitBreaker.html
+    prompt: "An internal admin endpoint is called a few times per minute and answers in 300 ms with clear, well-tested code. A developer proposes a hand-tuned rewrite that reaches 50 ms but is much harder to read and change. How should the architect judge it?"
+    explanation: "Quality attributes are traded against each other according to business value. Here the latency gain buys nothing users need, while the loss of maintainability makes every future change slower and riskier, so the rewrite is not worth it. Faster is not automatically better, and keeping the same tests does not restore readability."
+    theoryUrl: https://wiki.c2.com/?PrematureOptimization
     options:
-      - { text: "Return a 503 for the whole page until recommendations are back", correct: false }
       - {
-          text: "Render the page with a fallback (cached or generic items) after a short timeout",
+          text: "Reject it: the speed-up has no business value and costs maintainability",
           correct: true,
         }
       - {
-          text: "Retry the recommendation call for up to 30 seconds before rendering the page without it",
+          text: "Accept it, because lower latency always improves the user experience",
           correct: false,
         }
-      - { text: "Redirect users to a static maintenance page", correct: false }
+      - {
+          text: "Accept it, as long as the hand-tuned code is covered by the same tests as the old code",
+          correct: false,
+        }
+      - { text: "Reject it, because fast code is always harder to test", correct: false }
   - type: single
     prompt: "Why does 'static stability' recommend pre-provisioning capacity for an AZ failure instead of relying on autoscaling to replace it?"
     explanation: "During a large failure many customers hit the control plane at the same time, and scaling actions may be slow or fail. A statically stable design keeps working using resources already in place, without needing any control-plane call at the moment of failure."

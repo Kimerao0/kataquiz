@@ -9,35 +9,38 @@ run:
   timePerQuestionSec: 90
 questions:
   - type: single
-    prompt: "A URL shortener creates codes from an auto-incrementing counter, encoded in base62. What does this print?"
-    code: |
-      const ALPHABET = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
-      function encode(n) {
-        let out = '';
-        while (n > 0) {
-          out = ALPHABET[n % 62] + out;
-          n = Math.floor(n / 62);
+    prompt: "A URL shortener derives each code from the first 7 characters of a hash of the long URL. What must this design handle that a counter-based design avoids by construction?"
+    explanation: "Truncating a hash to a few characters makes collisions between different URLs likely as the number of links grows (the birthday problem), so the write path must detect a clash and resolve it, for example by re-hashing with a salt. A counter gives each link a unique number, so it cannot collide. Determinism (same URL, same code) is a feature of hashing, and code length stays fixed."
+    theoryUrl: https://en.wikipedia.org/wiki/Birthday_problem
+    options:
+      - { text: "Two different long URLs can map to the same code", correct: true }
+      - {
+          text: "The same long URL always produces the same code, which must be prevented",
+          correct: false,
         }
-        return out;
-      }
-      console.log(encode(1000), encode(62), encode(3844));
-    codeLanguage: javascript
-    explanation: "1000 = 16*62 + 8, and index 16 is 'g', so 1000 becomes 'g8'. 62 is 1*62 + 0, giving '10', and 3844 is 62^2, giving '100'. Counter-based codes are collision-free by construction but predictable, unlike truncated hashes, which can collide."
-    theoryUrl: https://en.wikipedia.org/wiki/Snowflake_ID
-    options:
-      - { text: "g8 10 100", correct: true }
-      - { text: "8g 01 001", correct: false }
-      - { text: "g8 1 10", correct: false }
-      - { text: "16 62 3844", correct: false }
+      - { text: "Codes grow longer as more links are stored", correct: false }
+      - {
+          text: "Hash functions are too slow to run on every write, so codes must be precomputed in batches",
+          correct: false,
+        }
   - type: single
-    prompt: "A shortener expects 1 billion new URLs per year for 10 years. Codes use base62 (a-z, A-Z, 0-9). What is the minimum code length that can hold all of them?"
-    explanation: "62^5 is about 916 million, too few. 62^6 is about 56.8 billion, which covers 10 billion with headroom. 62^7 (3.5 trillion) is more than needed, and every extra character makes URLs longer, which matters for a shortener."
-    theoryUrl: https://en.wikipedia.org/wiki/Snowflake_ID
+    prompt: "A shortener issues codes from a sequential counter. Some customers shorten private document links, and a researcher shows that anyone can walk the code space and find them. Which change addresses this best?"
+    explanation: "Sequential codes are predictable, so neighbouring codes are easy to guess. Non-sequential codes (random with a collision check, or a counter passed through a reversible permutation) in a sparse code space make enumeration impractical, and truly private links also need access control. Rate limiting only slows the walk, and a random starting value leaves the codes sequential."
+    theoryUrl: https://cheatsheetseries.owasp.org/cheatsheets/Insecure_Direct_Object_Reference_Prevention_Cheat_Sheet.html
     options:
-      - { text: "5 characters", correct: false }
-      - { text: "6 characters", correct: true }
-      - { text: "7 characters", correct: false }
-      - { text: "8 characters", correct: false }
+      - {
+          text: "Issue non-sequential codes in a sparse code space, and protect private links",
+          correct: true,
+        }
+      - { text: "Start the counter at a large random number instead of 1", correct: false }
+      - {
+          text: "Rate-limit redirects per IP address so that walking the space takes a little longer",
+          correct: false,
+        }
+      - {
+          text: "Switch the redirect from 302 to 301 so the codes are cached by browsers",
+          correct: false,
+        }
   - type: single
     prompt: "A shortener must report the number of clicks for each link. Which redirect status fits best?"
     explanation: "A 301 is permanent and may be cached by browsers and proxies, so later clicks never reach your server and are not counted. A 302 (or 307) is temporary and not cached by default, so every click hits the service, at the cost of more traffic. 200 with a meta refresh is not a redirect."
@@ -180,14 +183,26 @@ questions:
           correct: true,
         }
   - type: single
-    prompt: "A mobile client sends a message and the connection drops before it sees an acknowledgement. What delivery design gives users the best experience?"
-    explanation: "Networks make exactly-once impossible, so use at-least-once: the client retries until acknowledged, and the server deduplicates by a client-generated message id, so the effect is exactly-once. At-most-once loses messages, and without dedup retries duplicate them."
-    theoryUrl: https://microservices.io/patterns/communication-style/idempotent-consumer.html
+    prompt: "User B is offline for two hours while several conversations receive messages. When B reconnects, how should the client reliably get everything it missed?"
+    explanation: "Messages are persisted as they arrive, and the client remembers the last sequence number it has seen per conversation; on reconnect it asks storage for everything after that point. Push notifications are only a hint to wake the app, since they can be dropped or collapsed. A gateway's memory or a fire-and-forget pub/sub channel is not durable storage for an offline user."
+    theoryUrl: https://redis.io/docs/latest/develop/interact/pubsub/
     options:
-      - { text: "At-most-once, with no retry, to avoid duplicates", correct: false }
-      - { text: "Retry blindly and let users delete the duplicates", correct: false }
-      - { text: "At-least-once with a client message id deduplicated by the server", correct: true }
-      - { text: "Two-phase commit between the phone and the server", correct: false }
+      - {
+          text: "Fetch from storage everything after the last sequence number it saw",
+          correct: true,
+        }
+      - {
+          text: "Rely on the push notifications, since each one carries a missed message",
+          correct: false,
+        }
+      - {
+          text: "Ask the gateway, which buffers undelivered messages in memory until the user returns",
+          correct: false,
+        }
+      - {
+          text: "Replay the pub/sub channel, which keeps every message published while B was away",
+          correct: false,
+        }
   - type: single
     prompt: "A chat service stores billions of messages. The main access pattern is: append to a conversation, and read the latest N messages of one conversation. Which storage design fits?"
     explanation: "The workload is write-heavy and always scoped by conversation, so a wide-column or LSM-based store partitioned by conversation id and clustered by time gives sequential reads of the newest rows. General joins are not needed, and a single relational primary becomes the write bottleneck."
@@ -261,26 +276,26 @@ questions:
       - { text: "Tell users to expect delays during provider outages", correct: false }
       - { text: "Replace SMS with email for every message", correct: false }
   - type: single
-    prompt: "A fixed-window rate limiter allows 3 requests per 10-second window. What does this print?"
-    code: |
-      const LIMIT = 3, WINDOW = 10;
-      const counts = new Map();
-      function allow(t) {
-        const w = Math.floor(t / WINDOW);
-        const c = (counts.get(w) ?? 0) + 1;
-        counts.set(w, c);
-        return c <= LIMIT;
-      }
-      const times = [8, 9, 9.5, 10, 11, 12, 12.5];
-      console.log(times.filter(allow).length);
-    codeLanguage: javascript
-    explanation: "Requests at 8, 9 and 9.5 fall in window 0 (all allowed), and those at 10, 11 and 12 fall in window 1 (allowed). Only 12.5 is rejected. So 6 requests pass within 4.5 seconds, double the nominal rate: the classic boundary burst of fixed windows."
-    theoryUrl: https://cloud.google.com/architecture/rate-limiting-strategies-techniques
+    prompt: "A rate limiter keeps a log of every request timestamp per client to enforce '10,000 requests per hour' as a precise sliding window. Memory use grows huge with millions of clients. Which alternative keeps the sliding behaviour at a fraction of the cost?"
+    explanation: "A sliding window counter stores only the counts of the current and previous fixed windows and weights the previous one by how much of it still overlaps the sliding window. It needs constant memory per client and avoids most of the fixed window's boundary burst, at the price of a small approximation. A plain fixed window is cheap but reintroduces the boundary burst, and moving or sampling the log does not fix the cost model."
+    theoryUrl: https://blog.cloudflare.com/counting-things-a-lot-of-different-things/
     options:
-      - { text: "3", correct: false }
-      - { text: "4", correct: false }
-      - { text: "5", correct: false }
-      - { text: "6", correct: true }
+      - {
+          text: "Keep two counters per client, current and previous window, and weight the previous one",
+          correct: true,
+        }
+      - {
+          text: "Keep the log but move it from Redis to a relational table indexed by client and timestamp",
+          correct: false,
+        }
+      - {
+          text: "Switch to a fixed window counter, which has the same behaviour with less memory",
+          correct: false,
+        }
+      - {
+          text: "Sample one request in a hundred into the log and multiply the count by 100",
+          correct: false,
+        }
   - type: single
     prompt: "An API should let clients burst briefly, for example 20 requests at once, but average no more than 5 requests per second. Which algorithm models this directly?"
     explanation: "A token bucket refills at a steady rate (the average) and has a capacity (the allowed burst). A leaky bucket smooths output to a constant rate, and a fixed window has boundary bursts without control. A concurrency limit caps in-flight requests, not rate."
@@ -303,50 +318,59 @@ questions:
       - { text: "The counter expires too early, raise the TTL to one hour", correct: false }
       - { text: "Network latency is too high, move Redis to every node", correct: false }
   - type: single
-    prompt: "The Redis cluster behind a rate limiter for a public read API goes down. The limiter exists to protect the backend from accidental overload, not to enforce security. What is the best behaviour?"
-    explanation: "For a protective limiter, failing closed turns a limiter outage into a full API outage. Failing open with a conservative per-node local limit keeps the service available while still bounding overload. Fail closed is right for security controls such as login attempts."
+    prompt: "An API runs in three regions, and its rate limiter uses one central Redis in the US. European requests now pay a transatlantic round trip on every call just for the limit check. What is the usual trade-off to make?"
+    explanation: "Keep counters in each region (splitting the client's budget across regions, or syncing counts asynchronously) and accept that the global limit is enforced approximately. A limit that is off by a few percent for a short time is usually acceptable, while adding cross-region latency to every request is not. Synchronous replication brings the latency back, and dropping the limit removes the protection."
     theoryUrl: https://cloud.google.com/architecture/rate-limiting-strategies-techniques
     options:
-      - { text: "Fail closed and return 429 for every request until Redis is back", correct: false }
       - {
-          text: "Fail open with a conservative per-node in-memory limit as fallback",
+          text: "Use regional counters and accept approximate enforcement of the global limit",
           correct: true,
         }
-      - { text: "Queue every request in memory until Redis returns", correct: false }
-      - { text: "Disable the backend until the limiter recovers", correct: false }
+      - {
+          text: "Keep the central Redis and run the limit check in parallel with the request, rejecting it afterwards",
+          correct: false,
+        }
+      - { text: "Remove the rate limiter for European traffic", correct: false }
+      - {
+          text: "Replicate the US Redis synchronously into every region before each check",
+          correct: false,
+        }
   - type: single
-    prompt: "A client exceeds its limit. What should the API respond so well-behaved clients can adapt?"
-    explanation: "HTTP 429 Too Many Requests signals the limit was hit, and a Retry-After header tells the client how long to wait, which allows clients to back off correctly. A 500 suggests a server fault, a 403 suggests a permission problem, and a 200 hides the problem."
-    theoryUrl: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/429
+    prompt: "An API limits each client to 100 requests per second. One endpoint, a large report export, costs about a thousand times more than a normal call, and a few clients overload the database with exports while staying under their limit. What fits best?"
+    explanation: "A flat request count treats every call as equal, so it cannot protect against expensive ones. Weighting requests by cost (an export consumes many tokens) or giving the expensive endpoint its own, much lower limit aligns the limit with the load it actually creates. Lowering everyone's limit punishes cheap traffic, caching does not help when each export is different, and moving the endpoint only hides it from the limiter."
+    theoryUrl: https://cloud.google.com/architecture/rate-limiting-strategies-techniques
     options:
-      - { text: "500 Internal Server Error with a retry hint in the body", correct: false }
-      - { text: "403 Forbidden, then block the client for a day", correct: false }
-      - { text: "200 OK with an empty body to avoid error alarms", correct: false }
-      - { text: "429 Too Many Requests with a Retry-After header", correct: true }
+      - {
+          text: "Weight requests by cost, or give the export endpoint its own lower limit",
+          correct: true,
+        }
+      - {
+          text: "Lower the global limit to 10 requests per second for every client and endpoint",
+          correct: false,
+        }
+      - {
+          text: "Cache the export responses at the CDN so the database is protected",
+          correct: false,
+        }
+      - {
+          text: "Move the export endpoint to a separate domain so the limiter does not see it",
+          correct: false,
+        }
   - type: single
-    prompt: "A payment API implements idempotency keys. What does this print?"
-    code: |
-      const seen = new Map();
-      let balance = 100;
-      function charge(key, amount) {
-        if (seen.has(key)) return seen.get(key);
-        balance -= amount;
-        const result = { ok: true, balance };
-        seen.set(key, result);
-        return result;
-      }
-      charge('k1', 30);
-      charge('k1', 30);
-      charge('k2', 30);
-      console.log(balance, charge('k1', 30).balance);
-    codeLanguage: javascript
-    explanation: "The replay of `k1` returns the stored result without charging again, so only `k1` and `k2` take 30 each: balance is 40. The stored result for `k1` was captured when the balance was 70, so a retry returns that original response (70), not the current state."
-    theoryUrl: https://docs.stripe.com/api/idempotent_requests
+    prompt: "A payments service stores amounts as JavaScript numbers in euros, such as 19.99. Reconciliation keeps finding totals that differ by a cent. What is the standard fix?"
+    explanation: "Binary floating point cannot represent most decimal fractions exactly, so sums and conversions drift by fractions of a cent. Money is stored as integers in the smallest currency unit (cents) or as a decimal type, with the currency alongside, and rounding happens explicitly at defined points. Rounding only for display or using a wider float hides the error without removing it."
+    theoryUrl: https://martinfowler.com/eaaCatalog/money.html
     options:
-      - { text: "40 40", correct: false }
-      - { text: "10 10", correct: false }
-      - { text: "40 70", correct: true }
-      - { text: "70 70", correct: false }
+      - { text: "Store integer minor units, such as cents, with the currency", correct: true }
+      - { text: "Round every amount to two decimals only when it is displayed", correct: false }
+      - {
+          text: "Use a wider floating-point type so the rounding error becomes negligible",
+          correct: false,
+        }
+      - {
+          text: "Run reconciliation less often so the small differences are averaged out",
+          correct: false,
+        }
   - type: single
     prompt: "A ledger must always be able to explain where each cent went and support audits. Which data model fits?"
     explanation: "A double-entry, append-only ledger records each movement as balanced debit and credit entries that are never updated or deleted; corrections are new compensating entries. Balances are derived or cached from entries. A single mutable balance column loses the history."
@@ -363,27 +387,45 @@ questions:
         }
       - { text: "A cache of balances rebuilt from logs only when someone asks", correct: false }
   - type: single
-    prompt: "A checkout spans three services: Orders, Payments and Inventory, each with its own database. A failure after the payment must not leave stock reserved forever. What is the common approach?"
-    explanation: "A saga runs a sequence of local transactions with compensating actions (release stock, refund) when a later step fails. Two-phase commit across services is fragile and hurts availability. Ignoring the failure leaves inconsistent data."
-    theoryUrl: https://microservices.io/patterns/data/saga.html
+    prompt: "A shop wants to accept card payments while keeping its security and compliance (PCI DSS) scope as small as possible. Which architecture fits?"
+    explanation: "With the provider's hosted payment page or embedded fields, card numbers go straight from the browser to the provider, and your systems only see a token. That keeps raw card data out of your servers, logs and databases, which shrinks the compliance scope. Passing card numbers through your API, even without storing them, or storing them encrypted keeps those systems in scope."
+    theoryUrl: https://docs.stripe.com/security/guide
     options:
-      - { text: "A distributed two-phase commit across all three databases", correct: false }
-      - { text: "A shared database for the three services", correct: false }
-      - { text: "A saga of local transactions with compensating actions", correct: true }
-      - { text: "Run the steps in order and ignore failures after the payment", correct: false }
-  - type: single
-    prompt: "A payment provider sends webhooks for events. You see duplicates and out-of-order delivery, such as 'refunded' arriving before 'captured'. How should the handler be built?"
-    explanation: "Verify the signature, deduplicate by event id, and apply transitions of an explicit state machine so impossible or stale transitions are ignored or parked. Webhooks are at-least-once and unordered, so you can also fetch the current object from the provider API when in doubt."
-    theoryUrl: https://docs.stripe.com/webhooks
-    options:
-      - { text: "Process events in arrival order and trust the sequence", correct: false }
-      - { text: "Skip signature checks to keep the endpoint fast", correct: false }
       - {
-          text: "Verify the signature, deduplicate by event id and apply state transitions",
+          text: "Card data goes straight to the provider's hosted fields; you keep only a token",
           correct: true,
         }
       - {
-          text: "Reject every duplicate event with a 500 so the provider stops resending and drops the event",
+          text: "Your API receives card numbers and encrypts them before storing them in the database",
+          correct: false,
+        }
+      - {
+          text: "Your API forwards card numbers to the provider without storing them",
+          correct: false,
+        }
+      - {
+          text: "Card numbers are stored in a separate, firewalled database only the payments team can access",
+          correct: false,
+        }
+  - type: single
+    prompt: "After paying on the provider's hosted page, the customer is redirected back to your success URL, and your app marks the order paid when that page loads. Some paid orders are never fulfilled, and some unpaid ones are. What is the right design?"
+    explanation: "The redirect depends on the customer's browser: they can close the tab before it loads, or open the success URL without paying. Fulfil orders from a server-side signal, a signed webhook or a status query to the provider, and use the redirect only to show a status. A hard-to-guess URL or asking the customer to wait still trusts the client."
+    theoryUrl: https://docs.stripe.com/payments/checkout/fulfill-orders
+    options:
+      - {
+          text: "Fulfil on a signed webhook or a server-side status check, not on the redirect",
+          correct: true,
+        }
+      - {
+          text: "Make the success URL long and random so customers cannot guess it",
+          correct: false,
+        }
+      - {
+          text: "Keep the redirect, but also mark the order paid when the customer clicks Pay",
+          correct: false,
+        }
+      - {
+          text: "Ask the customer to stay on the page until the success URL has finished loading and confirmed the order",
           correct: false,
         }
   - type: boolean

@@ -164,10 +164,10 @@ questions:
       - { text: "No, a full RFC is for costly-to-reverse or cross-team changes", correct: true }
       - { text: "No, because linting is never an architectural concern", correct: false }
   - type: boolean
-    prompt: "An RFC process requires every reviewer to agree before the proposal can be accepted."
+    prompt: "A design doc delivers most of its value after the code is written, as a record of how the system was implemented."
     answer: false
-    explanation: "RFCs collect input, but they usually end with a decision by an owner or a defined group. Requiring unanimity gives every reviewer a veto and stalls decisions."
-    theoryUrl: https://github.com/rust-lang/rfcs
+    explanation: "A design doc is most valuable before implementation, while changing direction is still cheap: it surfaces trade-offs, alternatives and cross-team concerns for review. After launch it drifts from the code unless someone maintains it, and the code itself is the record of how things were built."
+    theoryUrl: https://www.industrialempathy.com/posts/design-docs-at-google/
   - type: single
     prompt: "What is an architectural fitness function?"
     explanation: "A fitness function is an objective, preferably automated check of an architectural characteristic (coupling, latency, security posture, and so on). It turns a design intention into something that can fail a build or raise an alert. A review checklist or diagram is not an objective measure."
@@ -184,30 +184,23 @@ questions:
           correct: false,
         }
   - type: single
-    prompt: "A fitness function runs in CI over this dependency list. What does the script print?"
-    code: |
-      const rules = { ui: ['app'], app: ['domain'], domain: [], infra: ['domain', 'app'] };
-      const imports = [
-        ['ui/Cart.ts', 'app/checkout.ts'],
-        ['app/checkout.ts', 'domain/order.ts'],
-        ['domain/order.ts', 'infra/db.ts'],
-        ['infra/db.ts', 'domain/order.ts'],
-        ['ui/Cart.ts', 'domain/order.ts'],
-      ];
-      const layer = (f) => f.split('/')[0];
-      const violations = imports.filter(([from, to]) => {
-        const a = layer(from), b = layer(to);
-        return a !== b && !rules[a].includes(b);
-      });
-      console.log(violations.length, violations.map(([f]) => f).join(','));
-    codeLanguage: javascript
-    explanation: "Only imports across layers are checked against the allowed list. `domain -> infra` is not allowed (domain depends on nothing), and `ui -> domain` skips the app layer, so there are two violations. `infra -> domain` is allowed, and same-layer imports are ignored."
+    prompt: "A fitness function fails the build when the p95 latency of a key endpoint exceeds 300 ms in a load test. It fails randomly because CI runs on noisy shared machines, and developers have started ignoring it. What is the best response?"
+    explanation: "A fitness function only guides the architecture if its result is trusted. Running the load test in a stable, dedicated environment, or comparing against a baseline with a tolerance, keeps the check objective while removing the noise. Deleting it loses the guard, a manual review makes it subjective again, and a huge threshold makes it meaningless."
     theoryUrl: https://www.thoughtworks.com/en-us/insights/articles/fitness-function-driven-development
     options:
-      - { text: "1 domain/order.ts", correct: false }
-      - { text: "3 domain/order.ts,infra/db.ts,ui/Cart.ts", correct: false }
-      - { text: "2 domain/order.ts,ui/Cart.ts", correct: true }
-      - { text: "0 (no violations)", correct: false }
+      - {
+          text: "Run it in a stable environment or against a baseline with a tolerance",
+          correct: true,
+        }
+      - { text: "Delete it, since performance cannot be checked automatically", correct: false }
+      - {
+          text: "Replace it with a manual performance review before each quarterly release",
+          correct: false,
+        }
+      - {
+          text: "Raise the threshold to 3 seconds so that it never fails on the shared machines",
+          correct: false,
+        }
   - type: single
     prompt: "Which of these is a continual (always-on) fitness function rather than a triggered one?"
     explanation: "Triggered fitness functions run on an event such as a commit or deployment (unit tests, dependency rules in CI, load tests in the pipeline). A continual one runs all the time in production, for example monitoring that alerts when p99 latency or an SLO is violated."
