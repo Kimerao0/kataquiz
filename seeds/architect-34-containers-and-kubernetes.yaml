@@ -39,7 +39,7 @@ questions:
         }
       - { text: "Edits persist only if the Pod runs as root", correct: false }
   - type: single
-    prompt: "A Deployment has 4 replicas with the strategy below. During a rolling update, what is the maximum number of Pods that can exist, and how many must stay available?"
+    prompt: "A team configures its API Deployment with the rolling-update strategy below. What trade-off does this choice make?"
     code: |
       apiVersion: apps/v1
       kind: Deployment
@@ -62,13 +62,25 @@ questions:
               - name: api
                 image: acme/api:2.0.0
     codeLanguage: yaml
-    explanation: "maxSurge 1 allows one extra Pod above the desired count (5 total), and maxUnavailable 0 means all 4 must stay available, so a new Pod must become Ready before an old one is removed. This is the safest but slowest setting and needs spare capacity."
+    explanation: "With no Pods allowed to be unavailable, a new Pod must become Ready before an old one is removed, so serving capacity never drops, at the price of a slower rollout and room in the cluster for an extra Pod. Old and new versions still serve side by side during any rolling update, and nothing here ties the rollout to the autoscaler or replaces all Pods at once."
     theoryUrl: https://kubernetes.io/docs/concepts/workloads/controllers/deployment/
     options:
-      - { text: "At most 4 Pods in total; 3 must stay available", correct: false }
-      - { text: "At most 5 Pods in total; all 4 must stay available", correct: true }
-      - { text: "At most 5 Pods in total; 3 must stay available", correct: false }
-      - { text: "At most 8 Pods in total; none are required to stay available", correct: false }
+      - {
+          text: "Capacity never drops during the rollout, but it is slower and needs room for an extra Pod",
+          correct: true,
+        }
+      - {
+          text: "Old and new versions never serve traffic at the same time, so the new release does not need to stay compatible with the old one",
+          correct: false,
+        }
+      - {
+          text: "All old Pods are replaced at once, accepting a short outage in exchange for the fastest rollout",
+          correct: false,
+        }
+      - {
+          text: "The rollout pauses whenever CPU rises above the autoscaler target, protecting users from load spikes during deploys",
+          correct: false,
+        }
   - type: single
     prompt: "After a bad rollout you run `kubectl rollout undo deployment/api`. What does Kubernetes do under the hood?"
     explanation: "A Deployment manages versions through ReplicaSets, one per Pod template revision. Undo scales the previous ReplicaSet back up and the current one down, following the same rolling-update strategy. It does not restore data, and it does not rebuild images."
@@ -181,27 +193,42 @@ questions:
       - { text: "The Ingress controller, by rerouting traffic to other clusters", correct: false }
       - { text: "A node autoscaler such as Cluster Autoscaler or Karpenter", correct: true }
   - type: single
-    prompt: "An HPA targets 60% average CPU. There are 4 replicas running at an average of 90% CPU. By the documented algorithm, what is the desired replica count?"
-    explanation: "desiredReplicas = ceil(currentReplicas * currentMetric / targetMetric) = ceil(4 * 90 / 60) = ceil(6) = 6. It is proportional, not additive, and it is bounded by min and max replicas."
+    prompt: "A shop runs flash sales announced in advance, where traffic jumps tenfold within 30 seconds. The HPA scales on CPU, but new Pods need about 3 minutes to pull the image and warm up, so the first minutes of every sale are full of errors. What is the most effective change?"
+    explanation: "The HPA is reactive: it adds Pods only after load has already arrived, and those Pods help only once they are Ready. For a known event, raise the minimum replicas ahead of time and keep headroom, so capacity is there before the spike. Faster metrics or a lower target still react after the spike starts, and limits do not add capacity."
     theoryUrl: https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/
     options:
-      - { text: "5", correct: false }
-      - { text: "7", correct: false }
-      - { text: "6", correct: true }
-      - { text: "8", correct: false }
+      - {
+          text: "Shorten the HPA metrics interval so that it notices the spike a few seconds earlier and scales out sooner",
+          correct: false,
+        }
+      - { text: "Raise the minimum replicas before each sale and keep headroom", correct: true }
+      - {
+          text: "Lower the CPU target to 20% so that the HPA reacts more aggressively once the sale traffic arrives",
+          correct: false,
+        }
+      - {
+          text: "Remove the CPU limits so the existing Pods can absorb the spike on their own",
+          correct: false,
+        }
   - type: single
-    prompt: "A team adds a liveness probe on `/health` that queries the database. The database has a 2-minute outage and the whole API fleet starts restarting in a loop. What was the design mistake?"
-    explanation: "A liveness probe should answer 'is this process stuck and beyond recovery?', not 'are my dependencies up?'. Restarting healthy Pods cannot fix the database and amplifies the outage. Dependency checks belong, with care, in readiness so Pods are taken out of rotation instead of killed."
+    prompt: "An API's liveness probe calls an endpoint served by the same busy request handlers, with a short timeout. During a traffic peak responses slow down, probes time out, and Kubernetes restarts Pods one after another, so the remaining Pods get even more load. What is the design lesson?"
+    explanation: "A liveness failure means 'restart me', which only helps a process that is truly stuck. An overloaded Pod is slow, not broken: restarting it removes capacity and pushes more load onto the others, a cascading failure. Keep liveness cheap and lenient, and handle overload with readiness, load shedding and scaling."
     theoryUrl: https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/
     options:
-      - { text: "The probe should have used TCP instead of HTTP", correct: false }
       - {
-          text: "Liveness should check only the process itself, not external dependencies",
+          text: "Make the liveness timeout even shorter, so overloaded Pods are recycled sooner and come back fresh",
+          correct: false,
+        }
+      - {
+          text: "Keep liveness cheap and lenient, since restarting overloaded Pods only removes capacity",
           correct: true,
         }
-      - { text: "Probes should be removed entirely in production clusters", correct: false }
       - {
-          text: "The probe interval should be exactly equal to the DB timeout, so restarts happen once the outage ends",
+          text: "Have the liveness probe also query the database, so it reflects the full request path",
+          correct: false,
+        }
+      - {
+          text: "Move the same check to the startup probe, which keeps running for the whole life of the Pod",
           correct: false,
         }
   - type: single

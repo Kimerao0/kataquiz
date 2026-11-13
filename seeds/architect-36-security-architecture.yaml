@@ -105,23 +105,23 @@ questions:
       - { text: "Client credentials grant", correct: true }
       - { text: "Implicit grant", correct: false }
   - type: single
-    prompt: "A developer runs this snippet on a JWT copied from the browser, without any key. What does it show, and what does that imply?"
-    code: |
-      const token =
-        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.' +
-        'eyJzdWIiOiJ1XzQyIiwicm9sZSI6ImFkbWluIiwiZW1haWwiOiJhbmFAZXhhbXBsZS5jb20ifQ.' +
-        'c2lnbmF0dXJl'
-
-      const [, payload] = token.split('.')
-      console.log(JSON.parse(Buffer.from(payload, 'base64url').toString()))
-    codeLanguage: javascript
-    explanation: "It prints `{ sub: 'u_42', role: 'admin', email: 'ana@example.com' }`. A signed JWT (JWS) is only encoded, not encrypted, so anyone holding it can read the claims. The signature protects integrity, not confidentiality, so secrets and sensitive data must not go into the payload unless using JWE."
+    prompt: "To save downstream lookups, a team puts each user's national ID number and credit score into the access JWT that the browser holds and sends to every API. They argue the token is signed with RS256, so the data is protected. What is wrong with the argument?"
+    explanation: "A signed JWT (JWS) is only base64url-encoded, so anyone who holds it, including the browser, scripts on the page, proxies and logs, can read the claims without any key. The signature guarantees integrity, not confidentiality. Keep sensitive data out of the payload, or look it up server-side; switching algorithm does not change this."
     theoryUrl: https://datatracker.ietf.org/doc/html/rfc7519
     options:
-      - { text: "It throws, because decoding requires the signing key", correct: false }
-      - { text: "It prints the claims in clear text; a signed JWT is not encrypted", correct: true }
-      - { text: "It prints only the header, because the payload is hashed", correct: false }
-      - { text: "It prints the claims, but only because the algorithm is HS256", correct: false }
+      - {
+          text: "Nothing, as long as the private key stays on the identity provider and is rotated regularly",
+          correct: false,
+        }
+      - {
+          text: "A signature stops tampering but not reading: anyone holding the token can decode the claims",
+          correct: true,
+        }
+      - {
+          text: "RS256 tokens are readable by anyone, but HS256 tokens would keep the claims confidential",
+          correct: false,
+        }
+      - { text: "Large claims make the signature invalid once the token exceeds 4 KB", correct: false }
   - type: single
     prompt: 'A user clicks "log out everywhere" after their laptop is stolen, but the stolen access JWT (1 hour lifetime, stateless validation) still works for 40 more minutes. What is the underlying limit, and the usual mitigation?'
     explanation: "Self-contained JWTs are valid until `exp` and the API does not consult any state, so they cannot be revoked immediately. Mitigate with short access-token lifetimes plus rotating refresh tokens that the server can revoke, or accept a small denylist or introspection check for high-risk APIs. Encrypting the JWT or rotating the key for everyone is a blunt tool."
@@ -281,22 +281,23 @@ questions:
       - { text: "Compress the traffic so it is harder to read", correct: false }
       - { text: "Move the load balancer to a different subnet", correct: false }
   - type: single
-    prompt: "A user lookup builds SQL from input as shown. For the given `name`, which rows does the query return?"
-    code: |
-      const name = "x' OR '1'='1"
-      const query =
-        `SELECT * FROM users WHERE name = '${name}' AND active = true`
-
-      console.log(query)
-      // SELECT * FROM users WHERE name = 'x' OR '1'='1' AND active = true
-    codeLanguage: javascript
-    explanation: "`AND` binds tighter than `OR`, so the condition is `name = 'x' OR ('1'='1' AND active = true)`. That returns every active user plus any user named x, even inactive ones. Either way the attacker rewrote the logic. Use parameterised queries so input is never parsed as SQL."
-    theoryUrl: https://owasp.org/www-community/attacks/SQL_Injection
+    prompt: "A forum lets users post comments that are stored and shown to everyone. A tester posts a comment containing a `<script>` tag and it runs in other users' browsers. Which defence addresses the root cause?"
+    explanation: "This is stored cross-site scripting, an injection flaw: untrusted data is interpreted as code in the page. The root-cause fix is context-aware output encoding when rendering (or a vetted sanitiser when some HTML must be allowed), with a Content Security Policy as defence in depth. Filtering the word 'script' is easy to bypass, and HTTPS or input length limits do not stop the payload."
+    theoryUrl: https://cheatsheetseries.owasp.org/cheatsheets/Cross_Site_Scripting_Prevention_Cheat_Sheet.html
     options:
-      - { text: "No rows, because the quotes make the statement a syntax error", correct: false }
-      - { text: "Only users whose name is exactly `x' OR '1'='1`", correct: false }
-      - { text: "All users, including inactive ones", correct: false }
-      - { text: "All active users, plus any user named x regardless of active", correct: true }
+      - {
+          text: "Reject any comment containing the word 'script', case-insensitively, before saving it to the database",
+          correct: false,
+        }
+      - {
+          text: "Encode output for its context when rendering, with a vetted sanitiser where HTML is allowed",
+          correct: true,
+        }
+      - {
+          text: "Serve the forum only over HTTPS, so the injected script cannot be loaded",
+          correct: false,
+        }
+      - { text: "Limit comments to 500 characters so payloads cannot fit", correct: false }
   - type: single
     prompt: "An endpoint `GET /api/orders/1042` returns the order for any authenticated user who requests that ID, including orders of other customers. Which OWASP Top 10 category is this, and what is the fix?"
     explanation: "This is Broken Access Control (an insecure direct object reference). The fix is to enforce authorization on the server for every object access, for example checking that the order belongs to the caller. Hiding the ID or making it unguessable helps a little but is not a control, and authentication alone proves identity, not permission."
@@ -313,20 +314,23 @@ questions:
           correct: true,
         }
   - type: single
-    prompt: "An image-import feature fetches any URL a user supplies. After launch, a researcher shows it can read the cloud instance metadata service and obtain role credentials. What is this vulnerability, and what is the best mitigation?"
-    explanation: "This is Server-Side Request Forgery (SSRF): the server is tricked into making requests to internal resources such as the link-local metadata address. Mitigate with an allow-list of destinations, blocking private and link-local ranges after DNS resolution, and hardening the metadata service (for example IMDSv2). Client-side validation and HTTPS-only checks do not stop it."
-    theoryUrl: https://owasp.org/Top10/A10_2021-Server-Side_Request_Forgery_%28SSRF%29/
+    prompt: "A pen test before launch finds that anyone can reset any account's password by entering the email address and the date of birth, both easy to find online. The code has no injection or crypto bugs and does exactly what the spec says. Which OWASP Top 10 category is this, and where is it fixed?"
+    explanation: "This is Insecure Design: the flaw is in the flow itself, so perfectly implemented code still produces it. It is fixed by redesigning the flow (a single-use, short-lived token sent to a verified channel) and prevented by threat modeling and secure design patterns before code is written. Better input validation, encryption or configuration cannot repair a design that trusts guessable facts."
+    theoryUrl: https://owasp.org/Top10/A04_2021-Insecure_Design/
     options:
       - {
-          text: "CSRF; add an anti-forgery token to the form and validate the Origin header on every request",
+          text: "Cryptographic failures; hash the date of birth in the database with a strong algorithm and a per-user salt",
           correct: false,
         }
-      - { text: "XSS; escape the URL when rendering it in HTML", correct: false }
       - {
-          text: "SSRF; allow-list destinations, block internal ranges, harden the metadata service",
+          text: "Insecure design; redesign the flow, and threat-model before coding",
           correct: true,
         }
-      - { text: "Open redirect; require the URL to use HTTPS", correct: false }
+      - {
+          text: "Injection; validate and sanitise the email and date fields more strictly before they reach the lookup",
+          correct: false,
+        }
+      - { text: "Security misconfiguration; turn off verbose error messages", correct: false }
   - type: single
     prompt: "Which approach is appropriate for storing user passwords?"
     explanation: "Use a slow, salted, memory-hard password hashing function such as Argon2id, scrypt or bcrypt, tuned so one guess is expensive. Fast general-purpose hashes like SHA-256 allow billions of guesses per second on GPUs, and reversible encryption lets an attacker with the key recover every password."

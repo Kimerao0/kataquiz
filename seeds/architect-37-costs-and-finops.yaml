@@ -116,35 +116,40 @@ questions:
           text: "Never use commitments, since on-demand is always the cheapest in total",
           correct: false,
         }
+  - type: boolean
+    prompt: "A reservation or savings plan with a 35% discount always costs less than on-demand for the same instance, whatever share of the term the instance actually runs."
+    answer: false
+    explanation: "A commitment is billed for every hour of the term whether or not you use it, while on-demand is billed only for hours used. It pays off only when the committed capacity is busy most of the time; for a workload that runs a few hours a day, on-demand or spot is cheaper despite the higher hourly price."
+    theoryUrl: https://docs.aws.amazon.com/savingsplans/latest/userguide/what-is-savings-plans.html
   - type: single
-    prompt: "A one-year commitment makes the effective hourly price 35% lower than on-demand, but you pay it for every hour of the year whether or not you use the instance. Roughly what utilization makes the commitment break even?"
-    explanation: "You pay 0.65 of the on-demand hourly price for all hours; on-demand costs 1.0 per hour used. Break-even is when used hours x 1.0 = 0.65 x total hours, so at 65% utilization. Above that the commitment is cheaper, below it you would have saved money with on-demand."
-    theoryUrl: https://aws.amazon.com/ec2/pricing/reserved-instances/
-    options:
-      - { text: "About 35% utilization", correct: false }
-      - { text: "About 50% utilization", correct: false }
-      - { text: "About 65% utilization", correct: true }
-      - { text: "About 85% utilization", correct: false }
-  - type: single
-    prompt: "A data-processing job in a private subnet reads about 20,000 GB per month from S3 through a NAT gateway. Assume the NAT gateway charges $0.045 per GB processed. What is the monthly processing cost, and what is the best fix?"
-    explanation: "20,000 GB x $0.045 = $900 per month in processing charges alone, on top of the hourly fee. An S3 gateway VPC endpoint routes S3 traffic privately at no per-GB charge, so the cost disappears. Larger NAT gateways do not change per-GB pricing, and moving the job to a public subnet weakens security for no reason."
+    prompt: "A data-processing job in a private subnet reads tens of terabytes per month from S3 in the same Region. The largest line on the network bill is NAT gateway data processing. What is the best fix?"
+    explanation: "The job's S3 traffic goes through the NAT gateway, which charges per GB processed. An S3 gateway VPC endpoint routes that traffic privately with no per-GB charge, so the cost disappears without changing the job. A second NAT gateway does not change per-GB pricing, and moving the job to a public subnet weakens security for no reason."
     theoryUrl: https://docs.aws.amazon.com/vpc/latest/privatelink/vpce-gateway.html
     options:
-      - { text: "$90 per month; add a second NAT gateway to share the load", correct: false }
-      - { text: "$900 per month; move the job to a public subnet with a public IP", correct: false }
-      - { text: "$9,000 per month; replace S3 with an on-premises store", correct: false }
-      - { text: "$900 per month; add an S3 gateway VPC endpoint", correct: true }
+      - {
+          text: "Add a second NAT gateway in another AZ so the processing charges are spread across two gateways",
+          correct: false,
+        }
+      - {
+          text: "Move the job to a public subnet with a public IP so it reaches S3 without the NAT gateway",
+          correct: false,
+        }
+      - { text: "Replace S3 with an on-premises file store", correct: false }
+      - { text: "Add an S3 gateway VPC endpoint for the subnet", correct: true }
   - type: single
-    prompt: "Your video platform serves 50,000 GB per month directly from EC2 instances to the public internet at an assumed $0.09 per GB of data transfer out. A colleague proposes a CDN in front. What is the most accurate evaluation?"
-    explanation: "Direct egress costs 50,000 x $0.09 = $4,500 per month before compute. A CDN caches popular content near viewers, reduces origin egress and usually offers cheaper per-GB transfer at volume, plus better latency. The real trade-off is CDN fees and cache-invalidation complexity, not that CDNs make egress free."
+    prompt: "Your video platform serves tens of terabytes per month directly from EC2 instances to the public internet, and data transfer out is now a larger line than compute. A colleague proposes a CDN in front. What is the most accurate evaluation?"
+    explanation: "A CDN caches popular content near viewers, so most bytes never leave the origin, and CDN transfer is usually cheaper per GB at volume, with better latency as a bonus. The real trade-off is CDN fees and cache-invalidation complexity, not that CDNs make egress free. Same-Region transfer rules do not apply to traffic leaving for the internet."
     theoryUrl: https://aws.amazon.com/blogs/architecture/overview-of-data-transfer-costs-for-common-architectures/
     options:
-      - { text: "Egress costs about $450; a CDN would not matter at this scale", correct: false }
       - {
-          text: "Egress costs about $4,500; a CDN cuts origin traffic and usually lowers per-GB cost",
+          text: "A CDN would not matter, because egress is billed on the origin whether or not a cache sits in front of it",
+          correct: false,
+        }
+      - {
+          text: "A CDN cuts origin egress for cached content and usually lowers per-GB cost",
           correct: true,
         }
-      - { text: "Egress is free when traffic stays inside the same Region", correct: false }
+      - { text: "Egress is free as long as viewers are in the same Region", correct: false }
       - {
           text: "A CDN is more expensive in all cases because it adds a second bill on top of origin egress",
           correct: false,
@@ -183,38 +188,53 @@ questions:
           correct: true,
         }
   - type: single
-    prompt: "A service logs every request at DEBUG level, ingesting 2,000 GB per month into a managed log service charging an assumed $0.50 per GB ingested, and nobody reads the logs older than a week. What is the best response?"
-    explanation: "Ingestion alone is 2,000 x $0.50 = $1,000 per month, plus storage. The fix is to log at INFO in production, sample verbose logs, drop noisy fields, and shorten retention (archiving to cheap storage if required). Deleting logging entirely removes your ability to debug incidents."
+    prompt: "A service logs every request at DEBUG level into a managed log service billed per GB ingested. Logging is now one of the top three lines on the bill, and nobody reads logs older than a week. What is the best response?"
+    explanation: "Log cost scales with volume ingested and retained, so cut the volume at the source: log at INFO in production, sample verbose logs, drop noisy fields, and shorten retention (archiving to cheap storage if compliance needs it). Disabling logging removes your ability to debug incidents, and longer retention only adds cost."
     theoryUrl: https://aws.amazon.com/cloudwatch/pricing/
     options:
       - {
           text: "Disable logging entirely; metrics are enough for incidents and cost nothing to store",
           correct: false,
         }
-      - { text: "Ingestion is about $100; ignore it", correct: false }
+      - { text: "Ignore it, since log ingestion is never a meaningful cost", correct: false }
       - {
-          text: "Ingestion is about $1,000; reduce levels, sample, and shorten retention",
+          text: "Lower the log level, sample verbose logs and shorten retention",
           correct: true,
         }
       - { text: "Double the retention so logs are safe, since storage is cheap", correct: false }
   - type: single
-    prompt: "A team runs a steady API on Lambda at 100 million requests per month. Assume a fully loaded Lambda cost of about $1.87 per million requests at this configuration, and two always-on containers that could serve the same load for a fixed $120 per month. Roughly at which monthly volume does Lambda stop being cheaper?"
-    explanation: "Break-even is 120 / 1.87, about 64 million requests per month. Above that, the fixed-cost containers are cheaper for a steady load; below it, pay-per-use wins, and it also wins for spiky or idle workloads. At 100 million steady requests Lambda would cost about $187, so the containers win, ignoring operational effort."
+    prompt: "A team runs an API on Lambda. Traffic used to be spiky, but it is now high and steady around the clock. A cost review suggests moving it to a few always-on containers. What is the reasoning behind that suggestion?"
+    explanation: "Pay-per-use pricing grows linearly with requests, while always-on containers are a roughly fixed cost that a steady load keeps busy, so above some steady volume the containers become cheaper. Functions still win for spiky, low or idle traffic, where fixed capacity would sit unused. The move should also weigh the operational effort the containers add."
     theoryUrl: https://aws.amazon.com/lambda/pricing/
     options:
-      - { text: "About 6 million requests per month", correct: false }
-      - { text: "About 64 million requests per month", correct: true }
-      - { text: "About 640 million requests per month", correct: false }
-      - { text: "Never; Lambda is always cheaper than containers", correct: false }
+      - {
+          text: "Lambda charges a growing premium per request once a function passes a monthly volume threshold",
+          correct: false,
+        }
+      - {
+          text: "Per-request cost grows with volume, while busy fixed capacity costs about the same",
+          correct: true,
+        }
+      - {
+          text: "Containers are always cheaper than functions, at any traffic level and for any traffic pattern",
+          correct: false,
+        }
+      - { text: "Lambda cannot handle steady traffic without throttling", correct: false }
   - type: single
-    prompt: "Development and staging environments run 24/7 but are used only during working hours, 10 hours a day on 5 days a week. What is the approximate saving from shutting them down outside those hours?"
-    explanation: "A week has 168 hours and the environments are needed for 50, so running only then saves 1 - 50/168, about 70% of the compute cost. Storage and fixed charges continue, so the real saving is slightly lower. Idle non-production environments are one of the easiest wins in cloud cost reviews."
+    prompt: "Development and staging environments run 24/7 but are used only during working hours on weekdays. Which change gives the largest saving at the lowest risk?"
+    explanation: "Scheduling non-production environments to stop or scale to zero outside working hours removes most of their compute cost, since the week has far more idle hours than working ones. Committing to reservations lowers the hourly price but still pays for every idle hour, deleting staging removes a safety net, and bigger instances only raise cost."
     theoryUrl: https://docs.aws.amazon.com/wellarchitected/latest/cost-optimization-pillar/welcome.html
     options:
-      - { text: "About 70% of compute cost", correct: true }
-      - { text: "About 30% of compute cost", correct: false }
-      - { text: "About 50% of compute cost", correct: false }
-      - { text: "Nothing, because instances are billed per month anyway", correct: false }
+      - { text: "Shut them down or scale to zero outside working hours", correct: true }
+      - {
+          text: "Buy three-year reservations for the environments, so every hour they run is billed at a discount",
+          correct: false,
+        }
+      - {
+          text: "Delete staging and test changes directly in production behind feature flags",
+          correct: false,
+        }
+      - { text: "Move them to bigger instances so builds finish sooner", correct: false }
   - type: single
     prompt: "Several teams share one Kubernetes cluster and the finance department asks which team caused last month's 40% cost rise. The bill shows a single line for the cluster. What should the platform team put in place?"
     explanation: "Cost allocation needs consistent metadata: tags or labels (team, service, environment) and tooling that attributes shared cluster cost, for example per-namespace requests, back to teams. Without it, showback or chargeback is guesswork. Splitting the bill evenly punishes efficient teams and gives no incentive to optimise."
@@ -269,15 +289,18 @@ questions:
         }
       - { text: "Compress every log file twice before upload", correct: false }
       - { text: "Add a lifecycle rule moving logs to colder storage after 30 days", correct: true }
-  - type: single
-    prompt: "An origin service costs $0.0004 per request to serve. At 10 million requests per month, a CDN cache hit ratio improves from 50% to 90%. Ignoring CDN fees, how much does the origin cost fall per month?"
-    explanation: "Origin requests drop from 5 million to 1 million, saving 4 million x $0.0004 = $1,600 per month. Caching improves cost per request and latency at once, which is why cache-hit ratio is an architectural lever for both."
-    theoryUrl: https://aws.amazon.com/cloudfront/pricing/
+  - type: multi
+    prompt: "A read-heavy API has a rising cost per request. Which architectural changes typically lower it? Select all that apply."
+    explanation: "Serving cacheable responses from a CDN or cache means most requests never reach the origin, and removing N+1 queries cuts database work per request. Synchronous fan-out with retries multiplies the work behind each request, and DEBUG logging on every request adds ingestion cost to each one."
+    theoryUrl: https://docs.aws.amazon.com/wellarchitected/latest/cost-optimization-pillar/welcome.html
     options:
-      - { text: "About $400", correct: false }
-      - { text: "About $4,000", correct: false }
-      - { text: "About $160", correct: false }
-      - { text: "About $1,600", correct: true }
+      - { text: "Serve cacheable responses from a CDN or cache in front of the origin", correct: true }
+      - { text: "Replace N+1 database queries with batched queries", correct: true }
+      - {
+          text: "Fan out each request synchronously to more services, with retries on every call",
+          correct: false,
+        }
+      - { text: "Log every request and response body at DEBUG level", correct: false }
   - type: boolean
     prompt: "The goal of FinOps is to reduce cloud spend to the lowest possible amount."
     answer: false

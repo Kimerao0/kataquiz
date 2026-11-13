@@ -39,53 +39,68 @@ questions:
       - { text: "Stricter than the SLA, to leave a safety margin before penalties", correct: true }
       - { text: "Unrelated to the SLA, because the two measure different things", correct: false }
   - type: single
-    prompt: "A service has a 99.9% availability SLO over a rolling 30-day window, measured by time. How much downtime does the error budget allow?"
-    explanation: "30 days is 43,200 minutes; 0.1% of that is 43.2 minutes. 99.99% would give about 4.3 minutes and 99% about 7.2 hours, which is why each additional nine is so much more expensive to reach."
+    prompt: "A B2B service gets almost all its traffic during office hours. Its availability SLO counts minutes of downtime, so a 30-minute outage at 3 a.m. costs as much budget as one at noon, when thousands of users are active. Which SLI better reflects what users experience?"
+    explanation: "A request-based SLI (good requests divided by valid requests) weights each failure by the traffic it hit, so a noon outage burns far more budget than a quiet-night one. Time-based SLIs treat every minute the same regardless of load. Dropping night hours or measuring only peak minutes still ignores how many users each failure affected."
     theoryUrl: https://sre.google/workbook/implementing-slos/
-    options:
-      - { text: "About 4.3 minutes", correct: false }
-      - { text: "About 43 minutes", correct: true }
-      - { text: "About 7.2 hours", correct: false }
-      - { text: "About 72 hours", correct: false }
-  - type: single
-    prompt: "An API handles about 10 million requests per month with a request-based SLO of 99.95% successful responses. Roughly how many failed requests does the monthly error budget allow?"
-    explanation: "The budget is 0.05% of 10,000,000, which is 5,000 failed requests. Request-based budgets scale with traffic, which is why they are more meaningful than time-based ones for services with uneven load."
-    theoryUrl: https://sre.google/workbook/implementing-slos/
-    options:
-      - { text: "500 requests", correct: false }
-      - { text: "50,000 requests", correct: false }
-      - { text: "5,000 requests", correct: true }
-      - { text: "500,000 requests", correct: false }
-  - type: single
-    prompt: "The error budget for the quarter is exhausted on week 8 after two incidents. The product manager wants to ship a big launch next week. What does a sound error budget policy say?"
-    explanation: "An agreed error budget policy trades velocity for reliability: when the budget is spent, risky changes pause and the team works on reliability until the service is back within SLO. Ignoring the budget makes the SLO meaningless, and 'raising the SLO retroactively' hides the problem."
-    theoryUrl: https://sre.google/workbook/error-budget-policy/
     options:
       - {
-          text: "Launch anyway, because product deadlines override reliability numbers once a launch is announced",
+          text: "Keep counting downtime minutes, but exclude night hours from the window because nobody is using the service then",
           correct: false,
         }
-      - { text: "Raise the SLO target for the next quarter and continue shipping", correct: false }
+      - { text: "The proportion of valid requests that succeed", correct: true }
       - {
-          text: "Pause non-essential launches and prioritise reliability work until recovery",
-          correct: true,
+          text: "Count only the minutes during the daily traffic peak, since that is when an outage really hurts the business",
+          correct: false,
         }
-      - { text: "Reset the error budget so the team starts fresh", correct: false }
+      - { text: "The number of incidents declared per month", correct: false }
   - type: single
-    prompt: "You are defining the availability SLI for a user-facing REST API. Which definition is best?"
-    explanation: "A good SLI is a ratio of good events to valid events measured as close to the user as practical, such as at the load balancer. Host CPU and process uptime say nothing about whether users got correct responses, and a synthetic ping from inside the cluster misses edge failures."
+    prompt: "A team ends every quarter with about 90% of its error budget unspent, while releases are slow because of heavy manual approvals and long freezes. Users are not asking for more reliability. What does SRE thinking suggest?"
+    explanation: "An error budget is meant to be spent: unused budget means the team is taking less risk than users need, paying for it in velocity. It can ship faster, relax manual gates or run riskier experiments, and check whether the SLO is set higher than users require. Tightening the SLO to match past performance would remove the room for change."
+    theoryUrl: https://sre.google/sre-book/embracing-risk/
+    options:
+      - {
+          text: "Tighten the SLO to match the reliability already achieved, so the team keeps those high standards from now on",
+          correct: false,
+        }
+      - { text: "Use the spare budget to ship faster and take more risk", correct: true }
+      - {
+          text: "Carry the unspent budget over into the next quarter, so that a later major launch can afford a long outage",
+          correct: false,
+        }
+      - { text: "Add more manual approvals, since they clearly work", correct: false }
+  - type: single
+    prompt: "Your availability SLI is measured at your load balancer. A third-party payment provider has a two-hour outage and checkout fails for users, burning most of your monthly error budget. A teammate wants to exclude those failures because the cause was not your code. What is the sound view?"
+    explanation: "The SLO describes what users experience, and they could not check out, so the failures count. A dependency's reliability caps your own; the response is to design for it (fallback provider, queuing orders for later capture, graceful degradation) or to set an SLO the dependency allows. Excluding external causes makes the SLO look healthy while users suffer."
     theoryUrl: https://sre.google/workbook/implementing-slos/
     options:
-      - { text: "Percentage of time the process is running on each host", correct: false }
-      - { text: "Average CPU utilization across the application servers", correct: false }
       - {
-          text: "Whether an in-cluster health endpoint answered successfully in the last minute, as seen by the orchestrator",
+          text: "Exclude them, because an error budget should only measure failures the team can actually control in its own code",
           correct: false,
         }
       - {
-          text: "Proportion of valid requests answered without a server error, measured at the load balancer",
+          text: "Count them, and design around the dependency or set an SLO it can support",
           correct: true,
         }
+      - {
+          text: "Count them only if the provider's own SLA was also breached during the outage",
+          correct: false,
+        }
+      - { text: "Pause the SLO until the provider publishes its postmortem", correct: false }
+  - type: single
+    prompt: "Product wants a latency SLO for a search API. Which formulation is most useful?"
+    explanation: "A latency SLO works best as a proportion of good events: the share of valid requests faster than a threshold over a window, which maps directly to an error budget. An average hides the slow tail that users feel, a maximum is dominated by a single outlier, and server CPU says nothing about response time."
+    theoryUrl: https://sre.google/sre-book/service-level-objectives/
+    options:
+      - { text: "Average latency below 200 ms over the month", correct: false }
+      - {
+          text: "No request ever slower than 1 second, measured as the maximum observed latency",
+          correct: false,
+        }
+      - {
+          text: "99% of valid requests complete in under 300 ms, over 30 days",
+          correct: true,
+        }
+      - { text: "Server CPU below 70%, so requests are never queued", correct: false }
   - type: single
     prompt: 'A stakeholder asks for a 100% availability SLO "because users hate downtime". What is the best response?'
     explanation: "100% is neither achievable nor desirable: users cannot perceive it because their own network and devices are less reliable, and each extra nine costs disproportionately more and blocks all change. Pick the level users actually need and use the remainder as budget for velocity."
@@ -138,14 +153,20 @@ questions:
       - { text: "Duration, because it is the time each request takes", correct: false }
       - { text: "Saturation, because work is queuing for the resource", correct: true }
   - type: single
-    prompt: "Dashboards show an average latency of 120 ms and the team says things look fine, yet some customers complain about timeouts. What is the best first step?"
-    explanation: "Averages hide the tail: a small percentage of very slow requests barely moves the mean. Look at latency percentiles (p95, p99) from histograms, because tail requests are often the ones that hit multiple slow dependencies or retries. Restarting servers or ignoring the complaints does not address the data gap."
-    theoryUrl: https://prometheus.io/docs/practices/histograms/
+    prompt: "Metrics show that checkout p99 latency doubled at noon. Checkout calls six downstream services, and each team says its own dashboards look normal. Which signal best shows where the extra time goes in a slow request?"
+    explanation: "A distributed trace breaks one request into spans across services, so you can see which call, retry or queue wait took the time. Metrics tell you that something is slow but are aggregated by design. Searching every service's logs by timestamp is slow and error-prone without a shared trace ID, and more host metrics only describe resources."
+    theoryUrl: https://opentelemetry.io/docs/concepts/signals/traces/
     options:
-      - { text: "Look at p95 and p99 latency from histograms, not only the average", correct: true }
-      - { text: "Increase the average latency alert threshold to avoid noise", correct: false }
-      - { text: "Restart all servers to clear accumulated state", correct: false }
-      - { text: "Conclude the complaints come from client-side networks", correct: false }
+      - {
+          text: "Each service's logs, searched by timestamp around noon and lined up by hand to rebuild the request's path",
+          correct: false,
+        }
+      - { text: "Distributed traces of slow checkout requests", correct: true }
+      - {
+          text: "A new metric label with the request ID, so each request gets its own latency series",
+          correct: false,
+        }
+      - { text: "Host CPU and memory dashboards for all six services", correct: false }
   - type: boolean
     prompt: "To get the fleet-wide p99 latency, it is valid to compute the p99 on each instance and then average those values."
     answer: false
@@ -179,20 +200,23 @@ questions:
         }
       - { text: "Use log levels so verbose output can be reduced in production", correct: true }
   - type: single
-    prompt: "In a distributed trace, how does a downstream service know it belongs to the same trace as the upstream caller?"
-    explanation: "The caller propagates the trace context, typically through the W3C `traceparent` header on HTTP calls, and the callee continues the trace by creating child spans with the same trace ID. Matching by timestamps or IP addresses would be unreliable."
-    theoryUrl: https://opentelemetry.io/docs/concepts/context-propagation/
+    prompt: "A company instruments 40 services with its observability vendor's proprietary SDK. Moving to another backend now means touching the code of every service. What does instrumenting with OpenTelemetry change?"
+    explanation: "OpenTelemetry is a vendor-neutral standard for the APIs, SDKs and wire protocol of telemetry, so code is instrumented once and the data can be exported to any compatible backend, often by changing only exporter or collector configuration. It does not store or visualise data itself, and it does not remove the need to decide what to instrument."
+    theoryUrl: https://opentelemetry.io/docs/what-is-opentelemetry/
     options:
       - {
-          text: "The tracing backend matches spans by similar timestamps and service names after the fact",
+          text: "It replaces the observability backend with a built-in storage and dashboard layer, so no vendor is needed any more",
           correct: false,
         }
-      - { text: "Both services must run on the same host and share memory", correct: false }
       - {
-          text: "The caller sends the trace context, such as a `traceparent` header, with the request",
+          text: "Instrumentation is written once against a standard and can export to any compatible backend",
           correct: true,
         }
-      - { text: "The callee guesses the caller from the source IP address", correct: false }
+      - {
+          text: "It instruments every service automatically, so teams never need to add spans or attributes",
+          correct: false,
+        }
+      - { text: "It only collects logs, leaving metrics and traces to the vendor", correct: false }
   - type: single
     prompt: "A trace for a checkout request shows the API gateway and the order service, but the downstream payment call that goes through a message queue appears as a separate, unrelated trace. What is the likely cause?"
     explanation: "Context propagation was not carried across the queue: the producer did not inject the trace context into the message headers and the consumer did not extract it, so the consumer starts a new root trace. HTTP-only instrumentation does not cover asynchronous messaging by itself."
