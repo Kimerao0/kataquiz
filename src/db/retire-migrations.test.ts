@@ -60,6 +60,7 @@ const R4_RETIRED_TITLES = [
   'Architect Roadmap 41: System design case studies',
 ]
 const R4_KEPT_TITLE = 'Architect Roadmap 40: Organization and teams'
+const R4_KEPT_TITLE_26 = 'Architect Roadmap 26: Distributed consistency'
 
 async function runMigration(tx: TestTx, file: string) {
   const text = readFileSync(join(process.cwd(), file), 'utf8')
@@ -379,6 +380,18 @@ describe('0011 retire architect R4', () => {
 
       const [quiz] = await tx.select().from(quizzes).where(eq(quizzes.id, kept.quizId))
       expect(quiz?.title).toBe(R4_KEPT_TITLE)
+      const [attempt] = await tx.select().from(attempts).where(eq(attempts.id, keptAttemptId))
+      expect(attempt?.quizId).toBe(kept.quizId)
+    })
+  })
+
+  it('keeps seed quiz 26 and its attempt', async () => {
+    await withTestDb(async (tx) => {
+      const { kept, keptAttemptId } = await arrange(tx, R4_RETIRED_TITLES, R4_KEPT_TITLE_26)
+      await runMigration(tx, R4_MIGRATION)
+
+      const [quiz] = await tx.select().from(quizzes).where(eq(quizzes.id, kept.quizId))
+      expect(quiz?.title).toBe(R4_KEPT_TITLE_26)
       const [attempt] = await tx.select().from(attempts).where(eq(attempts.id, keptAttemptId))
       expect(attempt?.quizId).toBe(kept.quizId)
     })
