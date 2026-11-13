@@ -357,7 +357,7 @@ questions:
       - { text: "Instances launched during an outage are billed at a higher rate", correct: false }
   - type: single
     prompt: "A startup with one product team runs on a single cloud. An architect proposes wrapping every managed service (queues, storage, database) in in-house abstractions and avoiding provider-specific features, so the system could move to another cloud. What is the main trade-off to weigh?"
-    explanation: "Portability is a quality attribute with a price: lowest-common-denominator abstractions take time to build and maintain, and they give up managed features that would save effort. For a small team with no concrete plan to switch, that cost buys an option it may never use; isolating only the few parts where a switch is likely is a cheaper hedge. Abstractions add no speed, and moving data out of a cloud is never free."
+    explanation: "Portability is a quality attribute with a price: lowest-common-denominator abstractions take time to build and maintain, and they give up managed features that would save effort. For a small team with no concrete plan to switch, that cost buys an option it may never use; isolating only the few parts where a switch is likely is a cheaper hedge. Abstractions add no speed, and even where providers waive exit fees, migrating data and rewiring services is real work."
     theoryUrl: https://martinfowler.com/articles/oss-lockin.html
     options:
       - {
@@ -369,7 +369,7 @@ questions:
           correct: false,
         }
       - {
-          text: "None: lock-in is irrelevant, because providers guarantee a free migration of all data out",
+          text: "None: lock-in is irrelevant, since leaving a provider costs nothing",
           correct: false,
         }
       - {

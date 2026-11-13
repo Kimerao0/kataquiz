@@ -105,24 +105,24 @@ questions:
           correct: false,
         }
   - type: single
-    prompt: "A Redis cluster spreads keys over six shards. One key, the homepage's trending list, receives about 40% of all cache reads, and the shard holding it runs at 100% CPU while the other five sit mostly idle. What helps most?"
-    explanation: "A key lives on exactly one shard, so adding shards or changing how the key is written cannot split its read traffic. Keeping a copy for a few seconds in each app instance's memory, or storing several copies under suffixed keys and reading one at random, spreads the load, at the cost of a few seconds of staleness. A shorter TTL only adds refreshes on the same shard."
-    theoryUrl: https://redis.io/docs/latest/develop/clients/client-side-caching/
+    prompt: "A Redis cluster spreads keys over six shards. One key, the homepage's trending list, receives about 40% of all cache reads, and the shard holding it runs at 100% CPU while the other five sit mostly idle. Which fix spreads that load, and what does it cost?"
+    explanation: "A key lives on exactly one shard, so adding shards or changing the write strategy cannot split its read traffic. Storing N copies under suffixed keys such as `trending#1`..`trending#N`, which hash to different shards, lets each read pick one at random and spreads the load (reading from replicas does the same within one shard's group). The price is that every update must rewrite or invalidate all N copies, and until it has, readers can see different versions. A shorter TTL only adds refreshes on the same shard."
+    theoryUrl: https://redis.io/docs/latest/operate/oss_and_stack/reference/cluster-spec/
     options:
       - {
-          text: "Add more shards to the cluster, so that the key space and the trending key's traffic spread more evenly",
+          text: "Add shards so the key's traffic spreads over more nodes; the cost is a slower resharding window",
           correct: false,
         }
       - {
-          text: "Serve it from a short-lived in-process copy, or replicate it under several keys",
+          text: "Copy it under suffixed keys on several shards and read one at random; copies can briefly disagree after an update",
           correct: true,
         }
       - {
-          text: "Lower the key's TTL, so it is refreshed more often and each copy is read fewer times",
+          text: "Lower the key's TTL so each cached copy is read fewer times; the cost is more database refreshes",
           correct: false,
         }
       - {
-          text: "Switch that key to write-through, so reads of it no longer depend on the shard",
+          text: "Switch the key to write-through so reads no longer depend on the shard holding it; the cost is that every write to the list gets slower",
           correct: false,
         }
   - type: single

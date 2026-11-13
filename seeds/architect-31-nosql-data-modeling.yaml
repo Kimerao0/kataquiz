@@ -91,7 +91,7 @@ questions:
         }
   - type: single
     prompt: "An orders table holds 500 million items, and about 0.1% of them are flagged for manual review. Reviewers need to list the flagged orders, newest first. Which design serves this efficiently?"
-    explanation: "A secondary index only contains items that carry its key attributes, so setting a review attribute only on flagged orders (and removing it when cleared) gives a small, sparse index that lists exactly those orders. A Scan with a filter still reads all 500 million items. An index on a true/false flag that every order carries holds the whole table, and its two key values become hot partitions."
+    explanation: "A secondary index only contains items that carry its key attributes, so setting a review attribute only on flagged orders (and removing it when cleared) gives a small, sparse index that lists exactly those orders. A Scan with a filter still reads all 500 million items. An index on a Y/N string that every order carries holds the whole table, and its two key values become hot partitions."
     theoryUrl: https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/bp-indexes-general-sparse-indexes.html
     options:
       - {
@@ -103,7 +103,7 @@ questions:
           correct: false,
         }
       - {
-          text: "A secondary index keyed on an `is_flagged` attribute set to true or false on every order",
+          text: "A secondary index keyed on an `is_flagged` attribute set to \"Y\" or \"N\" on every order",
           correct: false,
         }
       - {

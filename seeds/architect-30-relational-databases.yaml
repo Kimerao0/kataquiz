@@ -307,7 +307,7 @@ questions:
       - { text: "All transactions run one at a time", correct: false }
   - type: boolean
     prompt: "True or false: with row-level locking, two transactions that update different rows of the same table must wait for each other until one of them commits."
-    explanation: "False. Row-level locks cover the rows a transaction changes, so writers conflict only when they touch the same row, and updates to different rows proceed in parallel. That is why write contention usually comes from a few hot rows rather than from a busy table as such."
+    explanation: "False. Row-level locks cover the rows a transaction changes, so writers conflict only when they touch the same row, and updates to different rows proceed in parallel."
     theoryUrl: https://www.postgresql.org/docs/current/explicit-locking.html#LOCKING-ROWS
     answer: false
   - type: single
