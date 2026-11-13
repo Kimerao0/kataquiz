@@ -2,7 +2,7 @@
 
 feature: architect-roadmap-v2
 title: Architect Roadmap v2
-phase: proving
+phase: shipped
 ---
 
 # Architect Roadmap v2
@@ -177,3 +177,4 @@ Follow-up: Kill the old path, and the old quiz, i want a new quiz and new path. 
 - 2026-11-13 — R4.4 and R4.6 tightened like R2/R3 (R4 question set, step 25 opens the R4 version) (feature-check R4 triage)
 - 2026-11-13 — R4.7 reopened: tool/config trivia, arithmetic and duplicates left in 27, 29–38, 41; owner chose the strict rule in vendor-titled quizzes too (feature-check R4)
 - 2026-11-13 — R4.7 reopened (round 2): 3 recall questions and 6 duplicates of live quizzes; owner chose one targeted fix, then owner-check (feature-check R4)
+- 2026-11-13 — R4 merged b354ef0
