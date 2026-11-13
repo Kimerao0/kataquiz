@@ -393,7 +393,7 @@ questions:
       }
     codeLanguage: javascript
     explanation: "An upcaster changes how history is read, so any value it fills in must be a true fact about every old event: here, that every v1 order really was in euros. If that is not certain, the upcaster invents history that every projection then trusts. Upcasters work precisely without migrating the store, and they run on every read rather than once at deploy time."
-    theoryUrl: https://martinfowler.com/articles/201701-event-driven.html
+    theoryUrl: https://martendb.io/events/versioning.html
     options:
       - {
           text: "That `EUR` is actually true for every v1 event, since the default becomes part of history",
@@ -497,14 +497,17 @@ questions:
         }
   - type: multi
     prompt: "A team is evaluating event sourcing for several new domains. Which of these are strong fits? Select all that apply."
-    explanation: "An insurance claims process and a warehouse stock tracker benefit from immutable history and temporal queries, and a booking domain that must reason about the sequence of user intents benefits from having every intent recorded. A simple settings table or a static content catalog gets no benefit from history and pays all the costs."
+    explanation: "An insurance claims process and a warehouse stock tracker benefit from immutable history and temporal queries, and a booking domain that must reason about the sequence of user intents benefits from having every intent recorded. A cache that only ever serves the latest exchange rate, or a static content catalog, gets no benefit from history and pays all the costs."
     theoryUrl: https://learn.microsoft.com/en-us/azure/architecture/patterns/event-sourcing
     options:
       - {
           text: "An insurance claims process where adjusters must show how each decision was reached",
           correct: true,
         }
-      - { text: "A table of feature settings, edited rarely by a few admins", correct: false }
+      - {
+          text: "A cache of exchange rates refreshed every minute, where only the current rate is ever used",
+          correct: false,
+        }
       - {
           text: "A warehouse stock tracker where past states must be reconstructible",
           correct: true,

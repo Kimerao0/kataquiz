@@ -24,17 +24,26 @@ questions:
         }
       - { text: "The message, because consumers lock messages one by one", correct: false }
   - type: single
-    prompt: "A topic has 3 partitions and a consumer group runs 5 instances. What happens?"
-    explanation: "Partitions are split among consumers with each partition owned by one consumer, so 3 consumers get one partition and 2 sit idle (ready as standbys if a member fails). Kafka does not split a partition among several consumers of the same group."
-    theoryUrl: https://kafka.apache.org/documentation/#intro_consumers
+    prompt: "Order events are keyed by merchant id so that each merchant's events stay in order. One merchant now produces most of the traffic: the consumer that owns its partition lags far behind while the others are idle. Ordering only matters within each order. What is the best fix?"
+    explanation: "All records with the same key land on one partition, and a partition is read by one consumer in the group, so a dominant key becomes a hot partition however many consumers or partitions you add. The key should be only as broad as the ordering you actually need, which here is per order. Random partitioning would balance the load but break the sequence of each order's events."
+    theoryUrl: https://kafka.apache.org/documentation/#intro_concepts_and_terms
     options:
       - {
-          text: "All 5 consumers receive messages, with partitions split into sub-partitions",
+          text: "Key events by order id, so the merchant's load spreads over many partitions and each order stays in sequence",
+          correct: true,
+        }
+      - {
+          text: "Add more consumers to the group, so that several of them share the backlog of the busy partition",
           correct: false,
         }
-      - { text: "Three consumers each own one partition, two are idle", correct: true }
-      - { text: "Kafka rejects the fifth consumer and the group fails to start", correct: false }
-      - { text: "Every consumer receives every message of every partition", correct: false }
+      - {
+          text: "Add partitions to the topic, so that the busy merchant's key is spread across all of them automatically",
+          correct: false,
+        }
+      - {
+          text: "Switch the producer to random partitioning, which balances the load and still keeps each order in sequence",
+          correct: false,
+        }
   - type: single
     prompt: "A Kafka consumer cannot keep up, and the topic's partition count cannot be changed for now. The team hands the messages of each partition to a pool of 16 threads and commits each offset as soon as its message finishes. What do they give up?"
     explanation: "Kafka keeps one committed offset per partition and group, so committing message 105 while 101 is still running (or has failed) can skip 101 after a crash, unless the code commits only up to the lowest unfinished offset. Running a partition's messages in parallel also drops the ordering the partition provided. Parallelising per key, or adding partitions later, keeps those guarantees."
@@ -95,45 +104,45 @@ questions:
       - { text: "Log compaction", correct: true }
       - { text: "Consumer group rebalancing", correct: false }
   - type: single
-    prompt: "Services rebuild their cache of user profiles at startup by reading a compacted topic keyed by user id. A user deletes their account and must disappear from that topic. What do you do?"
-    explanation: "Compaction keeps the latest record per key, so a key only goes away when its latest record is a tombstone (a null value), which compaction eventually removes as well. An empty profile keeps the key alive in the topic, and Kafka logs are never edited in place. Consumers rebuilding state must treat the tombstone as 'delete this key'."
+    prompt: "A team wants a compacted topic keyed by product id to be the only record of every price change, because finance must later show what each price was on any past date. What is the problem with this design?"
+    explanation: "Compaction only guarantees that the latest record for each key survives; older values are removed in the background, so a compacted topic holds current state, not history. A full history needs a topic with time-based or unlimited retention, or a separate store, possibly next to a compacted topic for current prices. Compaction keeps the order and offsets of the records it retains, and any number of groups can read it."
     theoryUrl: https://kafka.apache.org/documentation/#compaction
     options:
       - {
-          text: "Publish a record with the user's key and a null value, which compaction treats as a delete marker",
+          text: "Compaction discards older values for each key, so the price history finance needs is lost over time",
           correct: true,
         }
       - {
-          text: "Nothing, since compaction drops a key on its own once no consumer has read it for the retention period",
+          text: "A compacted topic can be read by only one consumer group, so finance would block the other readers",
           correct: false,
         }
       - {
-          text: "Delete the user's old records directly from the partition files on every broker",
+          text: "Compaction reorders the records by key, so the dates of the price changes can no longer be trusted",
           correct: false,
         }
       - {
-          text: "Publish a record with an empty profile as its value, which then replaces the old profile",
+          text: "Nothing, since compaction removes only records that repeat an identical value and keeps every real change",
           correct: false,
         }
   - type: single
-    prompt: "A consumer group was stopped for ten days during a migration. The topic it reads keeps data for seven days. What happens when the group starts again?"
-    explanation: "Retention is independent of consumption: records older than the window are deleted whether or not anyone has read them. The group's committed offset now points at data that no longer exists, so it restarts from the earliest or latest available position, depending on its reset policy, and the gap is lost. Retention has to cover the longest consumer outage you want to survive."
+    prompt: "A platform team is choosing the retention period for a topic read by several services. One is a reporting job that can be down over a long weekend, and teams sometimes reprocess recent events after a bug fix. What should drive the choice?"
+    explanation: "Retention deletes records by age or size whether or not anyone has read them, so it defines the window in which a stopped consumer can still catch up and a team can replay. Size it from the longest outage and reprocessing need you want to survive, then check what that window costs in storage. Producer throughput tells you the cost of a window, not how long it must be."
     theoryUrl: https://kafka.apache.org/documentation/#intro_concepts_and_terms
     options:
       - {
-          text: "Retention has deleted the oldest unread records, so about three days of events can no longer be read",
+          text: "The longest consumer outage and replay window you need to cover, weighed against storage cost",
           correct: true,
         }
       - {
-          text: "Nothing is lost, because Kafka pauses retention on a topic while any group still has unread messages on it",
+          text: "Producer throughput alone, since retention exists only to keep the brokers from running out of disk",
           correct: false,
         }
       - {
-          text: "The group resumes from its committed offset and reads everything, since committed data is kept",
+          text: "Very little, since unread records are kept until every group has committed past them, whatever the retention",
           correct: false,
         }
       - {
-          text: "The broker refuses the group until an operator restores the topic from a backup",
+          text: "The number of partitions, since each partition keeps a fixed number of records regardless of their age",
           correct: false,
         }
   - type: single
@@ -237,11 +246,14 @@ questions:
       - { text: "A cron job running every 5 minutes with a full table scan", correct: false }
   - type: multi
     prompt: "Which events typically trigger a Kafka consumer group rebalance? Select all that apply."
-    explanation: "Membership changes (a consumer joins, leaves or is considered dead after missing heartbeats or exceeding max.poll.interval.ms) and changes in the topic's partition count cause a rebalance. Producing more messages to a partition does not."
+    explanation: "Membership changes cause a rebalance: a consumer joins or leaves, or is considered dead because it stopped sending heartbeats or went too long between polls while processing. Adding partitions to a subscribed topic triggers one as well. Producing more messages to a partition does not."
     theoryUrl: https://kafka.apache.org/documentation/#consumerconfigs_max.poll.interval.ms
     options:
       - { text: "A new consumer instance joins the group", correct: true }
-      - { text: "A consumer exceeds max.poll.interval.ms between polls", correct: true }
+      - {
+          text: "A consumer spends so long on a batch that it stops polling and is treated as failed",
+          correct: true,
+        }
       - { text: "Partitions are added to a subscribed topic", correct: true }
       - { text: "Producers increase their message rate", correct: false }
   - type: single
@@ -299,14 +311,26 @@ questions:
       - { text: "Pause the order service while analytics catches up", correct: false }
       - { text: "Start consumers with a new group id", correct: true }
   - type: single
-    prompt: "A team uses RabbitMQ and notices queue memory growing without bound after the consumers slow down. Which mechanism limits how many unacknowledged messages a consumer receives?"
-    explanation: "The consumer prefetch count (basic.qos) caps unacknowledged messages per consumer, giving backpressure and fair dispatch. Publisher confirms control producer-side acknowledgement, and exchanges only route messages."
+    prompt: "Several RabbitMQ workers share a queue. One slow worker ends up holding hundreds of delivered but unacknowledged messages while the other workers sit idle. What fixes the dispatch?"
+    explanation: "Without a limit, the broker pushes messages to consumers as fast as it can, so a slow worker builds a private backlog that the others cannot take. Limiting the unacknowledged messages each consumer may hold gives backpressure and sends new work to whoever is free. Publisher confirms only acknowledge producers, a fanout would duplicate every job, and automatic acks push even faster and lose messages when a worker crashes."
     theoryUrl: https://www.rabbitmq.com/docs/consumer-prefetch
     options:
-      - { text: "Publisher confirms", correct: false }
-      - { text: "Topic exchange bindings", correct: false }
-      - { text: "Consumer prefetch count", correct: true }
-      - { text: "Message TTL on the exchange", correct: false }
+      - {
+          text: "Cap the unacknowledged messages each worker may hold, so the broker hands new ones to workers with capacity",
+          correct: true,
+        }
+      - {
+          text: "Enable publisher confirms, so that producers slow down until the slow worker has caught up",
+          correct: false,
+        }
+      - {
+          text: "Bind the queue to a fanout exchange, so that every worker receives every message and none sits idle",
+          correct: false,
+        }
+      - {
+          text: "Switch the workers to automatic acknowledgement, so that messages leave the queue as soon as they are delivered",
+          correct: false,
+        }
   - type: single
     prompt: "Which of these is an accurate trade-off when comparing Kafka and SQS for an event backbone of a growing platform?"
     explanation: "SQS is fully managed with little to operate and per-message pricing, but it has no replay and consumers compete. Kafka offers replay, ordering per partition and high throughput, at the cost of operating or paying for a cluster and managing partitions. Neither is strictly better."
