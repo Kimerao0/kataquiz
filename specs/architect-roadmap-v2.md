@@ -123,7 +123,7 @@ Follow-up: Kill the old path, and the old quiz, i want a new quiz and new path. 
 4. [built] On a database holding the R3 content, `pnpm release` leaves exactly one seed quiz per title for 24–41, each changed one with the R4 question set.
 5. [built] On a fresh database, `pnpm release` runs the R1–R4 migrations without error and imports every seed, the path included.
 6. [built] After `pnpm release` on a database holding the R3 content, the "Road to Software Architect" page lists 41 steps and step 25 opens the R4 version of quiz 25.
-7. [built] Reading quizzes 24, 25 and 27–41, no question turns on an edge case or a trick output; quiz 26 may.
+7. [open] Reading quizzes 24, 25 and 27–41, no question turns on an edge case or a trick output; quiz 26 may.
 
 ## Proofs
 
@@ -169,3 +169,4 @@ Follow-up: Kill the old path, and the old quiz, i want a new quiz and new path. 
 - 2026-11-12 — R3 merged 9329c85
 - 2026-11-13 — R4.4 and R4.6 tightened like R2/R3 (R4 question set, step 25 opens the R4 version) (feature-check R4 triage)
 - 2026-11-13 — R4.7 reopened: tool/config trivia, arithmetic and duplicates left in 27, 29–38, 41; owner chose the strict rule in vendor-titled quizzes too (feature-check R4)
+- 2026-11-13 — R4.7 reopened (round 2): 3 recall questions and 6 duplicates of live quizzes; owner chose one targeted fix, then owner-check (feature-check R4)
