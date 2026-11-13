@@ -247,38 +247,47 @@ questions:
           correct: true,
         }
   - type: single
-    prompt: "You must replace a legacy monolith without a big-bang rewrite, while it keeps serving production traffic. Which approach fits?"
-    explanation: "The strangler fig pattern puts a routing layer in front of the old system and moves capabilities to the new one piece by piece until the legacy part can be removed. A parallel rewrite with a single cut-over carries the big-bang risk."
-    theoryUrl: https://martinfowler.com/bliki/StranglerFigApplication.html
+    prompt: "A startup builds a first version to find out whether anyone wants the product. If it succeeds, load and requirements are expected to change beyond recognition within two years. Part of the team wants to design for that future scale now. What does 'sacrificial architecture' suggest?"
+    explanation: "Sacrificial architecture accepts that a design fit for today will be replaced once the business outgrows it, so you build for current needs and treat the later replacement as planned, not as failure. Designing for imagined scale delays learning whether the product works at all. Sacrificing the code later is not a licence for poor quality now, since a modular system is easier to replace piece by piece."
+    theoryUrl: https://martinfowler.com/bliki/SacrificialArchitecture.html
     options:
       - {
-          text: "Freeze the monolith for a year and rewrite everything in parallel",
-          correct: false,
-        }
-      - {
-          text: "Route traffic through a facade and migrate capabilities gradually (strangler fig)",
+          text: "Build for today's needs, keep it modular, and plan to replace it if it succeeds",
           correct: true,
         }
       - {
-          text: "Duplicate the database and run both systems writing to it simultaneously, switching on release day",
+          text: "Design for the projected scale now, so the first version never has to be replaced",
           correct: false,
         }
       - {
-          text: "Split the monolith by technical layer into three deployable services",
+          text: "Skip modularity and tests, because code that will be replaced does not need them",
+          correct: false,
+        }
+      - {
+          text: "Start with microservices, so that each part can scale independently when the growth arrives",
           correct: false,
         }
   - type: single
-    prompt: "You must rename a field in an API response used by consumers you cannot coordinate with. Which change sequence is safest?"
-    explanation: "Parallel change (expand, migrate, contract) first adds the new field alongside the old, lets consumers migrate, and only then removes the old field. Renaming in place breaks every consumer that has not been updated."
-    theoryUrl: https://martinfowler.com/bliki/ParallelChange.html
+    prompt: "A team works on trunk and releases weekly. It must replace the ORM used by dozens of modules in one codebase, a job of several months. How can it keep releasing from trunk throughout?"
+    explanation: "Branch by abstraction puts an abstraction in front of the ORM, moves callers onto it in small commits, builds the new implementation behind it, switches over, and finally deletes the old one, so trunk stays releasable at every step. A long-lived branch defers integration into one painful merge, and a single big commit carries the risk the technique avoids. A routing facade intercepts calls at the edge of a system, not a library used deep inside it."
+    theoryUrl: https://martinfowler.com/bliki/BranchByAbstraction.html
     options:
-      - { text: "Rename it and announce the change in the release notes", correct: false }
       - {
-          text: "Add the new field, keep the old, migrate consumers, then remove the old",
+          text: "Put an abstraction in front of the ORM, move callers to it, then swap what is behind it",
           correct: true,
         }
-      - { text: "Version the whole API as v2 and shut down v1 the same day", correct: false }
-      - { text: "Return both fields under the same key as an array", correct: false }
+      - {
+          text: "Do the migration on a long-lived branch and merge it once every module is converted",
+          correct: false,
+        }
+      - {
+          text: "Put a routing facade in front of the service and send traffic to a rewritten copy",
+          correct: false,
+        }
+      - {
+          text: "Convert every module in one large commit during a weekend code freeze, so trunk never holds two ORMs",
+          correct: false,
+        }
   - type: single
     prompt: "A team debates picking a database now, but the product's access patterns are still unknown and the data layer can be wrapped behind an interface. What does the 'last responsible moment' principle suggest?"
     explanation: "Delay hard-to-reverse decisions until the cost of not deciding exceeds the benefit of waiting, while keeping options open (here an abstraction). Deciding as early as possible commits you blind, and never deciding blocks the work."

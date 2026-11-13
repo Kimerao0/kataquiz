@@ -42,14 +42,26 @@ questions:
           correct: false,
         }
   - type: single
-    prompt: "A shortener must report the number of clicks for each link. Which redirect status fits best?"
-    explanation: "A 301 is permanent and may be cached by browsers and proxies, so later clicks never reach your server and are not counted. A 302 (or 307) is temporary and not cached by default, so every click hits the service, at the cost of more traffic. 200 with a meta refresh is not a redirect."
-    theoryUrl: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/302
+    prompt: "A shortener expects about 100 million new links per month, each record about 500 bytes, kept for five years, with 100 redirects per link created. What does a rough estimate say about where the design effort should go?"
+    explanation: "Five years is about 6 billion records, roughly 3 TB, which a modest replicated or lightly sharded store holds. Writes average around 40 per second while redirects average thousands per second, with viral peaks far above that, so the read path is where the design work pays off. Petabyte tiering and many write shards solve problems these numbers do not have, and a rough estimate is exactly the tool for deciding this before building."
+    theoryUrl: https://github.com/donnemartin/system-design-primer
     options:
-      - { text: "301 Moved Permanently, because it is the SEO-friendly choice", correct: false }
-      - { text: "200 OK with a meta refresh tag in the body", correct: false }
-      - { text: "404 Not Found followed by a client-side lookup", correct: false }
-      - { text: "302 Found, so browsers come back to the service on every click", correct: true }
+      - {
+          text: "Storage stays in the low terabytes, so the read path deserves most of the effort",
+          correct: true,
+        }
+      - {
+          text: "Storage reaches petabytes, so tiering old links to object storage is the first problem to solve",
+          correct: false,
+        }
+      - {
+          text: "The write rate needs dozens of database shards from the first day",
+          correct: false,
+        }
+      - {
+          text: "The figures are too uncertain to use, so measure production traffic before choosing anything",
+          correct: false,
+        }
   - type: single
     prompt: "A shortener has a 100:1 read-to-write ratio, a small set of viral links takes most of the traffic, and every lookup is by key. Which design is the best fit?"
     explanation: "Key-value lookups with a heavy skew fit a key-value store with a cache-aside layer in front: hot keys stay in memory and the store handles the long tail. Relational joins, full-text search or per-request computation add cost without any benefit for this access pattern."
@@ -111,14 +123,23 @@ questions:
           correct: false,
         }
   - type: single
-    prompt: "A feed is paginated with OFFSET/LIMIT. New posts arrive constantly, and users scrolling see the same posts repeated on the next page. What is the right fix?"
-    explanation: "With offset pagination, items inserted at the top shift everything down, so the next page repeats items. Keyset (cursor) pagination continues from the last seen position (for example a post id or timestamp), which is stable and also avoids scanning skipped rows."
-    theoryUrl: https://use-the-index-luke.com/no-offset
+    prompt: "A social app precomputes timelines with fan-out on write. It has 300 million accounts, but only about a third open the app in a given month, so most timeline writes are never read. What is the usual fix?"
+    explanation: "Precomputed timelines only pay off for users who read them. Fanning out to recently active users and rebuilding a timeline on demand (by pulling from followees) when an inactive user returns removes most of the wasted writes and memory. Compressing wasted work keeps it, pure pull makes every active user's read expensive, and deleting accounts is a product decision, not a fix."
+    theoryUrl: https://www.infoq.com/presentations/Twitter-Timeline-Scalability/
     options:
-      - { text: "Use larger pages so the problem shows up less often", correct: false }
-      - { text: "Cache each page for five minutes on the server", correct: false }
-      - { text: "Switch to cursor (keyset) pagination from the last item seen", correct: true }
-      - { text: "Lock the feed table while a user is scrolling", correct: false }
+      - {
+          text: "Fan out only to active users; rebuild a timeline on demand when one returns",
+          correct: true,
+        }
+      - {
+          text: "Keep fanning out to every follower, but compress the stored timelines so the waste costs less memory",
+          correct: false,
+        }
+      - {
+          text: "Switch every user to fan-out on read, so no timeline is ever precomputed",
+          correct: false,
+        }
+      - { text: "Delete accounts that have not opened the app for a month", correct: false }
   - type: single
     prompt: "A user publishes a post, refreshes the feed, and does not see it. The feed is read from an asynchronously replicated replica. Which fix gives the best consistency for that user without making the whole system strongly consistent?"
     explanation: "Read-your-writes consistency is needed only for the author: route their reads to the primary for a short time (or merge their recent posts client-side). Making all reads synchronous raises latency and cost for everyone, and telling users to wait is a product workaround."
@@ -222,19 +243,25 @@ questions:
       - { text: "Separate queues and consumers per channel", correct: true }
       - { text: "Send all channels synchronously from the API request", correct: false }
   - type: single
-    prompt: "A workflow service retries a notification job after a timeout, and users sometimes get the same SMS twice. The provider accepted the first call but responded slowly. How do you prevent duplicates?"
-    explanation: "Delivery from a queue is at-least-once, so retries are expected. Attach an idempotency key (for example notification id plus channel) and record it before or atomically with the send, so a retry sees it already happened. Shorter timeouts only produce more ambiguous retries."
-    theoryUrl: https://microservices.io/patterns/communication-style/idempotent-consumer.html
+    prompt: "Twelve product services each call the email and push providers directly. Users complain that turning off marketing emails stops some of them but not others, and that quiet hours are ignored by half the features. Which design fixes this?"
+    explanation: "Preferences are enforced in twelve places, so they drift. Making notifications one capability, a service that every producer calls and that owns preferences and checks them at send time, gives one place where opt-outs and quiet hours are applied. A shared library still has twelve deployed versions, nightly copies go stale, and an email provider's unsubscribe list does not cover push."
+    theoryUrl: https://microservices.io/patterns/decomposition/decompose-by-business-capability.html
     options:
       - {
-          text: "Shorten the timeout so failures are detected sooner and the retry happens before the provider replies",
+          text: "Route every notification through one service that checks preferences at send time",
+          correct: true,
+        }
+      - {
+          text: "Publish a shared library with the preference rules and ask every team to upgrade to it",
           correct: false,
         }
-      - { text: "Disable retries and accept lost notifications", correct: false }
-      - { text: "Send each message twice on purpose to be safe", correct: false }
       - {
-          text: "Use an idempotency key per notification and channel, checked before sending",
-          correct: true,
+          text: "Copy each user's preferences into every product service's database every night",
+          correct: false,
+        }
+      - {
+          text: "Rely on the email provider's unsubscribe list for opt-outs on every channel",
+          correct: false,
         }
   - type: single
     prompt: "A marketing blast to 20 million users saturates the queue. Meanwhile, login one-time passcodes arrive after 15 minutes. What is the best fix?"
@@ -252,29 +279,44 @@ questions:
         }
       - { text: "Double the consumers of the single queue", correct: false }
   - type: single
-    prompt: "A push provider returns temporary errors for 10% of the requests. What is the right handling policy?"
-    explanation: "Retry transient failures with capped exponential backoff and jitter to avoid synchronised retry waves, and send messages that exhaust retries to a dead-letter queue for inspection or replay. Retrying immediately forever creates load spikes, and dropping silently loses data."
-    theoryUrl: https://aws.amazon.com/builders-library/timeouts-retries-and-backoff-with-jitter/
+    prompt: "A photo app sends a push for every like. A popular post collects 40 likes in an hour, and its author turns off notifications for the app altogether. What is the best design change?"
+    explanation: "Each like is a valid event, but a push per event turns into noise and costs you the channel. Buffering events per recipient and collapsing them into one notification per time window (\"Ana and 39 others liked your photo\") keeps the information and the user's attention. Restricting hours or moving to SMS keeps the volume, and dropping the excess loses information arbitrarily."
+    theoryUrl: https://developer.apple.com/design/human-interface-guidelines/managing-notifications
     options:
-      - { text: "Retry immediately in a tight loop until it succeeds", correct: false }
-      - { text: "Drop failed messages silently and log a counter", correct: false }
       - {
-          text: "Retry with exponential backoff and jitter, then dead-letter after the limit",
+          text: "Collapse likes per recipient into one notification per time window",
           correct: true,
         }
       - {
-          text: "Retry once after exactly 60 seconds for every message, then drop it if still failing",
+          text: "Keep one push per like, but send them only between 9 am and 9 pm in the user's time zone",
           correct: false,
         }
+      - {
+          text: "Rate-limit pushes per user and drop the likes that go over the limit",
+          correct: false,
+        }
+      - { text: "Move like notifications from push to SMS, which users read more carefully", correct: false }
   - type: single
-    prompt: "Your only SMS provider has had three outages this year. Which approach improves delivery for critical messages at reasonable cost?"
-    explanation: "Integrate a second provider and fail over automatically, guarded by a circuit breaker that stops sending to the failing one. Cost stays low by keeping the secondary as a fallback. Retrying the same failed provider longer or waiting for its recovery does not give availability."
-    theoryUrl: https://martinfowler.com/bliki/CircuitBreaker.html
+    prompt: "Support cannot answer 'did this customer receive the SMS?' The notification service only logs that the provider accepted each request. What should the design add?"
+    explanation: "Acceptance only means the provider queued the message; whether it reached the handset is reported later, through delivery callbacks keyed by the provider's message id. Storing a status per notification (queued, sent, delivered, failed) and updating it from those callbacks answers support and lets you alert or fall back on failures. Sending twice creates duplicates, and logging bodies with phone numbers adds a privacy risk without saying anything about delivery."
+    theoryUrl: https://www.twilio.com/docs/messaging/guides/track-outbound-message-status
     options:
-      - { text: "Increase the retry count against the same provider to 20", correct: false }
-      - { text: "Add a secondary provider and switch to it with a circuit breaker", correct: true }
-      - { text: "Tell users to expect delays during provider outages", correct: false }
-      - { text: "Replace SMS with email for every message", correct: false }
+      - {
+          text: "A status per notification, updated from the provider's delivery callbacks",
+          correct: true,
+        }
+      - {
+          text: "Nothing, since provider acceptance can be treated as delivery for SMS",
+          correct: false,
+        }
+      - {
+          text: "Send every SMS twice, so that at least one copy is very likely delivered",
+          correct: false,
+        }
+      - {
+          text: "Log each message body with the phone number, so support can search the logs for it",
+          correct: false,
+        }
   - type: single
     prompt: "A rate limiter keeps a log of every request timestamp per client to enforce '10,000 requests per hour' as a precise sliding window. Memory use grows huge with millions of clients. Which alternative keeps the sliding behaviour at a fraction of the cost?"
     explanation: "A sliding window counter stores only the counts of the current and previous fixed windows and weights the previous one by how much of it still overlaps the sliding window. It needs constant memory per client and avoids most of the fixed window's boundary burst, at the price of a small approximation. A plain fixed window is cheap but reintroduces the boundary burst, and moving or sampling the log does not fix the cost model."
