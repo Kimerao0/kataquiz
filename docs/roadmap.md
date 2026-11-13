@@ -154,12 +154,13 @@ Spec: `specs/paths.md` (phase 1, KQ42, live in production since 2026-11-11; arch
   2026-11-12 — check: 7/7 implemented (R3.7 bounced once: 10 trivia questions replaced, 22 back to general API/data theory); 21 findings (0 blockers): all fixed, R3.3/R3.4/R3.6 reworded via sync
   2026-11-12 — merged 9329c85 (ff onto local main holding unpushed R2; origin had nothing new, no rebase needed); pnpm check green: biome ok, tsc ok, 860/860 tests, portability ok
   2026-11-12 — closed: owner verified prod, deploy d605c4f
-- [ ] KQ50: Architect Roadmap v2 R4 — Architecture 24–41
-  Spec: `specs/architect-roadmap-v2.md` R4 · status: merged b354ef0, not pushed
+- [x] KQ50: Architect Roadmap v2 R4 — Architecture 24–41
+  Spec: `specs/architect-roadmap-v2.md` R4 · status: merged b354ef0, done — verified in prod 2026-11-13 (deploy b31f362)
   Specs: R4.1 … R4.7 (the spec file holds the text; never copy it here)
   Verdicts: 6 proven · R4.7 owner-check — `.proofs/architect-roadmap-v2/`
   2026-11-13 — check: 7/7 implemented (R4.7 bounced twice: ~45 trivia/duplicate questions replaced, then 9 more; owner chose owner-check after round 2); 13 findings (0 blockers): 11 fixed, 1 skipped (37 vs 34 overlap), 1 dismissed (gate "flake" was a concurrent mutation run); R4.4/R4.6 tightened via sync; pnpm check green, 866/866
   2026-11-13 — merged b354ef0 (ff, origin/main had nothing new; local main carried 2 unpushed roadmap commits, owner OK); pnpm check green: biome ok, tsc ok, 866/866 tests, portability ok
+  2026-11-13 — closed: owner verified prod, deploy b31f362
 
 ## Accepted — recorded so they are not rediscovered
 
