@@ -103,7 +103,7 @@ questions:
           correct: false,
         }
       - {
-          text: "A secondary index keyed on an `is_flagged` attribute set to \"Y\" or \"N\" on every order",
+          text: 'A secondary index keyed on an `is_flagged` attribute set to "Y" or "N" on every order',
           correct: false,
         }
       - {
