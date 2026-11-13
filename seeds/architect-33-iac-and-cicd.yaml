@@ -90,25 +90,26 @@ questions:
       - { text: "The `-parallelism` flag, which serialises runs across machines", correct: false }
       - { text: "The backend's state lock, which makes one run wait or fail", correct: true }
   - type: single
-    prompt: "You rename a resource in the configuration and run `terraform plan`. What does the plan most likely show, and what is the right fix?"
-    code: |
-      # before
-      resource "aws_s3_bucket" "assets" {
-        bucket = "acme-assets-prod"
-      }
-
-      # after
-      resource "aws_s3_bucket" "static_assets" {
-        bucket = "acme-assets-prod"
-      }
-    codeLanguage: hcl
-    explanation: "Terraform tracks resources by address, so a new address looks like a destroy of the old one and a create of the new one. Adding a `moved` block (or `terraform state mv`) tells it the object is the same. Re-running apply or using `-refresh-only` would not change the address mapping."
+    prompt: "A refactor moves 30 resources into a new module without changing any of their settings. The plan shows 30 destroys and 30 creates, including the production database. What should the team conclude before applying?"
+    explanation: "Terraform identifies each object by its address in the code, so a resource at a new address looks like a new resource and the old address looks like one to delete. The plan is real: applying it would destroy and recreate the database. Recording the old-to-new address mapping in the code or the state first makes the refactor a no-op, while re-running apply or scheduling downtime only accepts the damage."
     theoryUrl: https://developer.hashicorp.com/terraform/language/modules/develop/refactoring
     options:
-      - { text: "A no-op, because the bucket name is unchanged", correct: false }
-      - { text: "An in-place update; no action needed", correct: false }
-      - { text: "Destroy and create; fix it with a `moved` block", correct: true }
-      - { text: "An error about duplicate buckets; fix it with `-refresh-only`", correct: false }
+      - {
+          text: "The plan is cosmetic; apply will see that the real objects are identical and skip them",
+          correct: false,
+        }
+      - {
+          text: "New addresses look like new resources, so map old addresses to new ones before applying",
+          correct: true,
+        }
+      - {
+          text: "Moving resources into a module always recreates them once, so apply it in a maintenance window",
+          correct: false,
+        }
+      - {
+          text: "Apply twice, since the second run adopts the recreated objects back under their old addresses",
+          correct: false,
+        }
   - type: single
     prompt: "Someone widened a security group in the AWS console by hand. Your Terraform code still declares the narrow rule. What does the next `terraform plan` do?"
     explanation: "Plan refreshes real infrastructure, sees the drift against the configuration, and proposes changing the resource back to what the code declares. It does not adopt the console change into the code, and it does not ignore it. Pulling the manual change into code is a deliberate edit you make yourself."
@@ -124,11 +125,27 @@ questions:
           text: "It detects the drift and proposes reverting the group to the declared rule",
           correct: true,
         }
-  - type: boolean
-    prompt: "Marking a Terraform output or variable as `sensitive = true` keeps its value out of the state file."
-    answer: false
-    explanation: "`sensitive` only redacts the value from CLI output; the value is still stored in plaintext in the state file. That is why state must live in an encrypted backend with tight access control."
+  - type: single
+    prompt: "Security requires that the production database password never appears in Terraform state or in CI logs. Which approach meets that requirement?"
+    explanation: "Any value Terraform reads into a resource ends up in state, wherever it came from, so the only password that stays out is one Terraform never sees. Letting a secrets manager generate and rotate it, and giving Terraform only the secret's identifier, achieves that. An encrypted backend protects the state but the password is still inside it, and a CI variable or an ignored variables file still passes through Terraform."
     theoryUrl: https://developer.hashicorp.com/terraform/language/manage-sensitive-data
+    options:
+      - {
+          text: "Pass the password as a CI environment variable, so it never appears in the repository",
+          correct: false,
+        }
+      - {
+          text: "Keep the password in a variables file that is excluded from Git and copied onto the CI runner",
+          correct: false,
+        }
+      - {
+          text: "Let a secrets manager generate it and give Terraform only the secret's identifier",
+          correct: true,
+        }
+      - {
+          text: "Store the state in an encrypted bucket, so the password inside it is protected",
+          correct: false,
+        }
   - type: single
     prompt: "You need strong isolation between staging and production: different credentials, different blast radius, and the ability for staging engineers to never touch prod state. Which layout is the better fit?"
     explanation: "Separate root modules or directories with their own backends and credentials give real isolation. Workspaces share the same backend and configuration, so a mistaken workspace selection or shared credentials can hit prod. Workspaces are fine for ephemeral copies of the same environment, not for a security boundary."
@@ -334,17 +351,23 @@ questions:
     explanation: "When both environments come from the same code, the only differences are the ones you declared on purpose, so staging tests the real topology. Hand-built or separately maintained environments drift apart in ways nobody notices until a release breaks. Sizes can still differ; the shape should not."
     theoryUrl: https://12factor.net/dev-prod-parity
   - type: single
-    prompt: "You run `cdk diff` in the pipeline before deploy. What is its role?"
-    explanation: "`cdk diff` compares the synthesized template with the deployed stack and shows what would change, including IAM and security-group changes, so a reviewer can catch destructive or risky changes before deployment. It deploys nothing and is not a drift detector for manual console edits."
-    theoryUrl: https://docs.aws.amazon.com/cdk/v2/guide/cli.html
+    prompt: "A CDK app looks up the newest machine image through an API call while it synthesizes, and uses the result in a launch template. Why do CDK's own guidelines warn against this kind of lookup during synthesis?"
+    explanation: "Synthesis should be deterministic: the same commit should always produce the same template. A lookup that returns something new each time means a deploy can replace instances although nobody changed the code, and the change is hard to trace. CDK addresses this by caching lookup results in a file you commit; synthesis runs locally or in CI, not inside CloudFormation, and speed is not the main concern."
+    theoryUrl: https://docs.aws.amazon.com/cdk/v2/guide/best-practices.html
     options:
-      - { text: "It detects and repairs manual changes made in the console", correct: false }
       - {
-          text: "It shows the changes a deploy would make, for review before applying",
+          text: "The same commit can synthesize different templates, so deploys change resources nobody edited",
           correct: true,
         }
       - {
-          text: "It deploys only the resources that changed since the last run, skipping unchanged stacks",
+          text: "CloudFormation rejects templates that were generated by code making network calls",
           correct: false,
         }
-      - { text: "It rolls the stack back to the previous version", correct: false }
+      - {
+          text: "Synthesis runs inside CloudFormation, which has no internet access to reach the image API",
+          correct: false,
+        }
+      - {
+          text: "API calls slow synthesis down, and a fast synth is the main reason CDK exists",
+          correct: false,
+        }

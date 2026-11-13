@@ -144,42 +144,47 @@ questions:
     explanation: "An Ingress is only a declaration of routing rules. A controller (NGINX, Traefik, a cloud controller and so on) must be running to watch Ingress objects and implement them."
     theoryUrl: https://kubernetes.io/docs/concepts/services-networking/ingress/
   - type: single
-    prompt: "Given this Ingress, to which backend does a request for `/api/v1/users` go?"
-    code: |
-      apiVersion: networking.k8s.io/v1
-      kind: Ingress
-      metadata:
-        name: shop
-      spec:
-        rules:
-          - host: shop.example.com
-            http:
-              paths:
-                - path: /
-                  pathType: Prefix
-                  backend:
-                    service: { name: web, port: { number: 80 } }
-                - path: /api
-                  pathType: Prefix
-                  backend:
-                    service: { name: api, port: { number: 8080 } }
-    codeLanguage: yaml
-    explanation: "When several paths match, the longest matching path wins, so `/api` takes precedence over `/` and the request goes to the `api` Service. Ordering in the list does not decide the winner, and Prefix matching works on path segments, so `/api` does match `/api/v1/users`."
-    theoryUrl: https://kubernetes.io/docs/concepts/services-networking/ingress/
+    prompt: "Your cluster already exposes all HTTP services through one Ingress. A new MQTT broker speaks its own binary protocol over TCP, and IoT devices must reach it from the internet. How do you expose it?"
+    explanation: "Ingress rules route HTTP and HTTPS by host and path, which a raw TCP protocol does not carry, so the broker needs a layer-4 entry point such as its own LoadBalancer Service. Adding a path rule does nothing for a client that never sends an HTTP request. A headless Service only gives in-cluster DNS records for the Pods, and running the broker inside the controller's Pod couples two unrelated workloads."
+    theoryUrl: https://kubernetes.io/docs/concepts/services-networking/service/
     options:
-      - { text: "`web`, because it is declared first in the list", correct: false }
-      - { text: "`api`, because the longest matching prefix wins", correct: true }
-      - { text: "Both Services, which receive the request in turn", correct: false }
-      - { text: "Neither; the request gets a 404 because the paths overlap", correct: false }
+      - {
+          text: "Add a path rule for the broker to the existing Ingress, since the controller forwards any protocol on its ports",
+          correct: false,
+        }
+      - {
+          text: "Give the broker its own LoadBalancer Service, since Ingress routes HTTP by host and path",
+          correct: true,
+        }
+      - {
+          text: "Use a headless Service, which publishes each broker Pod's address directly to the internet",
+          correct: false,
+        }
+      - {
+          text: "Run the broker as a sidecar in the Ingress controller Pod, so it shares the public load balancer",
+          correct: false,
+        }
   - type: single
-    prompt: "A HorizontalPodAutoscaler targets 70% CPU utilization but the Deployment's containers define no CPU requests. What happens?"
-    explanation: "Utilization is calculated as a percentage of the container's resource request. Without requests the HPA has no denominator, reports it cannot compute the metric and does not scale. Limits are not a substitute, and the HPA does not guess defaults."
+    prompt: "An HPA scales the `api` Deployment between 3 and 20 replicas. The CI pipeline applies a manifest that sets `replicas: 3` on every deploy, so a deploy during peak traffic drops the service from 12 Pods to 3 until the HPA catches up. What is the right fix?"
+    explanation: "Two controllers own the same field: the pipeline writes the replica count on every apply, and the HPA writes it in response to load. Removing the count from the applied manifest leaves the HPA as the only owner. Applying the maximum wastes capacity and still fights the HPA, pausing autoscaling during deploys hides the problem, and a permanently high minimum gives up autoscaling."
     theoryUrl: https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/
     options:
-      - { text: "It uses the node's total CPU as the denominator instead", correct: false }
-      - { text: "It scales on the CPU limit, which acts as an implicit request", correct: false }
-      - { text: "It cannot compute utilization and does not scale on that metric", correct: true }
-      - { text: "It scales using a default request of 100m per container", correct: false }
+      - {
+          text: "Set the manifest's replica count to 20, the HPA maximum, so that a deploy can never reduce capacity",
+          correct: false,
+        }
+      - {
+          text: "Pause the HPA before each deploy and resume it once the rollout has finished",
+          correct: false,
+        }
+      - {
+          text: "Raise the HPA minimum to 12 permanently, so that a deploy can never drop below the peak",
+          correct: false,
+        }
+      - {
+          text: "Drop the replica count from the applied manifest and let the HPA own it",
+          correct: true,
+        }
   - type: single
     prompt: "An HPA scales a Deployment from 4 to 10 replicas under load, but 6 Pods stay Pending with the event 'Insufficient cpu'. Which component should add capacity?"
     explanation: "The HPA only changes the number of Pods. When Pods cannot be scheduled for lack of node capacity, a node autoscaler (Cluster Autoscaler or Karpenter) must add nodes. The VPA adjusts Pod requests, not node counts, and the scheduler only places Pods onto existing nodes."
@@ -311,10 +316,10 @@ questions:
       - { text: "StatefulSet with `volumeClaimTemplates`", correct: true }
       - { text: "Job with `completions: 3`", correct: false }
   - type: boolean
-    prompt: "Kubernetes Secrets are encrypted at rest by default, so base64 values in a manifest are safe to commit to Git."
+    prompt: "In a GitOps setup where every manifest lives in Git, committing a plain Secret manifest with the database password is acceptable as long as the repository is private."
     answer: false
-    explanation: "Secret values are only base64-encoded, which is an encoding, not encryption. At-rest encryption in etcd has to be configured, and manifests in Git need a separate tool (sealed secrets, SOPS or an external secrets operator) to stay confidential."
-    theoryUrl: https://kubernetes.io/docs/concepts/configuration/secret/
+    explanation: "A Secret manifest holds the value only base64-encoded, so everyone with read access to the repository, every clone, fork and CI cache, and the whole history has the password, and it cannot be taken back without rotating it. Commit an encrypted form (sealed secrets, SOPS) or a reference that an external secrets operator resolves from a secret manager instead."
+    theoryUrl: https://kubernetes.io/docs/concepts/security/secrets-good-practices/
   - type: single
     prompt: "This Dockerfile reinstalls all dependencies on every code change, making builds slow. What is the cause?"
     code: |

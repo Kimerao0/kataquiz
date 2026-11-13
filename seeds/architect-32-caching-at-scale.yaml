@@ -105,43 +105,45 @@ questions:
           correct: false,
         }
   - type: single
-    prompt: "A popular key expires at noon. Within 100 ms, 5,000 requests miss the cache and hit the database simultaneously, which then struggles. What is this called?"
-    explanation: "A cache stampede (or thundering herd, dogpile) happens when many requests miss at once on an expired hot key and all recompute it. Protect with single-flight/request coalescing, a lock, early refresh, or stale-while-revalidate."
-    theoryUrl: https://en.wikipedia.org/wiki/Cache_stampede
-    options:
-      - { text: "Cache poisoning", correct: false }
-      - { text: "Cache penetration", correct: false }
-      - { text: "Cache stampede (thundering herd)", correct: true }
-      - { text: "Write skew", correct: false }
-  - type: single
-    prompt: "This wrapper sits in front of the database loader in a service that runs on 40 instances. What does it protect against, and what is its limit?"
-    code: |
-      const inflight = new Map();
-
-      function get(key) {
-        if (!inflight.has(key)) {
-          inflight.set(key, loadFromDb(key).finally(() => inflight.delete(key)));
-        }
-        return inflight.get(key);
-      }
-    codeLanguage: javascript
-    explanation: "Concurrent misses for the same key inside one process share a single in-flight load (single-flight), so a hot key costs one database call per instance instead of one per request. The map is per process, so 40 instances can still issue 40 loads at once; a distributed lock or serving stale values covers that. It holds no values after the load settles, so it is not a cache, and it never rejects requests."
-    theoryUrl: https://pkg.go.dev/golang.org/x/sync/singleflight
+    prompt: "A Redis cluster spreads keys over six shards. One key, the homepage's trending list, receives about 40% of all cache reads, and the shard holding it runs at 100% CPU while the other five sit mostly idle. What helps most?"
+    explanation: "A key lives on exactly one shard, so adding shards or changing how the key is written cannot split its read traffic. Keeping a copy for a few seconds in each app instance's memory, or storing several copies under suffixed keys and reading one at random, spreads the load, at the cost of a few seconds of staleness. A shorter TTL only adds refreshes on the same shard."
+    theoryUrl: https://redis.io/docs/latest/develop/clients/client-side-caching/
     options:
       - {
-          text: "It caches every loaded value for the life of the process, so the database is read only once per key",
+          text: "Add more shards to the cluster, so that the key space and the trending key's traffic spread more evenly",
           correct: false,
         }
       - {
-          text: "It coalesces concurrent loads of a key, but only within one instance",
+          text: "Serve it from a short-lived in-process copy, or replicate it under several keys",
           correct: true,
         }
       - {
-          text: "It coalesces concurrent loads of a key across all 40 instances, since they share the same code",
+          text: "Lower the key's TTL, so it is refreshed more often and each copy is read fewer times",
           correct: false,
         }
       - {
-          text: "It rate-limits callers so the database never sees more than one query",
+          text: "Switch that key to write-through, so reads of it no longer depend on the shard",
+          correct: false,
+        }
+  - type: single
+    prompt: "A team puts Redis in front of a lookup service. Each request reads one of 500 million records, reads are spread evenly, and a given record is requested about once a month. After launch the hit rate is 2% and average latency went up slightly. What is the lesson?"
+    explanation: "A cache only saves work when the same data is read again while it is still cached. With almost no reuse, nearly every request pays the cache round trip and then the database read anyway. Growing the cache until it holds most of the records just builds a second copy of the database, and changing the write strategy or the client library does not create reuse."
+    theoryUrl: https://learn.microsoft.com/en-us/azure/architecture/best-practices/caching
+    options:
+      - {
+          text: "The access pattern has almost no reuse, so the cache adds a hop without saving reads",
+          correct: true,
+        }
+      - {
+          text: "The cache is too small; keep adding nodes until most of the 500 million records fit and the hit rate passes 90%",
+          correct: false,
+        }
+      - {
+          text: "Switch to write-through, so every record is already cached before anyone reads it",
+          correct: false,
+        }
+      - {
+          text: "The Redis client is misconfigured, since any cache in front of a database raises the hit rate",
           correct: false,
         }
   - type: single
@@ -166,14 +168,23 @@ questions:
           correct: false,
         }
   - type: multi
-    prompt: "Which techniques reduce the risk of a cache stampede on a hot key? Select all that apply."
-    explanation: "Request coalescing (single-flight) or a lock lets one request recompute, probabilistic or early refresh recomputes before expiry, and serving stale while revalidating avoids misses. Setting the same TTL on every key makes expiries align and does not help."
-    theoryUrl: https://en.wikipedia.org/wiki/Cache_stampede
+    prompt: "To save a database round trip, a team stores shopping carts only in Redis, which runs as a cache with LRU eviction and no persistence. Which problems follow from this design? Select all that apply."
+    explanation: "A cache is supposed to hold copies that can be thrown away and rebuilt from a source of truth. Here the cart exists nowhere else, so eviction under memory pressure or a node restart silently deletes customers' carts. Reads are not slower than from a database, and nothing in the design forces cart writes through a database transaction."
+    theoryUrl: https://redis.io/docs/latest/develop/reference/eviction/
     options:
-      - { text: "Single-flight or a lock around the recomputation", correct: true }
-      - { text: "Refreshing the entry shortly before it expires", correct: true }
-      - { text: "Serving a stale value while one request revalidates", correct: true }
-      - { text: "Setting an identical TTL for all keys so expiry is predictable", correct: false }
+      - { text: "Under memory pressure, eviction can silently delete active carts", correct: true }
+      - {
+          text: "A node restart or failure loses carts that exist nowhere else",
+          correct: true,
+        }
+      - {
+          text: "Reading a cart becomes slower than reading it from the relational database would be",
+          correct: false,
+        }
+      - {
+          text: "Every cart update now has to wait for a database transaction to commit",
+          correct: false,
+        }
   - type: single
     prompt: "A nightly job warms 1 million product keys with a TTL of exactly 1 hour. Every hour the database CPU spikes. What is the most likely reason and a fix?"
     explanation: "All keys expire at the same moment, so the misses arrive in a burst. Adding random jitter to the TTLs spreads the expirations. Increasing the DB size treats the symptom."
@@ -310,9 +321,9 @@ questions:
       - { text: "In-process caches cannot hold numbers", correct: false }
       - { text: "The 50 servers will merge their caches through consensus", correct: false }
   - type: boolean
-    prompt: "True or false: a CDN can serve a cached response to the user even when the origin server is down, if the content has a stale-if-error directive and a stale copy is available."
-    explanation: "True. `stale-if-error` allows a cache to serve a stale response when the origin returns errors or is unreachable, for the time specified. Support varies by CDN, but it is a standard resilience feature."
-    theoryUrl: https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Cache-Control
+    prompt: "Letting a CDN keep serving expired copies of article pages while the origin is down turns an origin outage into a period of possibly outdated pages, which for a news site is usually a better failure mode than error pages."
+    explanation: "True. Serving stale content on origin errors trades freshness for availability, and HTTP even has a standard way for the origin to allow it for a bounded time. It fits content where a slightly old page beats no page, like articles, and not data where staleness leads to wrong decisions."
+    theoryUrl: https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Caching
     answer: true
   - type: single
     prompt: "Four services and two batch jobs write to the `products` table. Each is supposed to delete the matching cache key after writing, but one job forgot, and stale products stay cached for hours. Which design makes invalidation reliable?"
