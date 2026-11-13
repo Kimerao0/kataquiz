@@ -114,14 +114,26 @@ questions:
         }
       - { text: "Accept it, because an SLO is only a goal and never enforced", correct: false }
   - type: single
-    prompt: "Your checkout service has a 99.9% SLO and calls three other services in series, each with its own 99.9% availability, all of which are hard dependencies. What is the approximate best availability you can offer, ignoring your own failures?"
-    explanation: "Availabilities of hard serial dependencies multiply: 0.999 x 0.999 x 0.999 is about 0.997, so roughly 99.7%. Your SLO cannot exceed what your hard dependencies allow unless you add redundancy, caching or graceful degradation."
-    theoryUrl: https://sre.google/sre-book/embracing-risk/
+    prompt: "A pipeline rebuilds the product search index from the inventory database every few minutes. Nobody calls it directly: users notice its failures as search results with outdated prices and stock. Which SLI best reflects what they experience?"
+    explanation: "For a data pipeline, users feel staleness, so a freshness SLI (the share of data updated within an agreed threshold) maps to their experience; correctness and coverage are the other typical pipeline SLIs. Worker utilisation describes resources, a health check only shows that the process is up, and counting runs started says nothing about whether they finished and delivered fresh data."
+    theoryUrl: https://sre.google/workbook/implementing-slos/
     options:
-      - { text: "About 99.9%, the best single dependency", correct: false }
-      - { text: "About 99.97%, because failures overlap and cancel out", correct: false }
-      - { text: "About 99.7%, the product of the three dependencies", correct: true }
-      - { text: "About 99.0%, the sum of the three failure rates times ten", correct: false }
+      - {
+          text: "The proportion of index data updated within an agreed freshness limit",
+          correct: true,
+        }
+      - {
+          text: "The CPU and memory utilisation of the workers that run the pipeline jobs",
+          correct: false,
+        }
+      - {
+          text: "The success rate of requests to the pipeline's health-check endpoint",
+          correct: false,
+        }
+      - {
+          text: "The number of pipeline runs started per hour, compared with the planned schedule",
+          correct: false,
+        }
   - type: single
     prompt: "Which pairing of method and target is correct?"
     explanation: "RED (Rate, Errors, Duration) describes request-driven services from the point of view of their users, while USE (Utilization, Saturation, Errors) describes the health of resources such as CPUs, disks and connection pools. They are complementary: RED tells you that users are hurt, USE helps find the constrained resource."
@@ -257,35 +269,29 @@ questions:
       - { text: "Page every engineer on the team, so someone always reacts", correct: false }
       - { text: "Raise the CPU threshold to 95% and keep paging on it", correct: false }
   - type: single
-    prompt: "This alert rule is based on a 99.9% SLO over 30 days. What does a burn rate of 14.4 sustained for one hour mean?"
+    prompt: "Checkout has a 99.9% availability SLO over 30 days. This rule pages the on-call several times a week for short error spikes that recover on their own and use a tiny share of the month's error budget. What is the better design?"
     code: |
-      - alert: HighErrorBudgetBurn
+      - alert: CheckoutErrors
         expr: |
-          (
-            sum(rate(http_requests_total{code=~"5.."}[1h]))
-            / sum(rate(http_requests_total[1h]))
-          ) > (14.4 * 0.001)
-          and
-          (
-            sum(rate(http_requests_total{code=~"5.."}[5m]))
-            / sum(rate(http_requests_total[5m]))
-          ) > (14.4 * 0.001)
+          sum(rate(http_requests_total{job="checkout", code=~"5.."}[5m]))
+          / sum(rate(http_requests_total{job="checkout"}[5m])) > 0.001
+        for: 1m
         labels:
           severity: page
     codeLanguage: yaml
-    explanation: "A burn rate of 14.4 means errors are consuming budget 14.4 times faster than the rate that would exactly exhaust it at the end of the window. In one hour that spends 14.4/720 = 2% of a 30-day budget, which is the classic page-worthy threshold. The short 5m window makes the alert reset quickly once the issue is fixed."
+    explanation: "A threshold equal to the SLO over five minutes fires on any blip, even one that barely touches the budget. A burn-rate alert pages only when the budget is being spent fast enough to threaten the SLO, and pairing a long window with a short one keeps it precise while letting it reset soon after recovery. Measuring over the full 30 days would detect a real outage far too slowly and keep firing long after it ends, and a fixed higher threshold misses slow burns."
     theoryUrl: https://sre.google/workbook/alerting-on-slos/
     options:
-      - { text: "The error rate is 14.4% of all requests", correct: false }
-      - { text: "The service has 14.4 minutes of budget left", correct: false }
       - {
-          text: "Budget is burning 14.4 times faster than sustainable, about 2% of the month's budget per hour",
+          text: "Page on the budget burn rate, over a long window confirmed by a short one",
           correct: true,
         }
       - {
-          text: "The alert fires after 14.4 consecutive failed requests, which equals 14.4% of the monthly budget",
+          text: "Evaluate the same ratio over the full 30-day SLO window, so the alert matches the SLO exactly",
           correct: false,
         }
+      - { text: "Raise the threshold to 5% errors and keep the 5-minute window", correct: false }
+      - { text: "Send the alert to a team email list instead of the pager", correct: false }
   - type: single
     prompt: "The on-call rotation gets about 40 pages a week, and most need no action. Which long-term response is right?"
     explanation: "Every page should be urgent, actionable and require a human; otherwise people learn to ignore them. Review each alert and delete, downgrade to ticket or dashboard, or fix the underlying cause. Adding people to the rota spreads the pain without reducing it, and muting alerts risks missing real incidents."

@@ -36,26 +36,32 @@ questions:
       - { text: "Client credentials flow with a secret embedded in the bundle", correct: false }
       - { text: "Authorization code flow with PKCE", correct: true }
   - type: single
-    prompt: "A client generates a PKCE verifier and derives the challenge as shown. Which value is sent where?"
+    prompt: "A mobile app signs users in with the authorization code flow and PKCE, creating the two values below for each login. A malicious app on the same phone intercepts the redirect and steals the authorization code. Why can it not exchange the code for tokens?"
     code: |
       import { createHash, randomBytes } from 'node:crypto'
 
       const verifier = randomBytes(32).toString('base64url')
       const challenge = createHash('sha256').update(verifier).digest('base64url')
     codeLanguage: javascript
-    explanation: "The challenge (with `code_challenge_method=S256`) goes in the authorization request, committing the client to a secret without revealing it. The verifier is sent later to the token endpoint together with the code, and the server recomputes the hash. Sending the verifier up front would let an attacker who intercepts the redirect reuse it."
+    explanation: "The app sends only the hash (the challenge) when it starts the flow and keeps the verifier in memory. The server issues tokens for the code only to a caller that presents a verifier hashing to that challenge, so a stolen code is useless on its own, and the hash cannot be reversed to recover the verifier. The code is neither encrypted with the challenge nor tied to an IP address, which another app on the same phone would share anyway."
     theoryUrl: https://datatracker.ietf.org/doc/html/rfc7636
     options:
-      - { text: "Both are sent in the authorization request URL", correct: false }
       - {
-          text: "The challenge is sent to the token endpoint; the verifier goes in the authorization request",
+          text: "It lacks the verifier, which never left the app and must match the challenge",
+          correct: true,
+        }
+      - {
+          text: "The authorization code is encrypted with the challenge, so only the original app can read it",
           correct: false,
         }
       - {
-          text: "The challenge is sent in the authorization request; the verifier goes to the token endpoint",
-          correct: true,
+          text: "The code is bound to the phone's IP address, so a request from another app is refused",
+          correct: false,
         }
-      - { text: "Neither is sent; the server derives both from the client ID", correct: false }
+      - {
+          text: "The challenge is a one-time password that expires within a second",
+          correct: false,
+        }
   - type: single
     prompt: "Your backend API receives a bearer JWT from the SPA. The SPA used the OIDC login and sends the ID token instead of the access token. Why is this a design flaw?"
     explanation: "The ID token is meant for the client: its audience is the client application and it states who authenticated. The access token is what a resource server should validate, with its own audience and scopes for that API. Accepting ID tokens at the API conflates authentication and authorization and may accept tokens minted for other clients."
@@ -174,18 +180,24 @@ questions:
       - { text: "Stateless JWTs signed with a long-lived key", correct: false }
       - { text: "Basic authentication on every request", correct: false }
   - type: single
-    prompt: "Which statement best captures the zero trust principle?"
-    explanation: "Zero trust means no implicit trust based on network location: every request is authenticated, authorized and evaluated against context (identity, device, policy), whether it comes from the internet or the internal network. A perimeter firewall plus a VPN is the traditional model it moves away from."
-    theoryUrl: https://csrc.nist.gov/pubs/sp/800/207/final
+    prompt: "A reporting service, acting for logged-in users, fetches documents from a document store using its own service account, which may read every customer's documents. It forwards the requested document ID, and the store only checks that the caller is the reporting service. What is the architectural flaw?"
+    explanation: "This is the confused deputy problem: a privileged intermediary uses its own broad authority on behalf of callers, so any user who can reach the reporting service can read any document. Carry the end user's identity downstream, for example by exchanging the user's token for a narrowly scoped one, and let the store authorize each read for that user. A stronger service secret, mutual TLS or unguessable IDs still identify only the service, not the user."
+    theoryUrl: https://en.wikipedia.org/wiki/Confused_deputy_problem
     options:
       - {
-          text: "Never trust, always verify: location alone never makes a request trusted",
+          text: "The store never sees the end user, so the service's broad rights serve anyone",
           correct: true,
         }
-      - { text: "Trust everything inside the VPN and verify everything outside it", correct: false }
-      - { text: "Remove authentication on internal services to reduce latency", correct: false }
       - {
-          text: "Authenticate users once at login and trust them for the whole session, even across services",
+          text: "The service account uses a static secret; a longer one rotated monthly would fix the leak",
+          correct: false,
+        }
+      - {
+          text: "Document IDs are sequential; switching to random UUIDs would stop users reading others' files",
+          correct: false,
+        }
+      - {
+          text: "The call uses plain TLS; switching to mutual TLS would close the gap",
           correct: false,
         }
   - type: single
@@ -204,14 +216,20 @@ questions:
         }
       - { text: "Move the billing service into a larger subnet", correct: false }
   - type: multi
-    prompt: "Which of these are typical building blocks of a zero trust architecture? Select all that apply."
-    explanation: "Strong identity for users and workloads, least-privilege authorization evaluated per request, and microsegmentation with continuous monitoring are core elements. A shared admin account used across the team is the opposite of per-identity accountability."
-    theoryUrl: https://csrc.nist.gov/pubs/sp/800/207/final
+    prompt: "A team is designing an analytics pipeline that receives customer events containing personal data. Which design choices limit what a future breach could expose? Select all that apply."
+    explanation: "Data protection by design shrinks the impact of a breach: pseudonymised identifiers, raw data deleted once it is no longer needed, and access scoped to what each role requires all reduce what an attacker can take. Copying raw personal data into a less protected environment such as staging multiplies the places it can leak from."
+    theoryUrl: https://gdpr-info.eu/art-25-gdpr/
     options:
-      - { text: "Strong identity for both users and workloads", correct: true }
-      - { text: "A single shared administrator account for convenience", correct: false }
-      - { text: "Least-privilege access decided per request", correct: true }
-      - { text: "Network segmentation with continuous logging and monitoring", correct: true }
+      - {
+          text: "Pseudonymise customer identifiers before events reach the warehouse",
+          correct: true,
+        }
+      - {
+          text: "Copy the raw events into staging as well, so analysts can test queries on real data",
+          correct: false,
+        }
+      - { text: "Delete raw events once an agreed retention period expires", correct: true }
+      - { text: "Give analysts aggregated tables rather than raw events", correct: true }
   - type: single
     prompt: "In a threat model of an order API, an attacker intercepts a request and changes the `amount` field before it reaches the server, which does not verify its integrity. Which STRIDE category is this?"
     explanation: "Modifying data in transit or at rest is Tampering, and the countermeasure is integrity protection (TLS, signatures, server-side validation of authoritative values). Spoofing is impersonating an identity, Repudiation is denying an action, and Information disclosure is about reading data."

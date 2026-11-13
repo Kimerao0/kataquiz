@@ -1,6 +1,6 @@
 version: 1
 title: "Architect Roadmap 38: Quality attributes"
-description: Availability and the number of nines, SLIs/SLOs and error budgets, RTO and RPO, multi-region disaster recovery, scalability, maintainability, and how to measure and balance them.
+description: Availability and how it is measured, RTO and RPO, multi-region disaster recovery, scalability, latency and throughput, security and portability trade-offs, maintainability, and how to balance them.
 language: en
 tags: [architect-roadmap, architecture, availability, disaster-recovery, scalability]
 run:
@@ -9,14 +9,26 @@ run:
   timePerQuestionSec: 90
 questions:
   - type: single
-    prompt: "Roughly how much downtime per year does an availability target of 99.9% ('three nines') allow?"
-    explanation: "0.1% of a year is about 8.8 hours. 99.99% allows about 52 minutes per year and 99.999% about 5 minutes, which is why each extra nine is dramatically harder to reach."
-    theoryUrl: https://sre.google/sre-book/embracing-risk/
+    prompt: "Two managed queue vendors both advertise 99.9% availability. Vendor A measures per calendar month with a probe inside its own data centre and excludes announced maintenance. Vendor B counts every failed client request over a rolling 30 days, with no exclusions. What should you conclude?"
+    explanation: "An availability figure means little without its definition: what counts as a failure, where it is measured, over which window and what is excluded. A probe inside the vendor's network can stay green while clients fail, and announced maintenance is still downtime for your users. Ask for the definitions and, where it matters, measure the dependency from your side."
+    theoryUrl: https://sre.google/sre-book/service-level-objectives/
     options:
-      - { text: "About 88 hours", correct: false }
-      - { text: "About 8.8 hours", correct: true }
-      - { text: "About 52 minutes", correct: false }
-      - { text: "About 5 minutes", correct: false }
+      - {
+          text: "The two figures are not comparable until you know how each one is defined",
+          correct: true,
+        }
+      - {
+          text: "They are equivalent, because the percentage is the same and both windows cover about a month",
+          correct: false,
+        }
+      - {
+          text: "Vendor A is more reliable, because excluding maintenance shows its unplanned downtime is lower",
+          correct: false,
+        }
+      - {
+          text: "Vendor B is worse, because request-based measurement always yields lower numbers than probes",
+          correct: false,
+        }
   - type: single
     prompt: "An object store advertises far higher durability than availability. What is the difference between the two?"
     explanation: "Durability is the probability that stored data is not lost over time; availability is the probability that you can read or write it right now. A service can be briefly unreachable without losing anything, which is why durability targets are usually much higher. Neither is about latency, and the two are measured independently."
@@ -36,18 +48,24 @@ questions:
         }
       - { text: "They are the same metric, quoted over different time windows", correct: false }
   - type: single
-    prompt: "Placing an order calls the email service synchronously to send the confirmation. When the email service is down, customers cannot place orders. Which change best protects the ordering flow?"
-    explanation: "The confirmation email is not needed to accept the order, so it should not be a hard dependency. Saving the order and publishing a message that an email worker consumes later lets orders succeed while email is down, and the backlog drains when it recovers. Retrying inline or adding email replicas keeps the email service on the critical path."
-    theoryUrl: https://learn.microsoft.com/en-us/azure/architecture/patterns/queue-based-load-leveling
+    prompt: "A team must choose between automatic failover and human-confirmed failover for its primary database. What is the core trade-off?"
+    explanation: "Automation shrinks detection and recovery time, which suits a tight RTO, but a health check cannot always tell a dead primary from a slow or cut-off one: failing over on a false alarm causes disruption and, without fencing the old primary, can leave two nodes accepting writes. A human confirmation avoids that at the cost of a longer RTO. Both options still need replication, and neither is better in every case."
+    theoryUrl: https://en.wikipedia.org/wiki/Split-brain_(computing)
     options:
-      - { text: "Publish a message to a queue and send the email asynchronously", correct: true }
-      - { text: "Retry the email call inline before failing the order", correct: false }
       - {
-          text: "Add more email service replicas so it is less likely to be down when an order arrives",
+          text: "Automatic recovers faster but may fail over on a false alarm and split writes",
+          correct: true,
+        }
+      - {
+          text: "Human-confirmed failover always has the shorter RTO, because people check the state first",
           correct: false,
         }
       - {
-          text: "Send the email first, and only save the order once the email is confirmed",
+          text: "Automatic failover removes the need to replicate data from the primary to the replica",
+          correct: false,
+        }
+      - {
+          text: "None: automatic failover is strictly better once health checks exist",
           correct: false,
         }
   - type: single
@@ -161,39 +179,66 @@ questions:
     explanation: "Each additional nine usually costs disproportionately more: tighter detection, automated failover, multi-AZ or multi-region, more testing and a larger on-call investment. That is why the target must come from business impact, not ambition."
     theoryUrl: https://sre.google/sre-book/embracing-risk/
   - type: single
-    prompt: "A service burned 100% of its monthly error budget in the first week. According to SRE practice, what should happen?"
-    explanation: "The error budget turns reliability into a shared decision rule: when it is spent, risky changes (feature launches) are slowed or frozen and effort goes to reliability work until the service is back within SLO. Raising the SLO or hiding the incidents defeats the mechanism."
-    theoryUrl: https://sre.google/sre-book/embracing-risk/
-    options:
-      - { text: "Loosen the SLO so the budget is no longer exhausted", correct: false }
-      - { text: "Keep shipping, because budgets are only reviewed quarterly", correct: false }
-      - { text: "Add more alerts and keep the release cadence unchanged", correct: false }
-      - { text: "Slow or freeze risky releases and prioritise reliability work", correct: true }
-  - type: single
-    prompt: "You must define an availability SLI for a REST API behind a load balancer. Which definition is best?"
-    explanation: "A good SLI is a ratio of good events to valid events as the user experiences it: here successful responses over all valid requests, measured at the load balancer. CPU, host uptime and instance counts describe resources, not what users get."
-    theoryUrl: https://sre.google/workbook/implementing-slos/
+    prompt: "A banking app asks for a second factor on every screen, and many users abandon it. Product now wants to remove the second factor entirely. Which design best balances security and usability?"
+    explanation: "Step-up (risk-based) authentication puts friction where the risk is: viewing a balance needs only the normal session, while adding a payee or making a large transfer asks for a fresh second factor. That keeps strong protection on the actions attackers want without taxing every interaction. Forced frequent password changes push users toward weaker, predictable passwords, and opt-in MFA leaves most accounts unprotected."
+    theoryUrl: https://pages.nist.gov/800-63-3/sp800-63b.html
     options:
       - {
-          text: "Average CPU utilisation of the instances staying below 70% across the whole fleet",
+          text: "Remove the second factor and require long passwords that users must change every 30 days",
           correct: false,
         }
-      - { text: "Percentage of time the instances answer ping", correct: false }
-      - { text: "Number of healthy instances in the target group", correct: false }
       - {
-          text: "Valid requests answered without a 5xx, divided by all valid requests",
+          text: "Keep it on every screen, since security always outweighs usability",
+          correct: false,
+        }
+      - {
+          text: "Ask for a second factor only on risky actions, such as new payees or large transfers",
           correct: true,
         }
-  - type: single
-    prompt: "Dashboards show an average response time of 120 ms, yet customers complain about slowness. Why is the average misleading for this?"
-    explanation: "Latency distributions are long-tailed. A small share of very slow requests barely moves the mean but hits real users, especially on pages that fan out to many calls. Percentiles such as p95 and p99 expose the tail, so SLOs are written on them."
-    theoryUrl: https://sre.google/sre-book/monitoring-distributed-systems/
-    options:
-      - { text: "Averages are only valid for CPU metrics, never for latency", correct: false }
-      - { text: "The mean hides the slow tail, which percentiles like p99 reveal", correct: true }
-      - { text: "The monitoring agent adds 120 ms to every request it measures", correct: false }
       - {
-          text: "Averages are computed over the median, so they ignore fast requests",
+          text: "Make the second factor optional and off by default, so users choose their own risk",
+          correct: false,
+        }
+  - type: single
+    prompt: "An ingestion service writes each incoming event to the database in its own transaction, and throughput has become the bottleneck. Grouping events into batches of a few hundred would raise throughput several times. What does the team give up?"
+    explanation: "Batching spreads the per-transaction overhead (round trips, commits) across many events, so throughput rises, but each event now waits for its batch to fill or for a flush timer, so per-event latency goes up. A maximum batch size plus a maximum wait bounds that delay. Batched writes are still committed durably and in order: the trade is latency for throughput."
+    theoryUrl: https://kafka.apache.org/documentation/#maximizingefficiency
+    options:
+      - {
+          text: "Per-event latency, since each event waits for its batch to fill or a timer to fire",
+          correct: true,
+        }
+      - {
+          text: "Durability, since batched writes stay in memory and are never persisted to disk",
+          correct: false,
+        }
+      - {
+          text: "Nothing, because batching always improves throughput and latency at the same time",
+          correct: false,
+        }
+      - {
+          text: "Ordering, since the database applies the events inside a batch in a random order",
+          correct: false,
+        }
+  - type: single
+    prompt: "A page sends 50 backend calls in parallel and waits for all of them. Each backend is fast at the median and only occasionally slow. Why is the page slow far more often than any single backend, and what helps?"
+    explanation: "When a request waits for all of many parallel calls, its latency is that of the slowest one, so a backend that is slow on a small share of calls makes a large share of 50-way fan-outs hit at least one slow call. Hedged requests to another replica, a smaller fan-out, or returning partial results by a deadline cut the effect. Making the calls sequential would add their latencies together, and parallel latencies do not sum."
+    theoryUrl: https://research.google/pubs/the-tail-at-scale/
+    options:
+      - {
+          text: "The slowest call sets the page time; hedge requests or reduce the fan-out",
+          correct: true,
+        }
+      - {
+          text: "Parallel calls share one connection, so 50 of them are 50 times slower; make them sequential",
+          correct: false,
+        }
+      - {
+          text: "The 50 median latencies add up, so the page takes about 50 times as long as one call",
+          correct: false,
+        }
+      - {
+          text: "Backends throttle each other when called at once; add a random delay before each call",
           correct: false,
         }
   - type: single
@@ -311,14 +356,26 @@ questions:
         }
       - { text: "Instances launched during an outage are billed at a higher rate", correct: false }
   - type: single
-    prompt: "You alert when the error rate exceeds 1% for one minute, and the on-call is paged ten times a week for blips that never threaten the monthly SLO. What is the SRE-recommended improvement?"
-    explanation: "Burn-rate alerts page only when the error budget is being consumed fast enough to threaten the SLO, typically using a fast and a slow window. This reduces false positives while still catching real incidents. Raising the threshold blindly or muting alerts loses signal."
-    theoryUrl: https://sre.google/workbook/alerting-on-slos/
+    prompt: "A startup with one product team runs on a single cloud. An architect proposes wrapping every managed service (queues, storage, database) in in-house abstractions and avoiding provider-specific features, so the system could move to another cloud. What is the main trade-off to weigh?"
+    explanation: "Portability is a quality attribute with a price: lowest-common-denominator abstractions take time to build and maintain, and they give up managed features that would save effort. For a small team with no concrete plan to switch, that cost buys an option it may never use; isolating only the few parts where a switch is likely is a cheaper hedge. Abstractions add no speed, and moving data out of a cloud is never free."
+    theoryUrl: https://martinfowler.com/articles/oss-lockin.html
     options:
-      - { text: "Alert on error budget burn rate over multiple windows", correct: true }
-      - { text: "Raise the threshold to 20% and keep the one-minute window", correct: false }
-      - { text: "Send the alerts to email instead of the pager", correct: false }
-      - { text: "Alert on CPU instead, since it moves more slowly", correct: false }
+      - {
+          text: "Portability that may never be used, paid for now in speed and lost features",
+          correct: true,
+        }
+      - {
+          text: "None: abstraction layers cost nothing to build and make the system portable for free",
+          correct: false,
+        }
+      - {
+          text: "None: lock-in is irrelevant, because providers guarantee a free migration of all data out",
+          correct: false,
+        }
+      - {
+          text: "Performance: abstractions make the system faster by removing calls to provider APIs",
+          correct: false,
+        }
   - type: single
     prompt: "A background worker pool processes a queue that gets huge spikes at random times. Autoscaling on average CPU reacts too late and messages wait for minutes. Which scaling signal fits best?"
     explanation: "For queue consumers, queue depth or the age of the oldest message (backlog per worker) leads the load, while CPU only rises after workers are already saturated. Memory and network metrics have the same lag problem."
