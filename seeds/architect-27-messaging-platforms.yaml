@@ -36,28 +36,26 @@ questions:
       - { text: "Kafka rejects the fifth consumer and the group fails to start", correct: false }
       - { text: "Every consumer receives every message of every partition", correct: false }
   - type: single
-    prompt: "What does this print for a range-style assignment of 6 partitions to 4 consumers?"
-    code: |
-      function assign(parts, consumers) {
-        const base = Math.floor(parts / consumers);
-        const extra = parts % consumers;
-        const out = [];
-        let p = 0;
-        for (let c = 0; c < consumers; c++) {
-          const n = base + (c < extra ? 1 : 0);
-          out.push(Array.from({ length: n }, () => p++));
-        }
-        return out;
-      }
-      console.log(JSON.stringify(assign(6, 4)));
-    codeLanguage: javascript
-    explanation: "base is 1 and extra is 2, so the first two consumers get two partitions and the remaining two get one: [[0,1],[2,3],[4],[5]]. This shows why partition counts that are not multiples of the consumer count produce uneven load."
+    prompt: "A Kafka consumer cannot keep up, and the topic's partition count cannot be changed for now. The team hands the messages of each partition to a pool of 16 threads and commits each offset as soon as its message finishes. What do they give up?"
+    explanation: "Kafka keeps one committed offset per partition and group, so committing message 105 while 101 is still running (or has failed) can skip 101 after a crash, unless the code commits only up to the lowest unfinished offset. Running a partition's messages in parallel also drops the ordering the partition provided. Parallelising per key, or adding partitions later, keeps those guarantees."
     theoryUrl: https://kafka.apache.org/documentation/#intro_consumers
     options:
-      - { text: "[[0,1],[2,3],[4],[5]]", correct: true }
-      - { text: "[[0],[1],[2],[3,4,5]]", correct: false }
-      - { text: "[[0,1],[2],[3],[4,5]]", correct: false }
-      - { text: "[[0,1,2],[3],[4],[5]]", correct: false }
+      - {
+          text: "Per-partition ordering, and a committed offset can move past messages that have not finished yet",
+          correct: true,
+        }
+      - {
+          text: "Nothing, since Kafka tracks the completion of each message separately and redelivers only those that failed",
+          correct: false,
+        }
+      - {
+          text: "Group membership, because a consumer that processes with threads can no longer join a consumer group",
+          correct: false,
+        }
+      - {
+          text: "Durability, because messages handed to threads are removed from the log immediately",
+          correct: false,
+        }
   - type: single
     prompt: "What is a Kafka consumer's committed offset?"
     explanation: "The committed offset is the position, per partition and group, from which the consumer resumes after a restart or rebalance. It does not delete data from the log and it is not a message id or a lock. When it is committed relative to processing determines at-most-once versus at-least-once behaviour."
@@ -97,33 +95,45 @@ questions:
       - { text: "Log compaction", correct: true }
       - { text: "Consumer group rebalancing", correct: false }
   - type: single
-    prompt: "What does this print for a compacted log, where a null value is a tombstone?"
-    code: |
-      const log = [
-        ['k1', 'a'], ['k2', 'b'], ['k1', 'c'],
-        ['k2', null], ['k3', 'd'],
-      ];
-      const latest = new Map();
-      for (const [k, v] of log) latest.set(k, v);
-      console.log(JSON.stringify([...latest].filter(([, v]) => v !== null)));
-    codeLanguage: javascript
-    explanation: 'Compaction keeps the latest value for each key: k1 becomes ''c'', k2 ends with a tombstone (deleted), k3 stays ''d''. The result is [["k1","c"],["k3","d"]], which is the current-state view of the topic.'
+    prompt: "Services rebuild their cache of user profiles at startup by reading a compacted topic keyed by user id. A user deletes their account and must disappear from that topic. What do you do?"
+    explanation: "Compaction keeps the latest record per key, so a key only goes away when its latest record is a tombstone (a null value), which compaction eventually removes as well. An empty profile keeps the key alive in the topic, and Kafka logs are never edited in place. Consumers rebuilding state must treat the tombstone as 'delete this key'."
     theoryUrl: https://kafka.apache.org/documentation/#compaction
     options:
-      - { text: '[["k1","a"],["k2","b"],["k3","d"]]', correct: false }
-      - { text: '[["k1","c"],["k2",null],["k3","d"]]', correct: false }
-      - { text: '[["k1","c"],["k3","d"]]', correct: true }
-      - { text: '[["k3","d"]]', correct: false }
-  - type: single
-    prompt: "A consumer group reads a 3-partition topic. Latest offsets are 120, 80 and 100, committed offsets are 100, 80 and 90. What is the total consumer lag?"
-    explanation: "Lag per partition is the log end offset minus the committed offset: 20 + 0 + 10 = 30. Lag is the key health metric for consumers: growing lag means they cannot keep up."
-    theoryUrl: https://kafka.apache.org/documentation/#monitoring
-    options:
-      - { text: "300", correct: false }
-      - { text: "30", correct: true }
-      - { text: "20", correct: false }
       - {
-          text: "0, since a partition at its end has no lag and others are ignored",
+          text: "Publish a record with the user's key and a null value, which compaction treats as a delete marker",
+          correct: true,
+        }
+      - {
+          text: "Nothing, since compaction drops a key on its own once no consumer has read it for the retention period",
+          correct: false,
+        }
+      - {
+          text: "Delete the user's old records directly from the partition files on every broker",
+          correct: false,
+        }
+      - {
+          text: "Publish a record with an empty profile as its value, which then replaces the old profile",
+          correct: false,
+        }
+  - type: single
+    prompt: "A consumer group was stopped for ten days during a migration. The topic it reads keeps data for seven days. What happens when the group starts again?"
+    explanation: "Retention is independent of consumption: records older than the window are deleted whether or not anyone has read them. The group's committed offset now points at data that no longer exists, so it restarts from the earliest or latest available position, depending on its reset policy, and the gap is lost. Retention has to cover the longest consumer outage you want to survive."
+    theoryUrl: https://kafka.apache.org/documentation/#intro_concepts_and_terms
+    options:
+      - {
+          text: "Retention has deleted the oldest unread records, so about three days of events can no longer be read",
+          correct: true,
+        }
+      - {
+          text: "Nothing is lost, because Kafka pauses retention on a topic while any group still has unread messages on it",
+          correct: false,
+        }
+      - {
+          text: "The group resumes from its committed offset and reads everything, since committed data is kept",
+          correct: false,
+        }
+      - {
+          text: "The broker refuses the group until an operator restores the topic from a backup",
           correct: false,
         }
   - type: single
@@ -235,18 +245,24 @@ questions:
       - { text: "Partitions are added to a subscribed topic", correct: true }
       - { text: "Producers increase their message rate", correct: false }
   - type: single
-    prompt: "A producer sends payment events with acks=1 and the leader broker fails right after acknowledging, before followers have copied the data. What is the risk?"
-    explanation: "With acks=1 the leader acks after writing locally, so if it dies before replication, a new leader may lack those records and they are lost. acks=all with min.insync.replicas of 2 or more waits for in-sync followers and prevents this, at a latency cost."
-    theoryUrl: https://kafka.apache.org/documentation/#producerconfigs_acks
+    prompt: "A producer sends a payment event, the broker stores it, but the acknowledgement is lost and the producer retries. Consumers then find the event twice in the partition. What prevents this duplicate on the producer side?"
+    explanation: "With idempotence enabled, the producer tags its writes with a producer id and sequence numbers, and the broker drops a retry it has already stored. Disabling retries trades duplicates for lost messages, and a copy on another partition is still a duplicate. This only covers producer retries: consumers still need idempotency for their own redeliveries."
+    theoryUrl: https://kafka.apache.org/documentation/#semantics
     options:
       - {
-          text: "The acknowledged messages may be lost because followers had not copied them",
+          text: "An idempotent producer, whose retries the broker recognises by sequence number and discards",
           correct: true,
         }
-      - { text: "The messages are duplicated on every follower", correct: false }
-      - { text: "Consumers receive the messages out of order", correct: false }
       - {
-          text: "No risk, because the leader's disk is always replayed on failover",
+          text: "Disabling producer retries, which keeps the log free of duplicates without losing any messages",
+          correct: false,
+        }
+      - {
+          text: "Adding partitions, so that the retry lands on a different partition from the original",
+          correct: false,
+        }
+      - {
+          text: "Committing consumer offsets earlier, so that the second copy is skipped automatically",
           correct: false,
         }
   - type: single

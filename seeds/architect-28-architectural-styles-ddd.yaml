@@ -162,20 +162,26 @@ questions:
       - { text: "Conformist", correct: true }
       - { text: "Separate ways", correct: false }
   - type: single
-    prompt: "A 12-year-old PHP monolith must move to a new platform without a big-bang rewrite, while the business keeps shipping features. Which approach do you choose?"
-    explanation: "The strangler fig pattern routes traffic through a facade and replaces functionality piece by piece with new implementations until the old system can be retired. A big-bang rewrite delays value and risks never reaching parity."
-    theoryUrl: https://martinfowler.com/bliki/StranglerFigApplication.html
+    prompt: "A team starts a strangler fig migration of a large monolith. Which capability is usually the best one to move first?"
+    explanation: "The first slice proves the facade, routing, deployment and data synchronisation with a small blast radius, while still delivering some value. Starting with the most entangled core puts the hardest problems before the approach is proven. Moving the shared data layer first is a big-bang rewrite in disguise."
+    theoryUrl: https://learn.microsoft.com/en-us/azure/architecture/patterns/strangler-fig
     options:
-      - { text: "Freeze features for a year and rewrite everything in parallel", correct: false }
       - {
-          text: "Put a facade in front and migrate capabilities one by one, routing to new code as each is ready",
+          text: "A well-bounded capability with few dependencies, to prove the facade and routing at low risk",
           correct: true,
         }
       - {
-          text: "Copy the database to the new platform, then run both systems writing to it in parallel until the old one is retired",
+          text: "The most entangled core module, because once it has moved everything else becomes easy",
           correct: false,
         }
-      - { text: "Fork the monolith per customer and rewrite each fork", correct: false }
+      - {
+          text: "The whole data layer, because every capability depends on it and it must move before any traffic is routed to new code",
+          correct: false,
+        }
+      - {
+          text: "The largest module by lines of code, so that the migration shows progress quickly",
+          correct: false,
+        }
   - type: single
     prompt: "During a strangler migration, the new Orders service and the monolith both write order data in their own databases. Reports show them drifting apart. What is the safest mitigation?"
     explanation: "Choose one system of record per piece of data at a time and sync the other from it (for example with change data capture or events), and migrate ownership explicitly. Two writers on the same data without coordination guarantees drift."
@@ -293,35 +299,47 @@ questions:
     theoryUrl: https://martinfowler.com/bliki/BoundedContext.html
     answer: false
   - type: single
-    prompt: "A platform has 200 engineers in 25 teams and releases are blocked because everyone merges into one repository and one pipeline. What change aligns architecture with the organisation?"
-    explanation: "Conway's law says systems mirror the communication structure of the organisation. Aligning services or modules and ownership with stream-aligned teams, each able to deploy independently, reduces coordination costs. Adding a release manager just reinforces the bottleneck."
-    theoryUrl: https://martinfowler.com/bliki/ConwaysLaw.html
+    prompt: "Nine downstream contexts integrate with your Pricing context, and each keeps asking for its own custom endpoint and data format. Which context mapping pattern addresses this?"
+    explanation: "An open host service defines one documented protocol for everyone, usually with a published language (a shared, well-documented interchange format), instead of a bespoke integration per consumer. A consumer that needs a different model can still add an anti-corruption layer on its side. Sharing the kernel with nine teams would turn every change into a nine-way negotiation."
+    theoryUrl: https://www.domainlanguage.com/ddd/
     options:
       - {
-          text: "Hire a release manager to schedule merges and run a weekly release train across all 25 teams",
+          text: "An open host service with a published language that all consumers use",
+          correct: true,
+        }
+      - {
+          text: "Separate ways, so that each downstream context reimplements pricing on its own",
           correct: false,
         }
       - {
-          text: "Align modules or services with team ownership, with independent pipelines (Conway's law)",
-          correct: true,
+          text: "A shared kernel, giving all nine teams joint ownership of Pricing's model and its code",
+          correct: false,
         }
-      - { text: "Make everyone use the same IDE settings", correct: false }
-      - { text: "Move all code into a single package", correct: false }
+      - {
+          text: "Conformist, with Pricing adopting the model of its largest consumer",
+          correct: false,
+        }
   - type: single
-    prompt: "While strangling a monolith, you routed 100% of /invoices traffic to the new service. Last week bugs appeared, and you want a safe way to move the next route. Which technique reduces risk the most?"
-    explanation: "Gradual rollout at the facade (percentage or cohort-based routing, optionally shadow traffic compared against the old implementation) lets you detect differences and roll back quickly. Cutting over all at once on a weekend concentrates the risk."
-    theoryUrl: https://learn.microsoft.com/en-us/azure/architecture/patterns/strangler-fig
+    prompt: "A `PlaceOrder` use case is triggered by an HTTP controller, a CLI command and a message consumer, and it saves orders through an `OrderRepository` port. In hexagonal terms, how do these pieces relate?"
+    explanation: "Driving (primary) adapters start the interaction and translate input into calls to the application. Driven (secondary) adapters implement ports the application needs, such as persistence. Several driving adapters for one use case is exactly what the pattern makes easy, with no need to route everything through HTTP."
+    theoryUrl: https://alistair.cockburn.us/hexagonal-architecture/
     options:
       - {
-          text: "Cut over all traffic on a quiet weekend and fix issues as they come in, since users are fewer",
+          text: "Controller, CLI and consumer are driving adapters; the repository implementation is a driven adapter",
+          correct: true,
+        }
+      - {
+          text: "All of them are driven adapters, because everything outside the domain is called by the application core",
           correct: false,
         }
       - {
-          text: "Route a small percentage or cohort first, compare with the old path, then ramp up",
-          correct: true,
+          text: "Only the controller is a valid entry point, so the CLI and the consumer should call the use case through HTTP",
+          correct: false,
         }
-      - { text: "Delete the old code first so no one can use it", correct: false }
-      - { text: "Run the new service only in staging and promote after a month", correct: false }
+      - {
+          text: "The repository is a driving adapter, because the use case cannot run until the repository has loaded its data",
+          correct: false,
+        }
   - type: single
     prompt: "A service layer function `createOrder(req: Request)` reads headers and returns `NextResponse`. Why does this violate clean architecture's dependency rule?"
     explanation: "The use case depends on framework types from an outer ring (HTTP request and response), so it cannot be reused or tested without that framework. Use cases should take plain input DTOs and return plain results, with the controller mapping HTTP to them."

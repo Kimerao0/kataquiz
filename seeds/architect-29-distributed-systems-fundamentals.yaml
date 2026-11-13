@@ -50,14 +50,14 @@ questions:
         }
       - { text: "Partitions can only be tolerated if latency is below a threshold", correct: false }
   - type: single
-    prompt: "A shopping cart is replicated across three regions. A user in Europe adds an item, then immediately refreshes and sees the cart without it, because the read hit a replica that was not yet updated. Which guarantee would fix this for that user?"
-    explanation: "Read-your-writes (session) consistency guarantees that a client sees its own writes, for example by routing the client to the leader or tracking the write's version. It is weaker than linearizability and cheaper. Eventual consistency alone permits this anomaly."
-    theoryUrl: https://jepsen.io/consistency
+    prompt: "A user refreshes a thread and sees a new reply, refreshes again and the reply is gone, then it comes back. Each refresh was served by a different, asynchronously updated replica. Which guarantee is missing?"
+    explanation: "Monotonic reads guarantees that once a client has seen a value, later reads never return an older state, for example by pinning the client to one replica or tracking the version it has seen. Read-your-writes concerns seeing your own writes, and this user wrote nothing. Durability is fine: the reply was never lost, only read from a lagging replica."
+    theoryUrl: https://jepsen.io/consistency/models/monotonic-reads
     options:
-      - { text: "Eventual consistency", correct: false }
-      - { text: "Read-your-writes consistency", correct: true }
-      - { text: "Serializability across all tables", correct: false }
-      - { text: "Atomic durability", correct: false }
+      - { text: "Monotonic reads", correct: true }
+      - { text: "Read-your-writes", correct: false }
+      - { text: "Durability of acknowledged writes", correct: false }
+      - { text: "Serializable transactions", correct: false }
   - type: single
     prompt: "Which statement best describes linearizability?"
     explanation: "A linearizable system behaves as if there is a single copy of the data and every operation takes effect atomically at a point between its start and end, so reads see the latest completed write. It is about single-object recency, whereas serializability is about transactions."
@@ -83,18 +83,26 @@ questions:
       - { text: "W=1, R=2 with writes asynchronous", correct: false }
       - { text: "W=3, R=0", correct: false }
   - type: single
-    prompt: "What does this print?"
-    code: |
-      const quorum = (n, w, r) => w + r > n;
-      console.log(quorum(3, 2, 2), quorum(5, 2, 2), quorum(5, 3, 3), quorum(3, 1, 1));
-    codeLanguage: javascript
-    explanation: "The overlap rule is w + r > n. For (3,2,2) 4 > 3 is true, for (5,2,2) 4 > 5 is false, for (5,3,3) 6 > 5 is true and for (3,1,1) 2 > 3 is false."
+    prompt: "A leaderless store with three replicas is configured to write to all three replicas and read from just one. What trade-off does this choice make?"
+    explanation: "Writing to every replica means any single replica already holds each acknowledged write, so reading one is enough and is fast. The price is write availability: with one replica down, a write cannot reach all three. Writing to two and reading from two keeps the overlap while tolerating one failure on both paths."
     theoryUrl: https://docs.aws.amazon.com/whitepapers/latest/availability-and-beyond-improving-resilience/quorum.html
     options:
-      - { text: "true false true false", correct: true }
-      - { text: "true true true false", correct: false }
-      - { text: "false false true false", correct: false }
-      - { text: "true false true true", correct: false }
+      - {
+          text: "Reads are cheap and see the latest write, but one unavailable replica blocks every write",
+          correct: true,
+        }
+      - {
+          text: "Writes survive any single replica failure, but reads can miss the latest write",
+          correct: false,
+        }
+      - {
+          text: "Neither path is affected by failures, because the store lowers the quorum automatically when a replica is down",
+          correct: false,
+        }
+      - {
+          text: "Reads see the latest write only if the client repeats each read three times",
+          correct: false,
+        }
   - type: single
     prompt: "A leader-based replicated database uses asynchronous replication. The leader fails right after acknowledging a write and a follower is promoted. What is the risk?"
     explanation: "With asynchronous replication the leader can acknowledge before followers have the write, so the promoted follower may lack acknowledged writes, which are then lost (or conflict if the old leader returns). Synchronous or semi-synchronous replication reduces this at the cost of latency and availability."
@@ -120,26 +128,26 @@ questions:
       - { text: "The system returns an error to both writers", correct: false }
       - { text: "LWW requires a global lock that stalls reads", correct: false }
   - type: single
-    prompt: "What does this print for the vector clock comparisons?"
-    code: |
-      function cmp(a, b) {
-        let lt = false, gt = false;
-        for (const k of new Set([...Object.keys(a), ...Object.keys(b)])) {
-          const x = a[k] || 0, y = b[k] || 0;
-          if (x < y) lt = true;
-          if (x > y) gt = true;
-        }
-        return lt && gt ? 'concurrent' : lt ? 'before' : gt ? 'after' : 'equal';
-      }
-      console.log(cmp({ A: 2, B: 1 }, { A: 1, B: 2 }), cmp({ A: 1, B: 1 }, { A: 2, B: 1 }));
-    codeLanguage: javascript
-    explanation: "In the first pair A is ahead in one clock and B in the other, so neither happened before the other: concurrent. In the second pair every counter is less than or equal and one is smaller: the first event happened before the second."
+    prompt: "A key-value store tracks versions with vector clocks. Two versions of a shopping cart arrive whose clocks are concurrent: neither is ahead of the other in every entry. What should the store do?"
+    explanation: "Concurrent vector clocks mean neither update knew about the other, so picking one silently loses data. Dynamo-style stores keep both as siblings for the application to merge (a cart can take the union), or use a CRDT. Comparing counter sums or timestamps imposes an order that does not exist."
     theoryUrl: https://en.wikipedia.org/wiki/Vector_clock
     options:
-      - { text: "before before", correct: false }
-      - { text: "concurrent after", correct: false }
-      - { text: "concurrent before", correct: true }
-      - { text: "after before", correct: false }
+      - {
+          text: "Keep both as siblings, or merge them, since neither one supersedes the other",
+          correct: true,
+        }
+      - {
+          text: "Keep the version with the larger sum of counters, since it has seen more updates in total",
+          correct: false,
+        }
+      - {
+          text: "Keep the version with the later wall-clock timestamp and discard the other one",
+          correct: false,
+        }
+      - {
+          text: "Reject both writes and ask the clients to retry until one of them wins",
+          correct: false,
+        }
   - type: single
     prompt: "You shard a user table across 4 database nodes by hashing the user id modulo 4. Adding a 5th node changes the formula to modulo 5. What is the consequence?"
     explanation: "Changing the modulus remaps most keys (roughly 80% moving from 4 to 5 nodes), so almost all data must be relocated. Consistent hashing, or a directory with virtual shards, limits movement to roughly 1/N of the keys."
@@ -183,14 +191,26 @@ questions:
         }
       - { text: "It is chosen permanently when the cluster is first created", correct: false }
   - type: single
-    prompt: "A Raft cluster has 5 nodes. How many node failures can it tolerate while still being able to commit writes?"
-    explanation: "Commit needs a majority: floor(5/2)+1 = 3 nodes. So up to 2 can fail. A 4-node cluster needs 3 as well and tolerates only 1, which is why odd cluster sizes are preferred."
+    prompt: "A team runs a 3-node Raft cluster and proposes adding a fourth node so that it tolerates more failures. What is your assessment?"
+    explanation: "Raft needs a majority to elect a leader and commit entries. The majority of four is three, so the cluster still tolerates one failure, while every write now waits for one more node. Even sizes work, but they add cost without adding fault tolerance; surviving two failures takes five nodes."
     theoryUrl: https://raft.github.io/
     options:
-      - { text: "1", correct: false }
-      - { text: "2", correct: true }
-      - { text: "3", correct: false }
-      - { text: "4", correct: false }
+      - {
+          text: "It does not help: a majority of four is three, so the cluster still survives only one failure",
+          correct: true,
+        }
+      - {
+          text: "It helps: with four nodes, two can fail and half the cluster keeps running",
+          correct: false,
+        }
+      - {
+          text: "It helps, as long as the fourth node is placed in a different availability zone",
+          correct: false,
+        }
+      - {
+          text: "It breaks the cluster, because Raft cannot elect a leader with an even number of nodes",
+          correct: false,
+        }
   - type: single
     prompt: "In Raft, why must a candidate collect votes from a majority to become leader?"
     explanation: "Any two majorities overlap in at least one node, so two leaders cannot be elected in the same term. This prevents split-brain, where two leaders accept conflicting writes. Without a majority a candidate retries after a randomized timeout."
@@ -204,20 +224,23 @@ questions:
           correct: true,
         }
   - type: single
-    prompt: "A 3-node etcd cluster is split by a partition into one node and two nodes. A client connected to the single node tries to write. What happens?"
-    explanation: "The isolated node cannot reach a majority, so it cannot commit writes and the write fails or times out (the majority side elects a leader and continues). This is CP behaviour: consistency over availability for the minority side."
+    prompt: "Why does Raft give each follower a randomized election timeout instead of the same fixed value?"
+    explanation: "If all followers timed out together, they would all become candidates and split the votes, and elections could repeat again and again. Randomizing the timeout makes it likely that one candidate starts first and gathers a majority before the others wake up. It has nothing to do with disk writes or cluster membership."
     theoryUrl: https://raft.github.io/
     options:
-      - { text: "The write succeeds locally and is merged later", correct: false }
       - {
-          text: "The write is committed because every node is the leader of its own partition",
+          text: "So that one follower usually times out first and wins, instead of several splitting the vote",
+          correct: true,
+        }
+      - {
+          text: "So that the leader can find out which follower is slowest and remove it from the cluster",
           correct: false,
         }
-      - { text: "The write fails because the node cannot reach a quorum", correct: true }
       - {
-          text: "The write succeeds and reads of it are guaranteed on the other side",
+          text: "To spread the disk writes of the replicated log evenly over time across all the nodes",
           correct: false,
         }
+      - { text: "So that clients notice a failed leader before the followers do", correct: false }
   - type: single
     prompt: "A request passes through an API gateway, three services and a database. Latency is high but each service's own logs look fine. Which tool answers 'where did the time go for this request'?"
     explanation: "Distributed tracing propagates a trace context across service calls and records spans with timing, so you see the whole request path and where the time is spent. Metrics show aggregates and logs show events, but neither links one request across services by themselves."
@@ -243,20 +266,26 @@ questions:
         }
       - { text: "The sampling rate is above 50%", correct: false }
   - type: single
-    prompt: "A team wants to serve users in three continents with local reads and writes and 'strong consistency everywhere'. What is the honest trade-off to explain?"
-    explanation: "Strong consistency across continents requires coordination over long round trips on every write (consensus or synchronous replication), so write latency rises to the slowest quorum path. The alternatives are relaxing consistency, partitioning data by region, or accepting higher latency."
-    theoryUrl: https://en.wikipedia.org/wiki/PACELC_theorem
+    prompt: "A trace of a slow page shows the Orders span followed by 40 short, back-to-back calls to the Pricing service, one per order line. What does this point to, and what is the usual fix?"
+    explanation: "Each call is short, but 40 sequential network round trips add up, and the trace waterfall makes the pattern obvious. Batching (one call for all lines) or at least running the calls concurrently removes most of the latency. Sampling changes what is stored, not how long requests take, and since each call is short the database is not the bottleneck."
+    theoryUrl: https://opentelemetry.io/docs/concepts/signals/traces/
     options:
-      - { text: "Strong consistency is free if you use enough replicas", correct: false }
       - {
-          text: "Writes pay cross-continent round trips for coordination, unless you relax consistency or partition data by region",
+          text: "A chatty N+1 call pattern, fixed by fetching all prices in one batched call or in parallel",
           correct: true,
         }
       - {
-          text: "Strong consistency is impossible in any distributed system, so every global product must simply choose eventual consistency and accept stale reads",
+          text: "A slow Pricing database, fixed by adding an index to the price table",
           correct: false,
         }
-      - { text: "Latency does not depend on distance when using HTTP/3", correct: false }
+      - {
+          text: "Too much tracing, fixed by lowering the sampling rate so that fewer spans are recorded",
+          correct: false,
+        }
+      - {
+          text: "Clock skew between hosts, which only makes concurrent calls look sequential in the trace view",
+          correct: false,
+        }
   - type: multi
     prompt: "Which of the following are consequences of moving from a single database to a sharded, replicated architecture? Select all that apply."
     explanation: "Cross-shard transactions and joins become hard or expensive, operational work grows (rebalancing, failover, monitoring), and replication lag can produce stale reads. Sharding does not make your schema simpler or remove the need for backups."
@@ -267,20 +296,26 @@ questions:
       - { text: "Operations such as rebalancing and failover need to be managed", correct: true }
       - { text: "Backups are no longer needed because data is replicated", correct: false }
   - type: single
-    prompt: "A service calls a payment provider and the call times out. What can the caller conclude?"
-    explanation: "A timeout is ambiguous: the request may have been lost, or processed with the response lost. The caller cannot tell, which is why operations must be idempotent or queryable by key before retrying. This is one of the fundamental problems of distributed systems (the two generals problem)."
-    theoryUrl: https://aws.amazon.com/builders-library/timeouts-retries-and-backoff-with-jitter/
+    prompt: "Two services stamp events with their own wall clocks, and a downstream job orders the events by timestamp to decide which happened first. Why is this unreliable?"
+    explanation: "Physical clocks skew, drift and can even jump backwards when they are synchronised, so an event stamped later on one machine may have happened earlier. When order matters, use a single sequencer (one partition, a database sequence) or logical clocks that capture causality. Arrival time at a broker reflects network delays, not the order of the original events."
+    theoryUrl: https://en.wikipedia.org/wiki/Lamport_timestamp
     options:
       - {
-          text: "The payment definitely failed because no response arrived, so it can be retried safely",
-          correct: false,
-        }
-      - { text: "The payment definitely succeeded", correct: false }
-      - {
-          text: "Unknown: it may have been processed, so retry only with an idempotency key",
+          text: "Clocks on different machines drift and get adjusted, so timestamps can contradict the real order",
           correct: true,
         }
-      - { text: "The provider is permanently down", correct: false }
+      - {
+          text: "The timestamps are fine, but serialising them to JSON loses the precision needed to compare them",
+          correct: false,
+        }
+      - {
+          text: "Only the broker's arrival time reflects the true order, because producers send events the moment they occur",
+          correct: false,
+        }
+      - {
+          text: "It is reliable as long as both services convert their timestamps to UTC before publishing",
+          correct: false,
+        }
   - type: single
     prompt: "Which scenario best illustrates eventual consistency being an acceptable choice?"
     explanation: "A social feed's like counter tolerates being a few seconds stale, and gains availability and latency. Bank transfers, inventory for the last item and unique username claims need stronger guarantees to avoid conflicts."

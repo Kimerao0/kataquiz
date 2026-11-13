@@ -157,63 +157,45 @@ questions:
           correct: false,
         }
   - type: single
-    prompt: "What does this script print?"
-    code: |
-      const handlers = new Map()
-      const on = (t, h) => (handlers.get(t) ?? handlers.set(t, []).get(t)).push(h)
-      const publish = (t, p) => {
-        console.log('publish', t)
-        for (const h of handlers.get(t) ?? []) h(p)
-      }
-      on('OrderPlaced', (o) => {
-        console.log('payment', o.id)
-        publish('PaymentTaken', o)
-      })
-      on('PaymentTaken', (o) => {
-        console.log('shipping', o.id)
-        publish('Shipped', o)
-      })
-      publish('OrderPlaced', { id: 7 })
-      console.log('done')
-    codeLanguage: javascript
-    explanation: "This in-memory bus dispatches synchronously, so each handler runs inside the `publish` that triggered it and the chain nests: publish, payment, publish, shipping, publish (no subscribers), and only then `done`. It shows choreography as a chain of reactions, but a real broker would be asynchronous, so `done` would not wait for them."
-    theoryUrl: https://martinfowler.com/articles/201701-event-driven.html
-    options:
-      - {
-          text: "publish OrderPlaced, done, payment 7, publish PaymentTaken, shipping 7, publish Shipped",
-          correct: false,
-        }
-      - {
-          text: "publish OrderPlaced, payment 7, shipping 7, publish PaymentTaken, publish Shipped, done",
-          correct: false,
-        }
-      - {
-          text: "publish OrderPlaced, payment 7, publish PaymentTaken, shipping 7, publish Shipped, done",
-          correct: true,
-        }
-      - {
-          text: "payment 7, shipping 7, publish OrderPlaced, publish PaymentTaken, publish Shipped, done",
-          correct: false,
-        }
-  - type: single
-    prompt: "A checkout process has 8 steps across 5 services, with compensations when a step fails and business timeouts (cancel if unpaid after 30 minutes). Product wants to see the status of every order in one place. Which style fits best?"
-    explanation: "A long process with compensations, timeouts and a need for visibility benefits from orchestration: a coordinator (saga orchestrator or workflow engine) holds the state, issues commands, handles failures and exposes progress. Pure choreography would scatter this logic and make the timeouts and status hard to implement."
+    prompt: "In a choreographed order flow, Shipping reacts to `PaymentTaken`. The business now wants a fraud check between payment and shipping. Which services have to change?"
+    explanation: "In choreography the sequence lives in who subscribes to what, so inserting a step in the middle means rewiring the next participant: Shipping now listens for `FraudCleared`. Adding a pure side reaction, such as analytics, would touch nobody, but reordering steps is not free. With orchestration, the same change would land mainly in the orchestrator."
     theoryUrl: https://microservices.io/patterns/data/saga.html
     options:
       - {
-          text: "Orchestration, with a coordinator that owns the process state and compensations",
+          text: "The new Fraud service, plus Shipping, which must now react to `FraudCleared` instead of `PaymentTaken`",
           correct: true,
         }
       - {
-          text: "Choreography, because a larger number of steps means more decoupling",
+          text: "Only the new Fraud service, because in choreography adding a step never requires changes to the existing services",
           correct: false,
         }
       - {
-          text: "A single shared database transaction that spans all five services",
+          text: "Only Payments, which must now call Fraud directly before it publishes `PaymentTaken`",
           correct: false,
         }
       - {
-          text: "Choreography with each service writing its own log that product reads manually",
+          text: "Every service in the flow, because choreography requires all participants to share one workflow definition",
+          correct: false,
+        }
+  - type: single
+    prompt: "In an orchestrated checkout saga, how does the orchestrator usually interact with the Payments and Inventory services?"
+    explanation: "An orchestrator tells each participant what to do through commands addressed to it, and uses the replies to decide the next step or trigger compensations. Letting participants decide the next step themselves is choreography, and a distributed transaction across their databases is exactly what sagas avoid."
+    theoryUrl: https://microservices.io/patterns/data/saga.html
+    options:
+      - {
+          text: "It sends each one a command, such as `ReserveStock`, and waits for a reply reporting the outcome",
+          correct: true,
+        }
+      - {
+          text: "It subscribes to their internal domain events and lets each service decide by itself what the next step is",
+          correct: false,
+        }
+      - {
+          text: "It writes directly into their databases inside one distributed transaction, so that every step commits together",
+          correct: false,
+        }
+      - {
+          text: "It publishes one `CheckoutStarted` event and then steps aside while the participants coordinate",
           correct: false,
         }
   - type: single
@@ -256,71 +238,73 @@ questions:
           correct: false,
         }
   - type: single
-    prompt: "What does this script print?"
-    code: |
-      const { EventEmitter } = require('node:events')
-      const bus = new EventEmitter()
-      bus.on('order.placed', () => console.log('A'))
-      bus.on('order.placed', async () => {
-        await null
-        console.log('B')
-      })
-      bus.on('order.placed', () => console.log('C'))
-      console.log('before')
-      bus.emit('order.placed')
-      console.log('after')
-    codeLanguage: javascript
-    explanation: "`emit` calls the listeners synchronously in registration order, and does not wait for async ones. The async listener runs up to its `await`, then yields, so `C` and `after` come first and `B` is logged afterwards as a microtask. Do not confuse an in-process `EventEmitter` with a broker: there is no durability or isolation of errors."
-    theoryUrl: https://nodejs.org/api/events.html#asynchronous-vs-synchronous
+    prompt: "Billing used to call Orders over HTTP. It now consumes `OrderPlaced` events from a durable broker, so it no longer needs Orders to be up. Which coupling between the two remains?"
+    explanation: "A durable broker removes temporal coupling (the two need not be up at the same time) and location coupling (Billing only knows the broker). What remains is the contract itself: if Orders renames a field or changes what an event means, Billing breaks. That is why event schemas need versioning and compatibility rules."
+    theoryUrl: https://learn.microsoft.com/en-us/azure/architecture/guide/architecture-styles/event-driven
     options:
-      - { text: "before, A, B, C, after", correct: false }
-      - { text: "before, A, C, B, after", correct: false }
-      - { text: "before, A, C, after, B", correct: true }
-      - { text: "before, after, A, B, C", correct: false }
-  - type: single
-    prompt: "What does this script print?"
-    code: |
-      const { EventEmitter } = require('node:events')
-      const e = new EventEmitter()
-      try {
-        e.emit('error', new Error('x'))
-      } catch (err) {
-        console.log('caught', err.message)
-      }
-      e.emit('ping')
-      console.log('end')
-    codeLanguage: javascript
-    explanation: "`EventEmitter` treats the event named `error` specially: with no listener it throws the error, so `emit` throws synchronously and is caught. Emitting `ping` without listeners is fine and returns `false`. In an event-driven design, a failing consumer must not be able to crash the publisher, which is one reason to use a broker."
-    theoryUrl: https://nodejs.org/api/events.html#error-events
-    options:
-      - { text: "caught x, then end", correct: true }
-      - { text: "end only, because emit ignores events without listeners", correct: false }
       - {
-          text: "An unhandled exception, since the `catch` cannot intercept `emit`",
+          text: "Coupling to the event contract: its name, its fields and what they mean",
+          correct: true,
+        }
+      - {
+          text: "Temporal coupling, since Billing still fails whenever Orders is down",
           correct: false,
         }
-      - { text: "caught x, then an exception when `ping` has no listener", correct: false }
+      - {
+          text: "Deployment coupling, since both services must now be released together for every change",
+          correct: false,
+        }
+      - {
+          text: "Location coupling, since Billing still needs the network address of every Orders instance",
+          correct: false,
+        }
   - type: single
-    prompt: "What do the two calls print? The producer later added a `coupon` field to its events, and some old events lack `total`."
+    prompt: "To answer each request, service A synchronously calls B, C and D. Each dependency is reliable on its own, yet A's error rate keeps rising as more dependencies are added. What is the underlying cause?"
+    explanation: "With synchronous calls, A works only when all of its dependencies answer in time, so their failure rates compound into A's. Publishing events lets A complete the work that does not need an immediate answer, while the others catch up later. Changing the protocol does not help, because a gRPC call is still a synchronous dependency."
+    theoryUrl: https://learn.microsoft.com/en-us/azure/architecture/guide/architecture-styles/event-driven
+    options:
+      - {
+          text: "A succeeds only if every dependency is up and fast at the same moment, so their failures add up",
+          correct: true,
+        }
+      - {
+          text: "Synchronous calls are unreliable over HTTP specifically, and switching them to gRPC would remove the problem",
+          correct: false,
+        }
+      - {
+          text: "Dependencies only add failure modes when they share a database, so B, C and D must be sharing one",
+          correct: false,
+        }
+      - {
+          text: "B, C and D are throttling A, because many calls from one client look like an attack to them",
+          correct: false,
+        }
+  - type: single
+    prompt: "The Shipping consumer below reads `OrderPlaced` events. The producer has started adding a `coupon` field, and very old events, from before multi-currency support, have no `currency`. Which statement about this consumer's design is accurate?"
     code: |
-      const consumer = (e) => {
-        const { id, total } = e
-        return `${id}:${total}`
+      function onOrderPlaced(event) {
+        const { orderId, total, currency = 'EUR' } = event.data
+        if (typeof total !== 'number') throw new Error('invalid OrderPlaced')
+        ship(orderId, total, currency)
       }
-      console.log(consumer({ id: 1, total: 5, coupon: 'X' }))
-      console.log(consumer({ id: 2 }))
     codeLanguage: javascript
-    explanation: "The consumer reads only the fields it needs, so the unknown `coupon` field is ignored (a tolerant reader) and the first call prints `1:5`. The missing `total` silently becomes `undefined`, which shows why consumers should also validate and default fields that may be absent. Being strict about unknown fields would break on every compatible change."
+    explanation: "A tolerant reader takes only what it needs, so additive changes like `coupon` do not break it, and it defaults or validates the fields it depends on. Rejecting unknown fields would turn every compatible change into an outage. Destructuring simply ignores extra properties, and calling back to Orders brings back runtime coupling."
     theoryUrl: https://martinfowler.com/bliki/TolerantReader.html
     options:
-      - { text: "1:5 and 2:undefined", correct: true }
       - {
-          text: "It throws on the first call, because of the unexpected `coupon` field",
+          text: "It is a tolerant reader: it ignores fields it does not use, defaults an optional one and checks the one it needs",
+          correct: true,
+        }
+      - {
+          text: "It is fragile, because a consumer should validate the whole event against the full schema and reject unknown fields such as `coupon`",
           correct: false,
         }
-      - { text: "1:5 and then a `TypeError`, because `total` is missing", correct: false }
       - {
-          text: "1:undefined and 2:undefined, since destructuring needs exact shapes",
+          text: "It should stop reading `total` and fetch the order from the Orders API, so schema changes never affect it",
+          correct: false,
+        }
+      - {
+          text: "It is unsafe, because destructuring throws as soon as the event has a field the code does not name",
           correct: false,
         }
   - type: multi
@@ -337,42 +321,45 @@ questions:
           correct: false,
         }
   - type: single
-    prompt: "What does this script print?"
-    code: |
-      function upcast(e) {
-        if (e.version === 1) {
-          return upcast({ ...e, version: 2, data: { ...e.data, currency: 'EUR' } })
-        }
-        return e
-      }
-      const old = { type: 'OrderPlaced', version: 1, data: { total: 10 } }
-      const cur = { type: 'OrderPlaced', version: 2, data: { total: 20, currency: 'USD' } }
-      console.log([old, cur].map(upcast).map((e) => `${e.data.total}${e.data.currency}`))
-      console.log(old.version)
-    codeLanguage: javascript
-    explanation: "The upcaster turns a version 1 event into the current shape at read time, defaulting the missing currency, so the first line is `[ '10EUR', '20USD' ]`. Because it builds a new object with spread, the original `old` event is untouched and its version is still 1. Upcasting lets consumers handle only the latest version while stored events stay immutable."
-    theoryUrl: https://martinfowler.com/articles/201701-event-driven.html
-    options:
-      - { text: "[ '10undefined', '20USD' ] and then 2", correct: false }
-      - { text: "[ '10EUR', '20USD' ] and then 2", correct: false }
-      - { text: "[ '10EUR', '20USD' ] and then 1", correct: true }
-      - { text: "[ '10EUR', '20EUR' ] and then 1", correct: false }
-  - type: single
-    prompt: "30 consumer teams use your `OrderPlaced` event, which you must change by renaming `total` to `amount`. You cannot coordinate a simultaneous release. Which approach is the safest?"
-    explanation: "Use expand and contract: publish both fields (or publish a new version in parallel) while consumers migrate, announce a deprecation period, track who still reads the old one, then remove it. A big-bang rename breaks everyone who has not deployed, and asking consumers to 'just parse both' without a plan leaves no end date."
+    prompt: "The team that publishes `InvoiceIssued` will deploy a new schema before any of its consumers is updated. What must hold for this change to be safe?"
+    explanation: "When the producer upgrades first, old consumers receive new-format events, so the new schema must be readable by the old reader (forward compatibility), for example by only adding optional fields. The mirror case, new consumers reading old events, matters when consumers upgrade first. Event size is irrelevant, and rewriting history is neither needed nor usually possible."
     theoryUrl: https://docs.confluent.io/platform/current/schema-registry/fundamentals/schema-evolution.html
     options:
-      - { text: "Rename the field and announce it in the engineering newsletter", correct: false }
       - {
-          text: "Send both fields (or a v2 in parallel) with a deprecation date, then remove the old one",
+          text: "Consumers still on the old schema must be able to read events written with the new one",
           correct: true,
         }
       - {
-          text: "Keep `total` forever and never add or change any field in the event again",
+          text: "Consumers on the new schema must be able to read events written with the old one",
           correct: false,
         }
       - {
-          text: "Wait until all 30 teams agree on a single release day, then rename the field and break every consumer at once",
+          text: "The new schema must produce events of the same size, so that the broker keeps accepting them",
+          correct: false,
+        }
+      - {
+          text: "The producer must first republish every historical event in the new format, then switch over",
+          correct: false,
+        }
+  - type: single
+    prompt: "A producer changes `total` in `OrderPlaced` from 'including VAT' to 'excluding VAT'. The field name and type stay the same, and the schema registry's compatibility check passes. What is the right assessment?"
+    explanation: "Compatibility checks look at structure (names, types, optionality), not meaning. Consumers will parse the value without complaint and compute wrong invoices or reports. A change of meaning needs a new field, such as `netTotal`, or a new event version, rolled out with expand and contract."
+    theoryUrl: https://docs.confluent.io/platform/current/schema-registry/fundamentals/schema-evolution.html
+    options:
+      - {
+          text: "It is a breaking change the registry cannot see, so it needs a new field or a new event version",
+          correct: true,
+        }
+      - {
+          text: "It is safe, since the registry has confirmed that every consumer can still deserialise the events",
+          correct: false,
+        }
+      - {
+          text: "It is safe as long as the producer announces it in the release notes before deploying",
+          correct: false,
+        }
+      - {
+          text: "It breaks only consumers written in strongly typed languages, which will fail to parse the value",
           correct: false,
         }
   - type: single
@@ -415,24 +402,24 @@ questions:
           correct: false,
         }
   - type: single
-    prompt: "A team publishes `CustomerUpdated` events with a generic diff payload for every change made through its CRUD API. Consumers have to inspect which fields changed to work out what really happened. What would you recommend?"
-    explanation: "Events should capture business facts with intent, such as `EmailAddressChanged` or `CustomerRelocated`, so consumers react to meaning instead of reverse-engineering CRUD diffs. Generic `Updated` events couple consumers to the producer's table structure and are hard to evolve."
-    theoryUrl: https://martinfowler.com/articles/201701-event-driven.html
+    prompt: "Twelve teams consume `CustomerRegistered`. Every few months the producer makes a change that its own tests and the schema check accept, yet a consumer breaks because it relied on a detail nobody wrote down. Which practice targets this?"
+    explanation: "With consumer-driven contracts, each consumer publishes the expectations it actually depends on, and the producer runs them in its pipeline, so it learns before release which change would break whom. The producer's own tests only check what the producer thinks matters. A shared library couples release cycles, and freezing every event makes evolution needlessly expensive."
+    theoryUrl: https://martinfowler.com/articles/consumerDrivenContracts.html
     options:
       - {
-          text: "Add a `changedFields` array so that consumers can parse the diff more easily",
-          correct: false,
-        }
-      - {
-          text: "Publish the whole database row each time, and let consumers compare it themselves",
-          correct: false,
-        }
-      - {
-          text: "Publish intent-revealing business events such as `EmailAddressChanged`",
+          text: "Consumer-driven contract tests: each consumer states what it relies on, and the producer's build runs them",
           correct: true,
         }
       - {
-          text: "Keep the generic event but split it into one topic per database column",
+          text: "A shared client library that every consumer must upgrade on the producer's release schedule",
+          correct: false,
+        }
+      - {
+          text: "Freezing the event forever and creating a brand-new event type for every change, however small, so that existing consumers never see a modification",
+          correct: false,
+        }
+      - {
+          text: "More thorough unit tests in the producer, covering every field it publishes",
           correct: false,
         }
   - type: single
