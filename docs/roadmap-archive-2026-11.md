@@ -47,6 +47,12 @@ must still resolve.
   Architect (41 steps) and AWS Cloud Practitioner (26). Deployed to production 2026-11-11 with `3b757d3`;
   the release imported both seed paths.
 
+- [x] KQ51: The header nav is messy at desktop widths, replace the account cluster with a menu
+  Closed by `23e828d`. One account button opens a menu with the name row, My mistakes and Sign out
+  (with a failure message); nav labels no longer wrap; one gap scale. Reviewed (code + UX), shots on a
+  production build at 375/768/1440 light+dark. Owner verified in prod 2026-11-16 (deploy `fbc9dc8`).
+  The lost entry point to My mistakes this left behind is KQ52.
+
 ## Dropped
 
 - [-] KQ19: Drop the dead `ChallengeInvite.quizId`
