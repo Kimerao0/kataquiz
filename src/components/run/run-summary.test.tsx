@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import type { PathPlacement } from '@/lib/paths/queries'
 import type { RunSummary as RunSummaryData } from '@/lib/run/service'
 import { renderWithMessages } from '@/test/intl'
+import type { Reviewed } from './run-review'
 import { type ComparisonState, type ReplayError, RunSummary } from './run-summary'
 
 const mine: RunSummaryData = {
@@ -311,16 +312,41 @@ describe('run summary path suggestion', () => {
 })
 
 describe('run summary review link', () => {
+  const miss: Reviewed = {
+    question: {
+      id: 'q1',
+      type: 'single',
+      prompt: 'What does a red triangular sign mean?',
+      imageUrl: null,
+      code: null,
+      codeLanguage: null,
+      options: [
+        { id: 'o1', text: 'Warning' },
+        { id: 'o2', text: 'Prohibition' },
+      ],
+    },
+    selectedOptionIds: ['o2'],
+    result: {
+      correct: false,
+      timedOut: false,
+      correctOptionIds: ['o1'],
+      explanation: null,
+      theoryUrl: null,
+      next: null,
+      summary: null,
+    },
+  }
+
   function renderWith(signedIn: boolean, summary: RunSummaryData) {
     return renderWithMessages(
-      <RunSummary summary={summary} quizSlug="road-signs" reviewed={[]} signedIn={signedIn} />,
+      <RunSummary summary={summary} quizSlug="road-signs" reviewed={[miss]} signedIn={signedIn} />,
     )
   }
 
   it('links a signed-in player with mistakes to My mistakes', () => {
     renderWith(true, mine)
 
-    expect(screen.getByRole('link', { name: /review in my mistakes/i })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: /saved to my mistakes/i })).toHaveAttribute(
       'href',
       '/mistakes',
     )
@@ -329,12 +355,25 @@ describe('run summary review link', () => {
   it('hides the link from a guest with mistakes', () => {
     renderWith(false, mine)
 
-    expect(screen.queryByRole('link', { name: /review in my mistakes/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /saved to my mistakes/i })).not.toBeInTheDocument()
   })
 
   it('hides the link from a signed-in player with no mistakes', () => {
     renderWith(true, { ...mine, errors: 0 })
 
-    expect(screen.queryByRole('link', { name: /review in my mistakes/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /saved to my mistakes/i })).not.toBeInTheDocument()
+  })
+
+  it('puts the link inside the review section', () => {
+    renderWithMessages(
+      <RunSummary summary={mine} quizSlug="road-signs" reviewed={[miss]} signedIn={true} />,
+    )
+
+    const section = screen.getByRole('heading', { name: 'Your run' }).closest('section')
+    if (!section) throw new Error('no review section')
+    expect(within(section).getByRole('link', { name: /saved to my mistakes/i })).toHaveAttribute(
+      'href',
+      '/mistakes',
+    )
   })
 })

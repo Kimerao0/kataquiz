@@ -70,6 +70,8 @@ export function RunSummary({
     setChallengeUrl(new URL(challengePath, window.location.origin).toString())
   }, [challengePath])
 
+  const mistakesFooter = signedIn && summary.errors > 0 ? <SavedToMistakesLink /> : undefined
+
   const verdict = summary.passed
     ? { Icon: CheckIcon, title: t('passed'), tone: 'text-ink' }
     : { Icon: XIcon, title: t('failed'), tone: 'text-suo' }
@@ -105,9 +107,7 @@ export function RunSummary({
 
       {/* Guarded rather than always rendered: a heading standing over an empty
           list would be the whole of what the review says. */}
-      {reviewed.length > 0 && <RunReview items={reviewed} />}
-
-      {signedIn && summary.errors > 0 && <ReviewMistakesLink />}
+      {reviewed.length > 0 && <RunReview items={reviewed} footer={mistakesFooter} />}
 
       <ChallengeLink url={challengeUrl} />
 
@@ -116,12 +116,12 @@ export function RunSummary({
   )
 }
 
-function ReviewMistakesLink() {
+function SavedToMistakesLink() {
   const t = useTranslations('run')
 
   return (
     <Link href="/mistakes" className="w-fit py-1 text-meta underline underline-offset-4">
-      {t('reviewMistakes')}
+      {t('savedToMistakes')}
     </Link>
   )
 }

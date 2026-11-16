@@ -418,6 +418,20 @@ describe('run start panel replay', () => {
 })
 
 describe('run start panel review link', () => {
+  const wrongEntry = {
+    question,
+    selectedOptionIds: ['o2'],
+    result: {
+      correct: false,
+      timedOut: false,
+      correctOptionIds: ['o1'],
+      explanation: null,
+      theoryUrl: null,
+      next: null,
+      summary: null,
+    },
+  }
+
   const finishedWithErrors = {
     ok: true,
     run: {
@@ -425,7 +439,7 @@ describe('run start panel review link', () => {
       attemptId: 'attempt-old',
       summary: { attemptId: 'attempt-old', score: 7, errors: 3, total: 10, passed: true },
       answered: 10,
-      history: [],
+      history: [wrongEntry],
     },
   }
 
@@ -439,7 +453,7 @@ describe('run start panel review link', () => {
   it('links a signed-in player to My mistakes from a summary with errors', async () => {
     await finishElsewhere({ askNickname: false })
 
-    expect(screen.getByRole('link', { name: /review in my mistakes/i })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: /saved to my mistakes/i })).toHaveAttribute(
       'href',
       '/mistakes',
     )
@@ -448,6 +462,58 @@ describe('run start panel review link', () => {
   it('shows a guest no link to My mistakes', async () => {
     await finishElsewhere({ askNickname: true })
 
-    expect(screen.queryByRole('link', { name: /review in my mistakes/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /saved to my mistakes/i })).not.toBeInTheDocument()
+  })
+})
+
+describe('run start panel live run review link', () => {
+  // Starts a one-question run through the ordinary path and answers it wrong,
+  // so the summary on screen comes from the RunPlayer branch, not a resume.
+  async function finishWithError(askNickname: boolean) {
+    const mine: RunSummary = {
+      attemptId: 'attempt-new',
+      score: 0,
+      errors: 1,
+      total: 1,
+      passed: false,
+    }
+    startRunAction.mockResolvedValue({
+      ok: true,
+      run: { attemptId: 'attempt-new', question, total: 1, timePerQuestionSec: null },
+    })
+    submitAnswerAction.mockResolvedValue({
+      ok: true,
+      result: {
+        correct: false,
+        timedOut: false,
+        correctOptionIds: ['o1'],
+        explanation: null,
+        theoryUrl: null,
+        next: null,
+        summary: mine,
+      },
+    })
+    renderPanel({ askNickname })
+
+    if (askNickname) await userEvent.type(screen.getByRole('textbox', { name: 'Nickname' }), 'Bea')
+    await userEvent.click(screen.getByRole('button', { name: 'Begin' }))
+    await userEvent.click(await screen.findByRole('radio', { name: 'Prohibition' }))
+    await userEvent.click(await screen.findByRole('button', { name: 'See your result' }))
+    await screen.findByText('0 of 1 correct · 1 mistake')
+  }
+
+  it('links a signed-in player to My mistakes after a started run with errors', async () => {
+    await finishWithError(false)
+
+    expect(screen.getByRole('link', { name: /saved to my mistakes/i })).toHaveAttribute(
+      'href',
+      '/mistakes',
+    )
+  })
+
+  it('shows a guest no link to My mistakes after a started run with errors', async () => {
+    await finishWithError(true)
+
+    expect(screen.queryByRole('link', { name: /saved to my mistakes/i })).toBeNull()
   })
 })

@@ -359,7 +359,7 @@ describe('challenge invite panel review link', () => {
   it('links a signed-in player to My mistakes after a challenge run with errors', async () => {
     await finishWithError(false)
 
-    expect(screen.getByRole('link', { name: /review in my mistakes/i })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: /saved to my mistakes/i })).toHaveAttribute(
       'href',
       '/mistakes',
     )
@@ -368,6 +368,6 @@ describe('challenge invite panel review link', () => {
   it('shows a guest no link to My mistakes after a challenge run with errors', async () => {
     await finishWithError(true)
 
-    expect(screen.queryByRole('link', { name: /review in my mistakes/i })).toBeNull()
+    expect(screen.queryByRole('link', { name: /saved to my mistakes/i })).toBeNull()
   })
 })

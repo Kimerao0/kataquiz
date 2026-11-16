@@ -1,6 +1,7 @@
 'use client'
 
 import { useTranslations } from 'next-intl'
+import type { ReactNode } from 'react'
 import type { PublicOption, RunHistoryEntry } from '@/lib/run/service'
 import { cn } from '@/lib/utils'
 import { Explanation, TheoryLink, verdictFor } from './feedback-parts'
@@ -22,7 +23,7 @@ function optionsWithIds(options: PublicOption[], ids: string[]): PublicOption[] 
   return options.filter((option) => ids.includes(option.id))
 }
 
-export function RunReview({ items }: { items: Reviewed[] }) {
+export function RunReview({ items, footer }: { items: Reviewed[]; footer?: ReactNode }) {
   const t = useTranslations('run')
 
   return (
@@ -35,6 +36,7 @@ export function RunReview({ items }: { items: Reviewed[] }) {
           </li>
         ))}
       </ol>
+      {footer}
     </section>
   )
 }
