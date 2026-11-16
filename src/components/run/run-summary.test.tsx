@@ -376,4 +376,39 @@ describe('run summary review link', () => {
       '/mistakes',
     )
   })
+
+  it('offers a guest with mistakes a sign-in link, and not the saved link', () => {
+    renderWith(false, mine)
+
+    expect(
+      screen.getByRole('link', { name: /sign in to save mistakes from future runs/i }),
+    ).toHaveAttribute('href', '/signin?next=%2Fq%2Froad-signs')
+    expect(screen.queryByRole('link', { name: /saved to my mistakes/i })).not.toBeInTheDocument()
+  })
+
+  it('offers a signed-in player no sign-in link', () => {
+    renderWith(true, mine)
+
+    expect(
+      screen.queryByRole('link', { name: /sign in to save mistakes from future runs/i }),
+    ).not.toBeInTheDocument()
+  })
+
+  it('offers a guest with no mistakes no sign-in link', () => {
+    renderWith(false, { ...mine, errors: 0 })
+
+    expect(
+      screen.queryByRole('link', { name: /sign in to save mistakes from future runs/i }),
+    ).not.toBeInTheDocument()
+  })
+
+  it('puts the sign-in link inside the review section', () => {
+    renderWith(false, mine)
+
+    const section = screen.getByRole('heading', { name: 'Your run' }).closest('section')
+    if (!section) throw new Error('no review section')
+    expect(
+      within(section).getByRole('link', { name: /sign in to save mistakes from future runs/i }),
+    ).toBeVisible()
+  })
 })

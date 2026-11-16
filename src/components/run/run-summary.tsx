@@ -70,7 +70,7 @@ export function RunSummary({
     setChallengeUrl(new URL(challengePath, window.location.origin).toString())
   }, [challengePath])
 
-  const mistakesFooter = signedIn && summary.errors > 0 ? <SavedToMistakesLink /> : undefined
+  const mistakesFooter = mistakesFooterFor(signedIn, summary.errors, quizSlug)
 
   const verdict = summary.passed
     ? { Icon: CheckIcon, title: t('passed'), tone: 'text-ink' }
@@ -113,6 +113,27 @@ export function RunSummary({
 
       <Actions quizSlug={quizSlug} onPlayAgain={onPlayAgain} />
     </section>
+  )
+}
+
+function mistakesFooterFor(signedIn: boolean, errors: number, quizSlug: string) {
+  if (errors === 0) return undefined
+  if (signedIn) return <SavedToMistakesLink />
+  return <SignInToSaveMistakesLink quizSlug={quizSlug} />
+}
+
+// Signing in does not adopt the run just played, so the copy promises future runs
+// and never this one.
+function SignInToSaveMistakesLink({ quizSlug }: { quizSlug: string }) {
+  const t = useTranslations('run')
+
+  return (
+    <Link
+      href={`/signin?next=${encodeURIComponent(`/q/${quizSlug}`)}`}
+      className="w-fit py-1 text-balance text-meta underline underline-offset-4"
+    >
+      {t('signInToSaveMistakes')}
+    </Link>
   )
 }
 

@@ -463,6 +463,9 @@ describe('run start panel review link', () => {
     await finishElsewhere({ askNickname: true })
 
     expect(screen.queryByRole('link', { name: /saved to my mistakes/i })).not.toBeInTheDocument()
+    expect(
+      screen.getByRole('link', { name: /sign in to save mistakes from future runs/i }),
+    ).toBeVisible()
   })
 })
 
@@ -515,5 +518,8 @@ describe('run start panel live run review link', () => {
     await finishWithError(true)
 
     expect(screen.queryByRole('link', { name: /saved to my mistakes/i })).toBeNull()
+    expect(
+      screen.getByRole('link', { name: /sign in to save mistakes from future runs/i }),
+    ).toBeVisible()
   })
 })
