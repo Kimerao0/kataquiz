@@ -416,3 +416,38 @@ describe('run start panel replay', () => {
     expect(screen.getByText('0 correct, 0 wrong')).toBeInTheDocument()
   })
 })
+
+describe('run start panel review link', () => {
+  const finishedWithErrors = {
+    ok: true,
+    run: {
+      status: 'finished',
+      attemptId: 'attempt-old',
+      summary: { attemptId: 'attempt-old', score: 7, errors: 3, total: 10, passed: true },
+      answered: 10,
+      history: [],
+    },
+  }
+
+  async function finishElsewhere(overrides: Parameters<typeof renderPanel>[0] = {}) {
+    resumeRunAction.mockResolvedValue(finishedWithErrors)
+    renderPanel({ resumable, ...overrides })
+    await userEvent.click(screen.getByRole('button', { name: 'Resume' }))
+    await screen.findByText('7 of 10 correct · 3 mistakes')
+  }
+
+  it('links a signed-in player to My mistakes from a summary with errors', async () => {
+    await finishElsewhere({ askNickname: false })
+
+    expect(screen.getByRole('link', { name: /review in my mistakes/i })).toHaveAttribute(
+      'href',
+      '/mistakes',
+    )
+  })
+
+  it('shows a guest no link to My mistakes', async () => {
+    await finishElsewhere({ askNickname: true })
+
+    expect(screen.queryByRole('link', { name: /review in my mistakes/i })).not.toBeInTheDocument()
+  })
+})

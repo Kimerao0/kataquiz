@@ -115,7 +115,9 @@ function resultOf(overrides: Partial<AnswerResult> = {}): AnswerResult {
 }
 
 function renderRun(question: PublicQuestion, overrides?: Partial<RunStart>) {
-  return renderWithMessages(<RunPlayer run={runOf(question, overrides)} quizSlug="road-signs" />)
+  return renderWithMessages(
+    <RunPlayer run={runOf(question, overrides)} quizSlug="road-signs" signedIn={false} />,
+  )
 }
 
 function option(name: string) {
@@ -169,7 +171,11 @@ describe('run player', () => {
   it('renders a script tag in a prompt as literal text', async () => {
     const hostile = '<script>alert(1)</script> Which sign?'
     const { container } = renderWithMessages(
-      <RunPlayer run={runOf({ ...single, prompt: hostile })} quizSlug="road-signs" />,
+      <RunPlayer
+        run={runOf({ ...single, prompt: hostile })}
+        quizSlug="road-signs"
+        signedIn={false}
+      />,
     )
 
     // The payload is on the page as characters, and as nothing else: no
@@ -370,7 +376,12 @@ describe('run player', () => {
 
   it('asks for the comparison only after the final answer of a challenge run', async () => {
     renderWithMessages(
-      <RunPlayer run={runOf(single)} quizSlug="road-signs" challenge={{ opponentName: 'Ada' }} />,
+      <RunPlayer
+        run={runOf(single)}
+        quizSlug="road-signs"
+        signedIn={false}
+        challenge={{ opponentName: 'Ada' }}
+      />,
     )
 
     // First answer of two: the run is not finished, so the opponent's score is
@@ -396,7 +407,12 @@ describe('run player', () => {
     fetchChallengeComparisonAction.mockRejectedValueOnce(new Error('fetch failed'))
     submitAnswerAction.mockResolvedValue({ ok: true, result: resultOf({ next: null, summary }) })
     renderWithMessages(
-      <RunPlayer run={runOf(single)} quizSlug="road-signs" challenge={{ opponentName: 'Ada' }} />,
+      <RunPlayer
+        run={runOf(single)}
+        quizSlug="road-signs"
+        signedIn={false}
+        challenge={{ opponentName: 'Ada' }}
+      />,
     )
 
     await userEvent.click(option('Warning'))
@@ -456,6 +472,7 @@ describe('run player', () => {
       <RunPlayer
         run={runOf(second)}
         quizSlug="road-signs"
+        signedIn={false}
         resumed={{ answered: 1, history: [priorStroke] }}
       />,
     )
@@ -506,7 +523,11 @@ describe('run player', () => {
     vi.useFakeTimers()
     try {
       renderWithMessages(
-        <RunPlayer run={runOf(multi, { timePerQuestionSec: 5 })} quizSlug="road-signs" />,
+        <RunPlayer
+          run={runOf(multi, { timePerQuestionSec: 5 })}
+          quizSlug="road-signs"
+          signedIn={false}
+        />,
       )
 
       // fireEvent rather than userEvent: userEvent's own waits and the fake

@@ -174,6 +174,7 @@ export function RunStartPanel({
         resumed={started.resumed}
         onPlayAgain={startFresh}
         pathNext={pathNext}
+        signedIn={!askNickname}
       />
     )
   }
@@ -186,6 +187,7 @@ export function RunStartPanel({
         reviewed={started.history}
         onPlayAgain={startFresh}
         pathNext={pathNext}
+        signedIn={!askNickname}
       />
     )
   }

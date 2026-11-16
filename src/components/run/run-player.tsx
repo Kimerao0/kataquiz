@@ -73,6 +73,8 @@ type RunPlayerProps = {
   onPlayAgain?: () => Promise<ReplayError | null>
   /** Handed straight to the summary; never set on a challenge run. */
   pathNext?: PathPlacement[]
+  /** Handed straight to the summary, which links signed-in players to My mistakes. */
+  signedIn: boolean
 }
 
 /** '1'–'9' to a zero-based option index. Zero is skipped: it misfires. */
@@ -99,6 +101,7 @@ export function RunPlayer({
   resumed,
   onPlayAgain,
   pathNext = [],
+  signedIn,
 }: RunPlayerProps) {
   const t = useTranslations('run')
   const tCommon = useTranslations('common')
@@ -374,6 +377,7 @@ export function RunPlayer({
         reviewed={reviewed}
         onPlayAgain={onPlayAgain}
         pathNext={pathNext}
+        signedIn={signedIn}
       />
     )
   }

@@ -23,7 +23,13 @@ const theirs: RunSummaryData = {
 
 function renderSummary(comparison?: ComparisonState) {
   return renderWithMessages(
-    <RunSummary summary={mine} quizSlug="road-signs" comparison={comparison} reviewed={[]} />,
+    <RunSummary
+      summary={mine}
+      quizSlug="road-signs"
+      comparison={comparison}
+      reviewed={[]}
+      signedIn={false}
+    />,
   )
 }
 
@@ -143,7 +149,13 @@ describe('run summary with a comparison', () => {
 describe('run summary play again', () => {
   function renderReplay(onPlayAgain?: () => Promise<ReplayError | null>) {
     return renderWithMessages(
-      <RunSummary summary={mine} quizSlug="road-signs" reviewed={[]} onPlayAgain={onPlayAgain} />,
+      <RunSummary
+        summary={mine}
+        quizSlug="road-signs"
+        reviewed={[]}
+        onPlayAgain={onPlayAgain}
+        signedIn={false}
+      />,
     )
   }
 
@@ -265,7 +277,13 @@ describe('run summary path suggestion', () => {
 
   it('shows the next step after a finished run', () => {
     renderWithMessages(
-      <RunSummary summary={mine} quizSlug="road-signs" reviewed={[]} pathNext={[step3]} />,
+      <RunSummary
+        summary={mine}
+        quizSlug="road-signs"
+        reviewed={[]}
+        pathNext={[step3]}
+        signedIn={false}
+      />,
     )
 
     expect(
@@ -278,10 +296,45 @@ describe('run summary path suggestion', () => {
     ['is omitted', undefined],
   ])('shows nothing about paths when pathNext %s', (_, pathNext) => {
     renderWithMessages(
-      <RunSummary summary={mine} quizSlug="road-signs" reviewed={[]} pathNext={pathNext} />,
+      <RunSummary
+        summary={mine}
+        quizSlug="road-signs"
+        reviewed={[]}
+        pathNext={pathNext}
+        signedIn={false}
+      />,
     )
 
     expect(screen.queryByText(/Next in/)).not.toBeInTheDocument()
     expect(screen.queryByText(/Last step of/)).not.toBeInTheDocument()
+  })
+})
+
+describe('run summary review link', () => {
+  function renderWith(signedIn: boolean, summary: RunSummaryData) {
+    return renderWithMessages(
+      <RunSummary summary={summary} quizSlug="road-signs" reviewed={[]} signedIn={signedIn} />,
+    )
+  }
+
+  it('links a signed-in player with mistakes to My mistakes', () => {
+    renderWith(true, mine)
+
+    expect(screen.getByRole('link', { name: /review in my mistakes/i })).toHaveAttribute(
+      'href',
+      '/mistakes',
+    )
+  })
+
+  it('hides the link from a guest with mistakes', () => {
+    renderWith(false, mine)
+
+    expect(screen.queryByRole('link', { name: /review in my mistakes/i })).not.toBeInTheDocument()
+  })
+
+  it('hides the link from a signed-in player with no mistakes', () => {
+    renderWith(true, { ...mine, errors: 0 })
+
+    expect(screen.queryByRole('link', { name: /review in my mistakes/i })).not.toBeInTheDocument()
   })
 })

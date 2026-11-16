@@ -136,6 +136,7 @@ export function ChallengeInvitePanel({
         quizSlug={quizSlug}
         challenge={{ opponentName }}
         resumed={started.resumed}
+        signedIn={!askNickname}
       />
     )
   }

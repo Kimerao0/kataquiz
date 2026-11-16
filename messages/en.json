@@ -93,6 +93,7 @@
   },
   "run": {
     "title": "Ready to drill",
+    "reviewMistakes": "Review in My mistakes",
     "nicknameLabel": "Nickname",
     "nicknamePlaceholder": "How should we call you?",
     "nicknameHint": "Optional, and only used on challenges you share.",

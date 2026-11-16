@@ -44,6 +44,8 @@ type RunSummaryProps = {
   onPlayAgain?: () => Promise<ReplayError | null>
   /** The next step of each path the quiz is in; never set on a challenge run. */
   pathNext?: PathPlacement[]
+  /** Whether the player has an account, and so a My mistakes page to go to. */
+  signedIn: boolean
 }
 
 export function RunSummary({
@@ -53,6 +55,7 @@ export function RunSummary({
   reviewed,
   onPlayAgain,
   pathNext = [],
+  signedIn,
 }: RunSummaryProps) {
   const t = useTranslations('run')
   // The challenger's own attempt, never the one they were challenged on: the
@@ -104,10 +107,22 @@ export function RunSummary({
           list would be the whole of what the review says. */}
       {reviewed.length > 0 && <RunReview items={reviewed} />}
 
+      {signedIn && summary.errors > 0 && <ReviewMistakesLink />}
+
       <ChallengeLink url={challengeUrl} />
 
       <Actions quizSlug={quizSlug} onPlayAgain={onPlayAgain} />
     </section>
+  )
+}
+
+function ReviewMistakesLink() {
+  const t = useTranslations('run')
+
+  return (
+    <Link href="/mistakes" className="w-fit py-1 text-meta underline underline-offset-4">
+      {t('reviewMistakes')}
+    </Link>
   )
 }
 

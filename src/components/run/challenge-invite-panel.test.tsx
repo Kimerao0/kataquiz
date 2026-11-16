@@ -322,3 +322,52 @@ describe('challenge invite panel', () => {
     expect(screen.queryByText(/Last step of/)).not.toBeInTheDocument()
   })
 })
+
+describe('challenge invite panel review link', () => {
+  // Plays a one-question challenge run to a wrong answer and waits for the
+  // summary, so an absence asserted afterwards is about the summary.
+  async function finishWithError(askNickname: boolean) {
+    const mine = { attemptId: 'attempt-2', score: 0, errors: 1, total: 1, passed: false }
+    submitAnswerAction.mockResolvedValue({
+      ok: true,
+      result: {
+        correct: false,
+        timedOut: false,
+        correctOptionIds: ['o2'],
+        explanation: null,
+        theoryUrl: null,
+        next: null,
+        summary: mine,
+      },
+    })
+    fetchChallengeComparisonAction.mockResolvedValue({
+      ok: true,
+      comparison: {
+        mine,
+        theirs: { attemptId: 'attempt-1', score: 1, errors: 0, total: 1, passed: true },
+      },
+    })
+    renderPanel({ askNickname })
+
+    if (askNickname) await userEvent.type(screen.getByLabelText('Nickname'), 'Bea')
+    await userEvent.click(screen.getByRole('button', { name: 'Take the challenge' }))
+    await userEvent.click(await screen.findByRole('radio', { name: 'Warning' }))
+    await userEvent.click(await screen.findByRole('button', { name: 'See your result' }))
+    await screen.findByText('0 of 1 correct · 1 mistake')
+  }
+
+  it('links a signed-in player to My mistakes after a challenge run with errors', async () => {
+    await finishWithError(false)
+
+    expect(screen.getByRole('link', { name: /review in my mistakes/i })).toHaveAttribute(
+      'href',
+      '/mistakes',
+    )
+  })
+
+  it('shows a guest no link to My mistakes after a challenge run with errors', async () => {
+    await finishWithError(true)
+
+    expect(screen.queryByRole('link', { name: /review in my mistakes/i })).toBeNull()
+  })
+})
