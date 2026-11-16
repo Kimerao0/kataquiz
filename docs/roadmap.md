@@ -126,6 +126,7 @@ Spec: `specs/paths.md` (phase 1, KQ42, live in production since 2026-11-11; arch
 - [ ] KQ53: Tell a guest who made mistakes that signing in keeps them
   KQ52 links a signed-in player's summary to My mistakes; a guest with errors sees nothing in that slot, though guest runs are never kept (`src/lib/mistakes/mistakes.ts`, `wrongAnswersOf`). A "Sign in to keep your mistakes" line there is the natural acquisition hook. Raised by the KQ52 UX review. Done when a guest whose run had errors sees the line on the summary, linking to sign-in with a `next` back to the quiz.
   _run summary in `src/components/run/`, `messages/en.json`_
+  2026-11-16 — built 76517c6, not pushed: decided signing in does not adopt guest runs, so the copy is "Sign in to save mistakes from future runs" (→ /signin?next=/q/<slug>, same tab); /signin intro widened; code + spec + UX reviewed, copy pinned by tests; guest shots on a production build 375–2560; pnpm check green 887/887
 
 ## Tooling — each of these has already cost a wasted cycle
 
