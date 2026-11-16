@@ -121,6 +121,7 @@ Spec: `specs/paths.md` (phase 1, KQ42, live in production since 2026-11-11; arch
 - [ ] KQ52: "My mistakes" has no entry point besides the account menu
   KQ51 moved My mistakes into the account menu, and nothing else in the app links to `/mistakes`, so a new player never meets it by scanning the bar. Add a contextual "Review in My mistakes" link where mistakes are made: the run summary, when the run had wrong answers and the player is signed in. Done when a signed-in player who got something wrong sees the link on the summary (check with `pnpm shots --play summary`).
   _run summary in `src/components/run/`_
+  2026-11-16 — built 0716da3, not pushed: quiet link under the review list when signed in and errors > 0, challenge runs included; reviewed (code), signed-in summary shots on a production build at 375–2560 light+dark; pnpm check green 880/880
 
 ## Tooling — each of these has already cost a wasted cycle
 
